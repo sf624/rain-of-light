@@ -59,13 +59,46 @@ const WEATHER = [
 // Direction: rain falls from above, or now and then flows sideways, each time a new way.
 const FLOWS = [
   { name: 'down',   toward: 0, hold: [20, 40], weight: 3 },
-  { name: 'across', toward: 1, hold: [8, 14],  weight: 1 },
+  { name: 'across', toward: 1, hold: [20, 40], weight: 1 },
 ];
-// Colour: one palette, a gradient between two palettes, or a rainbow.
+// Colour modes. Their order is the order of the weights uW in the shader.
 const COLOR_MODES = [
-  { name: 'mono',     mode: [1, 0, 0], hold: [14, 26], weight: 3 },
-  { name: 'gradient', mode: [0, 1, 0], hold: [14, 24], weight: 2 },
-  { name: 'rainbow',  mode: [0, 0, 1], hold: [10, 18], weight: 1.5 },
+  { name: 'mono',     hold: [14, 26], weight: 3 },   // one palette
+  { name: 'gradient', hold: [14, 24], weight: 2 },   // two palettes, flowing
+  { name: 'rainbow',  hold: [10, 18], weight: 1.5 }, // a random hue per drop
+  { name: 'palette',  hold: [14, 24], weight: 2 },   // each drop picks from a set of colours
+  { name: 'accent',   hold: [14, 24], weight: 1.5 }, // white rain, now and then a coloured drop
+  { name: 'comet',    hold: [12, 20], weight: 1.5 }, // white heads, coloured trails
+  { name: 'speed',    hold: [12, 20], weight: 1 },   // slow drops warm, fast ones blue-white
+  { name: 'cloud',    hold: [16, 28], weight: 2 },   // drifting clouds of colour
+  { name: 'depth',    hold: [12, 20], weight: 1 },   // one colour near, another far
+  { name: 'repaint',  hold: [20, 32], weight: 1.2 }, // each wave paints the field anew
+  { name: 'sky',      hold: [45, 75], weight: 1 },   // dawn, day, dusk and night go by
+];
+COLOR_MODES.forEach((m, i) => { m.mode = COLOR_MODES.map((_, k) => (k === i ? 1 : 0)); });
+const MODE = Object.fromEntries(COLOR_MODES.map((m, i) => [m.name, i]));
+
+// Sets of colours for the palette rain.
+const SETS = [
+  { name: 'pastel', c: [[1.0, 0.62, 0.75], [0.62, 0.85, 1.0], [0.72, 1.0, 0.72], [1.0, 0.92, 0.6]] },
+  { name: 'neon',   c: [[1.0, 0.1, 0.6], [0.1, 0.9, 1.0], [0.7, 1.0, 0.1], [0.6, 0.2, 1.0]] },
+  { name: 'wa',     c: [[0.93, 0.25, 0.15], [0.15, 0.3, 0.85], [1.0, 0.72, 0.1], [0.45, 0.8, 0.35]] },
+  { name: 'sunset', c: [[1.0, 0.35, 0.1], [1.0, 0.62, 0.2], [0.9, 0.2, 0.45], [0.55, 0.25, 0.9]] },
+  { name: 'ocean',  c: [[0.1, 0.4, 1.0], [0.2, 0.9, 0.9], [0.6, 0.9, 1.0], [0.15, 0.95, 0.6]] },
+];
+const ACCENTS = [[1.0, 0.68, 0.12], [1.0, 0.15, 0.1], [0.1, 0.85, 1.0], [1.0, 0.2, 0.8], [0.4, 1.0, 0.3]];
+const DEPTHS = [                                       // near, far
+  [[1.0, 0.55, 0.15], [0.1, 0.3, 1.0]],
+  [[1.0, 0.35, 0.55], [0.1, 0.85, 0.8]],
+  [[1.0, 0.85, 0.3], [0.55, 0.2, 1.0]],
+  [[0.3, 1.0, 0.6], [0.2, 0.35, 1.0]],
+];
+// The sky through one day: colour at the top, colour at the bottom.
+const SKY = [
+  [[0.35, 0.35, 0.95], [1.0, 0.55, 0.45]],  // dawn
+  [[0.45, 0.75, 1.0], [0.92, 0.96, 1.0]],   // day
+  [[0.6, 0.25, 0.85], [1.0, 0.45, 0.12]],   // dusk
+  [[0.08, 0.15, 0.65], [0.35, 0.45, 0.95]], // night
 ];
 
 // ---------- tunable settings (panel: p key or the gear button; also ?key=value) ----------
@@ -76,6 +109,7 @@ const DEFAULTS = {
   rainGain: 4.0, tipGain: 5.0, exposure: 1.5, bloom: 0.4, fog: 22,
   speed: 1.0, trail: 1.0, weather: 'auto', turnTime: 8, turnSteps: 9,
   color: 'auto', palette: 'auto', rainbow: 'drop', bandSpeed: 0.17, bandScale: 1.0, saturation: 1.0,
+  set: 'auto', skyDay: 90, lightning: 'downpour',
   flow: 'auto',
   camera: 'orbit', orbit: 0.025, radius: 7.5, fov: 60,
   ripples: 9,
@@ -117,13 +151,20 @@ const SCHEMA = [
     { key: 'turnSteps', label: '回転の段数 (1でクロスフェード)', min: 1, max: 18, step: 1 },
   ] },
   { title: '色', items: [
-    { key: 'color', label: '色の出し方', options: ['auto', 'mono', 'gradient', 'rainbow'] },
+    { key: 'color', label: '色の出し方', options: ['auto', ...COLOR_MODES.map((m) => m.name)],
+      hint: 'mono 単色 / gradient 流れるグラデーション / rainbow 虹 / palette 色の組からしずくごと / '
+        + 'accent 白い雨にときどき色 / comet 白い先頭と色の尾 / speed 速さで色分け / cloud 漂う色の雲 / '
+        + 'depth 手前と奥 / repaint 波紋で塗り替え / sky 空の一日' },
     { key: 'rainbow', label: '虹の色の付け方', options: ['drop', 'led', 'bands'],
       hint: 'drop: しずくごとにランダム / led: LEDごとにランダム / bands: 流れる帯' },
     { key: 'palette', label: 'パレット', options: ['auto', ...PALETTES.map((p) => p.name)] },
     { key: 'bandSpeed', label: '色の流れる速さ', min: 0, max: 0.8, step: 0.01 },
     { key: 'bandScale', label: '色の帯の細かさ', min: 0.1, max: 4, step: 0.05 },
     { key: 'saturation', label: '彩度 (虹)', min: 0, max: 1, step: 0.01 },
+    { key: 'set', label: '色の組 (palette)', options: ['auto', ...SETS.map((x) => x.name)] },
+    { key: 'skyDay', label: '空の一日 (秒, sky)', min: 20, max: 600, step: 5 },
+    { key: 'lightning', label: '稲光', options: ['downpour', 'off'],
+      hint: 'downpour: 豪雨のときに光る / off: 光らない / l キーでいつでも' },
   ] },
   { title: 'カメラ', items: [
     { key: 'camera', label: '動き', options: ['auto', 'orbit', 'walk', 'spin', 'gaze', 'rise'],
@@ -155,7 +196,16 @@ uniform float uFocal;
 uniform float uSize;
 uniform float uFlow;  // falling time: integrated, so speed changes never make drops jump
 uniform float uRain;  // 0 light rain .. 1 downpour
-uniform vec3 uMode;  // weights of mono, gradient, rainbow
+uniform float uW[11]; // weights of the colour modes, in the order of COLOR_MODES
+uniform vec3 uSet[4];  // palette rain: the colours drops pick from
+uniform vec3 uAccent;  // accent: the colour of the rare drop
+uniform vec3 uNear;    // depth: colour near the eye
+uniform vec3 uFar;     // depth: colour far away
+uniform float uCloudHue; // colour clouds: base hue
+uniform vec3 uSky0;    // sky: colour at the top
+uniform vec3 uSky1;    // sky: colour at the bottom
+uniform float uFlowRate; // how fast the rain falls now (weather)
+uniform float uFlash;  // lightning, 0 .. 1
 uniform vec3 uGrad0;
 uniform vec3 uGrad1;
 uniform float uTurn;       // 0 rain falls down .. 1 light flows sideways
@@ -181,6 +231,14 @@ out vec3 vColor;
 out float vSize;
 
 float hash(float n) { return fract(sin(n * 127.1 + 311.7) * 43758.5453); }
+float hash3(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+float noise3(vec3 p) {
+  vec3 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  vec2 e = vec2(1.0, 0.0);
+  return mix(mix(mix(hash3(i), hash3(i + e.xyy), f.x), mix(hash3(i + e.yxy), hash3(i + e.xxy), f.x), f.y),
+             mix(mix(hash3(i + e.yyx), hash3(i + e.xyx), f.x), mix(hash3(i + e.yxx), hash3(i + e.xxx), f.x), f.y), f.z);
+}
 
 vec3 hsv2rgb(vec3 c) {
   vec3 p = abs(fract(c.xxx + vec3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0);
@@ -199,7 +257,49 @@ vec3 flowColor(float along, float spatial, float h) {
   vec3 mono = mix(uColA, uColB, h);
   vec3 grad = mix(uGrad0, uGrad1, 0.5 + 0.5 * sin(phase * 6.2832 * 0.9 * uBandScale));
   vec3 bow = uBowStyle < 0.5 ? bowAt(phase * 0.7 * uBandScale) : vec3(0.0);
-  return mono * uMode.x + grad * uMode.y + bow * uMode.z;
+  return mono * uW[0] + grad * uW[1] + bow * uW[2];
+}
+
+// Colours of the field itself, whatever the flow: drifting clouds of colour,
+// near and far, the colour the last wave painted, and the sky.
+vec3 placeColor(vec3 pos, float u, float dist) {
+  vec3 c = vec3(0.0);
+  if (uW[7] > 0.001) {
+    vec3 drift = vec3(uTime * 0.35, uTime * 0.04, uTime * 0.18);
+    float n = noise3(pos * 0.14 + drift) * 0.7 + noise3(pos * 0.37 - drift * 0.6) * 0.3;
+    c += hsv2rgb(vec3(fract(uCloudHue + smoothstep(0.3, 0.7, n) * 0.4), 0.85, 1.0)) * 1.3 * uW[7];
+  }
+  if (uW[8] > 0.001) c += mix(uNear, uFar, smoothstep(2.5, uFogFar * 0.7, dist)) * uW[8];
+  if (uW[9] > 0.001) {
+    float last = -1e9;                       // the latest wave that has passed this LED
+    for (int i = 0; i < 8; i++) {
+      vec4 r = uRipples[i];
+      float age = uTime - r.w;
+      if (age > 0.0 && r.w > last && length(pos - r.xyz) < age * 3.6) last = r.w;
+    }
+    c += hsv2rgb(vec3(hash(last * 0.731), 0.8, 1.0)) * 1.3 * uW[9];
+  }
+  if (uW[10] > 0.001) c += mix(uSky0, uSky1, u) * uW[10];
+  return c;
+}
+
+// The colour a drop keeps as it flows, from its number (sd, cycle).
+vec3 dropColor(float sd, float cycle) {
+  float r = hash(sd + cycle * 13.37);
+  vec3 c = vec3(0.0);
+  if (uW[2] > 0.001 && uBowStyle > 0.5 && uBowStyle < 1.5) c += bowAt(r) * uW[2];
+  if (uW[3] > 0.001) c += uSet[int(min(r * 4.0, 3.0))] * 1.2 * uW[3];
+  if (uW[4] > 0.001) {
+    bool rare = hash(sd + cycle * 7.13 + 3.1) < 0.1;
+    c += (rare ? uAccent * 2.3 : vec3(0.9, 0.93, 1.0)) * uW[4];
+  }
+  if (uW[6] > 0.001) {
+    // Slow drops glow warm, fast ones blue-white; a downpour turns it all pale.
+    float s = clamp(pow(hash(sd + 1.0), 1.5) * 0.8 + (uFlowRate - 1.0) * 0.25, 0.0, 1.0);
+    c += (s < 0.5 ? mix(vec3(1.0, 0.32, 0.08), vec3(1.0, 0.88, 0.7), s * 2.0)
+                  : mix(vec3(1.0, 0.88, 0.7), vec3(0.5, 0.78, 1.0), s * 2.0 - 1.0)) * 1.2 * uW[6];
+  }
+  return c;
 }
 
 // One drop runs along a line of LEDs (u: 0 start .. 1 end), then waits past the
@@ -218,13 +318,16 @@ vec4 drop(float sd, float u, float trailK) {
 
 // Light gathered from several drops, with each drop's own random hue.
 struct Lit { float rain; float tip; vec3 rainCol; vec3 tipCol; };
+// Comet: a white head whose trail deepens into the palette colour.
+const vec3 HEAD = vec3(1.0, 0.97, 0.92);
 void gather(inout Lit L, vec4 r, float sd, float w) {
-  vec3 now = bowAt(hash(sd + r.w * 13.37));
-  vec3 before = bowAt(hash(sd + (r.w - 1.0) * 13.37));
+  vec3 now = dropColor(sd, r.w);
+  vec3 before = dropColor(sd, r.w - 1.0);
+  vec3 tail = uColA * 1.2 * uW[5];
   L.rain += (r.x + r.y) * w;
   L.tip += r.z * w;
-  L.rainCol += (now * r.x + before * r.y) * w;
-  L.tipCol += now * r.z * w;
+  L.rainCol += ((now + mix(tail, HEAD * uW[5], r.x * r.x)) * r.x + (before + tail) * r.y) * w;
+  L.tipCol += (now + HEAD * uW[5]) * r.z * w;
 }
 
 // The rain on one strand: two drops at their own pace; in heavy rain two more
@@ -263,6 +366,8 @@ void main() {
   vec3 pos = vec3(aData.x, (0.5 - u) * uHeight, aData.z);
   float h = hash(seed + 5.0);
   float spatial = (pos.x + pos.z) * 0.012;           // bands lean a little across the field
+  vec4 mv = uView * vec4(pos, 1.0);
+  float dist = -mv.z;
   Lit L = Lit(0.0, 0.0, vec3(0.0), vec3(0.0));
 
   // The flow turns from straight down to sideways in uTurnSteps steps; each
@@ -286,16 +391,17 @@ void main() {
   }
   float rain = L.rain;
   float tip = L.tip;
+  col += placeColor(pos, u, dist);
 
-  // The rainbow per drop (each drop keeps one random hue as it flows) or per
-  // LED (each LED has its own hue, shown as the light passes).
-  vec3 rainCol = col, tipCol = col, restCol = col;
-  if (uBowStyle > 0.5) {
-    vec3 led = bowAt(hash(seed * 0.37 + u * 91.7));
-    bool perDrop = uBowStyle < 1.5;
-    rainCol += uMode.z * (perDrop && rain > 1e-4 ? L.rainCol / rain : led);
-    tipCol += uMode.z * (perDrop && tip > 1e-4 ? L.tipCol / tip : led);
-    restCol += uMode.z * led;
+  // Colours that travel with each drop. An LED at rest shows one of its own.
+  vec3 restDrop = dropColor(seed * 0.37 + u * 91.7, 0.0) + uColA * 1.2 * uW[5];
+  vec3 rainCol = col + (rain > 1e-4 ? L.rainCol / rain : restDrop);
+  vec3 tipCol = col + (tip > 1e-4 ? L.tipCol / tip : restDrop);
+  vec3 restCol = col + restDrop;
+  // The rainbow per LED: each LED has its own hue, shown as the light passes.
+  if (uBowStyle > 1.5) {
+    vec3 led = bowAt(hash(seed * 0.37 + u * 91.7)) * uW[2];
+    rainCol += led; tipCol += led; restCol += led;
   }
 
   // Spherical waves of light.
@@ -309,14 +415,16 @@ void main() {
     ring += exp(-x * x * 1.8) * fade * fade;
   }
 
-  // Heads turn white, except in the rainbow, where they keep their colour.
-  float white = mix(0.75, 0.15, uMode.z);
+  // Heads turn white in most modes; in the colourful ones they keep their colour.
+  const float WHITE[11] = float[11](0.75, 0.75, 0.15, 0.2, 0.3, 0.0, 0.3, 0.35, 0.5, 0.3, 0.5);
+  float white = 0.0;
+  for (int i = 0; i < 11; i++) white += WHITE[i] * uW[i];
   vec3 c = restCol * uRest + rainCol * rain * uRainGain
          + mix(tipCol, vec3(1.0), white) * tip * uTipGain
          + mix(restCol, vec3(1.0), 0.35) * ring * 1.6;
+  // Lightning lights the whole field for a moment, most at the top.
+  c += vec3(0.8, 0.87, 1.0) * uFlash * mix(1.0, 0.35, u);
 
-  vec4 mv = uView * vec4(pos, 1.0);
-  float dist = -mv.z;
   float fog = 1.0 - smoothstep(uFogFar * 0.3, uFogFar, dist);
   c *= fog;
 
@@ -643,6 +751,7 @@ addEventListener('keydown', (e) => {
   if (e.key === 'c') step('color', COLOR_MODES); // next colour
   if (e.key === 'd') step('flow', FLOWS);        // switch direction
   if (e.key === 'v') step('camera', CAMERAS);    // next camera move
+  if (e.key === 'l') strike(time);               // lightning now
 });
 // A key moves on at random while the setting is auto, else to the next choice.
 function step(key, list) {
@@ -659,6 +768,8 @@ function hideOverlay() {
 }
 
 let time = Number(params.get('t')) || 0;
+let nextAuto = 2;   // the next automatic wave
+let look = null;    // the look now, easing towards the goal (set up below)
 
 // ---------- director: weather and colour change on their own ----------
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -683,7 +794,16 @@ let densityUntil = 0;
 let flowDir = [0, 1];
 // Turning between falling (0) and sideways (1): from, to, progress 0..1, now.
 let turnFrom = 0, turnTo = 0, turnP = 1, turnNow = 0;
-const goal = { mode: [1, 0, 0], a: PALETTES[0].a, b: PALETTES[0].b, g0: PALETTES[0].a, g1: PALETTES[1].b };
+const goal = {
+  mode: COLOR_MODES[0].mode, a: PALETTES[0].a, b: PALETTES[0].b, g0: PALETTES[0].a, g1: PALETTES[1].b,
+  s0: SETS[0].c[0], s1: SETS[0].c[1], s2: SETS[0].c[2], s3: SETS[0].c[3],
+  acc: ACCENTS[0], near: DEPTHS[0][0], far: DEPTHS[0][1], cloud: [0, 0, 0],
+};
+// Colours that belong to one mode; they change at once while that mode is unseen.
+const OWN = { s0: 'palette', s1: 'palette', s2: 'palette', s3: 'palette', acc: 'accent',
+  near: 'depth', far: 'depth', cloud: 'cloud' };
+const EASED = Object.keys(goal);
+const pickOf = (list) => list[Math.floor(Math.random() * list.length)];
 
 // A setting other than auto holds its choice until it is changed.
 const forced = (key) => (S[key] === 'auto' ? undefined : S[key]);
@@ -771,7 +891,45 @@ function nextColor(now) {
   colorUntil = forced('color') ? Infinity : now + rand(...colorMode.hold);
   const p = PALETTES.find((x) => x.name === S.palette) || pickPalette();
   const q = pickPalette(p);
-  Object.assign(goal, { mode: colorMode.mode, a: p.a, b: p.b, g0: p.a, g1: q.b });
+  const set = SETS.find((x) => x.name === S.set) || pickOf(SETS);
+  const depth = pickOf(DEPTHS);
+  Object.assign(goal, {
+    mode: colorMode.mode, a: p.a, b: p.b, g0: p.a, g1: q.b,
+    s0: set.c[0], s1: set.c[1], s2: set.c[2], s3: set.c[3],
+    acc: pickOf(ACCENTS), near: depth[0], far: depth[1], cloud: [Math.random(), 0, 0],
+  });
+  if (!look) return;
+  for (const [key, mode] of Object.entries(OWN)) {
+    if (look.mode[MODE[mode]] < 0.05) look[key] = [...goal[key]];
+  }
+  if (colorMode.name === 'repaint') nextAuto = Math.min(nextAuto, now + 1.5); // a first wave soon
+}
+
+// Lightning: two or three quick flashes, now and then in a downpour.
+let flashes = [], nextFlash = 0;
+function strike(now) {
+  flashes = [[now, 1]];
+  let t = now;
+  for (let i = 0, n = 1 + Math.floor(Math.random() * 2); i < n; i++) {
+    t += rand(0.07, 0.2);
+    flashes.push([t, rand(0.4, 0.9)]);
+  }
+  nextFlash = now + rand(5, 14);
+}
+function flashAt(now) {
+  if (S.lightning !== 'off' && look.rain > 0.8 && now > nextFlash) strike(now);
+  let f = 0;
+  for (const [t0, amp] of flashes) if (now >= t0) f += amp * Math.exp(-(now - t0) * 11);
+  return f;
+}
+
+// The sky's colours at this moment of its day.
+let skyClock = Math.random();
+function skyColors() {
+  const x = skyClock * SKY.length;
+  const i = Math.floor(x) % SKY.length, j = (i + 1) % SKY.length, k = smooth(x - Math.floor(x));
+  const lerp = (a, b) => a.map((v, n) => v + (b[n] - v) * k);
+  return [lerp(SKY[i][0], SKY[j][0]), lerp(SKY[i][1], SKY[j][1])];
 }
 
 // Start calm (light rain, one colour, falling) unless a setting says otherwise.
@@ -795,7 +953,7 @@ function apply(key) {
   if (key === 'flow') nextFlow(time);
   if (key === 'camera') nextCamera(time);
   if (['density', 'strandShare', 'rowShare', 'strandMin', 'rowMin'].includes(key)) nextDensity(time);
-  if (key === 'color' || key === 'palette') nextColor(time);
+  if (key === 'color' || key === 'palette' || key === 'set') nextColor(time);
 }
 if (S.density === 'manual') nextDensity(0); else densityUntil = rand(12, 20);
 if (forced('camera')) {
@@ -807,12 +965,12 @@ const tuner = createTuner({
   schema: SCHEMA, settings: S, defaults: DEFAULTS, storageKey: STORAGE_KEY,
   onChange: (key) => apply(key),
 });
-const look = {
+look = {
   flow: Number(params.get('t')) || 0,
   flowRate: weather.flow, rain: weather.rain,
   density: [S.density === 'manual' ? S.strandShare : 1, S.density === 'manual' ? S.rowShare : 1],
-  mode: [...goal.mode], a: [...goal.a], b: [...goal.b], g0: [...goal.g0], g1: [...goal.g1],
 };
+for (const key of EASED) look[key] = [...goal[key]];
 
 // Ease the current look towards the targets, over about tau seconds.
 function ease(dt) {
@@ -824,15 +982,15 @@ function ease(dt) {
   turnNow = turnFrom + (turnTo - turnFrom) * smooth(turnP);
   const kd = 1 - Math.exp(-dt / 5.0); // density drifts slowly
   for (let i = 0; i < 2; i++) look.density[i] += (densityGoal[i] - look.density[i]) * kd;
-  for (const key of ['mode', 'a', 'b', 'g0', 'g1']) {
-    for (let i = 0; i < 3; i++) look[key][i] += (goal[key][i] - look[key][i]) * kc;
+  for (const key of EASED) {
+    for (let i = 0; i < goal[key].length; i++) look[key][i] += (goal[key][i] - look[key][i]) * kc;
   }
+  skyClock = (skyClock + dt / Math.max(1, S.skyDay)) % 1;
   look.flow += dt * look.flowRate * SPEED * S.speed;
 }
 
 // ---------- frame ----------
 let last = performance.now();
-let nextAuto = 2;
 
 function frame(now) {
   const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)); // rAF time may precede `last`
@@ -877,7 +1035,9 @@ function frame(now) {
   if (S.ripples > 0 && time > nextAuto) {
     addRipple((Math.random() - 0.5) * SPAN * 0.6, (Math.random() - 0.5) * HEIGHT * 0.5,
       (Math.random() - 0.5) * SPAN * 0.6, time);
-    nextAuto = time + S.ripples * (0.7 + Math.random() * 0.6);
+    // While waves repaint the field, they come more often.
+    const every = colorMode.name === 'repaint' ? Math.min(S.ripples, 6) : S.ripples;
+    nextAuto = time + every * (0.7 + Math.random() * 0.6);
   }
 
   if (time > weatherUntil) nextWeather(time);
@@ -919,7 +1079,17 @@ function frame(now) {
   gl.uniform2fv(u.uFlowDir, flowDir);
   gl.uniform2f(u.uLane, SPAN / (GRID - 1), HEIGHT / ROWS);
   gl.uniform1f(u.uSpan, SPAN);
-  gl.uniform3fv(u.uMode, look.mode);
+  gl.uniform1fv(u.uW, look.mode);
+  gl.uniform3fv(u.uSet, [...look.s0, ...look.s1, ...look.s2, ...look.s3]);
+  gl.uniform3fv(u.uAccent, look.acc);
+  gl.uniform3fv(u.uNear, look.near);
+  gl.uniform3fv(u.uFar, look.far);
+  gl.uniform1f(u.uCloudHue, look.cloud[0]);
+  const [sky0, sky1] = skyColors();
+  gl.uniform3fv(u.uSky0, sky0);
+  gl.uniform3fv(u.uSky1, sky1);
+  gl.uniform1f(u.uFlowRate, look.flowRate);
+  gl.uniform1f(u.uFlash, flashAt(time));
   gl.uniform3fv(u.uGrad0, look.g0);
   gl.uniform3fv(u.uGrad1, look.g1);
   gl.uniform1f(u.uFogFar, S.fog);
