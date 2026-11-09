@@ -126,10 +126,14 @@ function wake() {
 }
 wake();
 
+// The view follows the pointer, except over the settings panel and the
+// buttons: there the view holds still while you tune.
+const STILL = '.tuner, .tuner-toggle, .sound-toggle, .full-toggle, .volume-bar';
 addEventListener('pointermove', (e) => {
+  wake();
+  if (e.target instanceof Element && e.target.closest(STILL)) return;
   pointer.x = e.clientX / innerWidth - 0.5;
   pointer.y = e.clientY / innerHeight - 0.5;
-  wake();
 });
 addEventListener('pointerdown', wake);
 addEventListener('keydown', wake);
