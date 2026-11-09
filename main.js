@@ -54,6 +54,14 @@ const S = loadSettings(DEFAULTS, STORAGE_KEY, params);
 // A saved or linked choice that no longer exists falls back to its default.
 for (const item of SCHEMA.flatMap((g) => g.items)) {
   if (item.options && !item.options.includes(S[item.key])) S[item.key] = DEFAULTS[item.key];
+  // A number out of range (or none) falls back to its default and is clamped.
+  if (item.options === undefined) {
+    let v = Number(S[item.key]);
+    if (!Number.isFinite(v)) v = DEFAULTS[item.key];
+    v = Math.min(item.max, Math.max(item.min, v));
+    if (item.key === 'ripples' && v > 0) v = Math.max(1, v); // 0 is none; else at least 1 s
+    S[item.key] = v;
+  }
 }
 const fovRad = () => S.fov * Math.PI / 180;
 
