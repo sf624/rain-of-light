@@ -1,6 +1,6 @@
 // Rain of Light: a lattice of light points with drops of light falling through it.
-// Plain WebGL2, no dependencies. Points are drawn additively into a half-float
-// buffer, then blurred for bloom and tone-mapped onto the screen.
+// Plain WebGL2, no dependencies. Points are drawn as opaque discs (with a depth
+// test) into a half-float buffer, then blurred for bloom and tone-mapped onto the screen.
 
 import { createTuner, loadSettings } from './tuner.js';
 import { createAudio } from './audio.js';
@@ -11,7 +11,7 @@ import {
 } from './config.js';
 import { FLOW_WRAP, POINT_VS, POINT_FS, QUAD_VS, DOWN_FS, BLUR_FS, COMPOSITE_FS } from './shaders.js';
 import { createGL, sub, cross, dot, norm, perspective, lookAt } from './gl.js';
-import { createLattice, buildLattice as fillLattice } from './lattice.js';
+import { createLattice, fillLattice } from './lattice.js';
 import { createControls } from './controls.js';
 
 // Errors show on the page (see the inline script in index.html), so a black screen is never silent.
@@ -105,7 +105,6 @@ function addRipple(x, y, z, t) {
   sound.ripple(pan);
 }
 
-// ---------- sound: on unless turned off; browsers let it start only with the first click or key ----------
 const sound = createAudio({ settings: S });
 const controls = createControls({
   sound, S,
@@ -397,6 +396,8 @@ function ease(dt) {
 // ---------- frame ----------
 let last = performance.now();
 
+let checked = false;
+
 function frame(now) {
   const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)); // rAF time may precede `last`
   last = now;
@@ -525,16 +526,14 @@ function frame(now) {
     // Blur once in each direction: a faint glow that keeps the LEDs crisp.
     gl.useProgram(blurProg.p);
     gl.uniform1i(blurProg.u.uTex, 0);
-    for (let i = 0; i < 1; i++) {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, bloomB.fb);
-      gl.bindTexture(gl.TEXTURE_2D, bloomA.tex);
-      gl.uniform2f(blurProg.u.uDir, 1 / bloomA.w, 0);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, bloomA.fb);
-      gl.bindTexture(gl.TEXTURE_2D, bloomB.tex);
-      gl.uniform2f(blurProg.u.uDir, 0, 1 / bloomA.h);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, bloomB.fb);
+    gl.bindTexture(gl.TEXTURE_2D, bloomA.tex);
+    gl.uniform2f(blurProg.u.uDir, 1 / bloomA.w, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, bloomA.fb);
+    gl.bindTexture(gl.TEXTURE_2D, bloomB.tex);
+    gl.uniform2f(blurProg.u.uDir, 0, 1 / bloomA.h);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
     // Composite to the screen.
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, W, H);
@@ -546,7 +545,7 @@ function frame(now) {
     gl.uniform1i(compProg.u.uScene, 0);
     gl.uniform1i(compProg.u.uBloom, 1);
     gl.uniform1f(compProg.u.uBloomK, S.bloom);
-  gl.uniform1f(compProg.u.uExposure, S.exposure * glow);
+    gl.uniform1f(compProg.u.uExposure, S.exposure * glow);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
@@ -559,7 +558,6 @@ function frame(now) {
   frameId = requestAnimationFrame(frame);
 }
 
-let checked = false;
 let frameId = requestAnimationFrame(frame);
 
 // A lost context stops the loop; when the browser gives it back, start afresh.

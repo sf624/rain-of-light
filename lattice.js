@@ -30,7 +30,7 @@ function bitReverse(n, bits) {
 }
 
 // Fills the buffers from the settings S and returns the sizes drawn.
-export function buildLattice(gl, { pointBuf, rankBuf }, S, SPAN) {
+export function fillLattice(gl, { pointBuf, rankBuf }, S, SPAN) {
   const GRID = Math.max(2, Math.round(S.grid));
   const ROWS = Math.max(2, Math.round(S.rows));
   const count = GRID * GRID * ROWS;

@@ -139,7 +139,7 @@ export const SCHEMA = [
     { key: 'skyDay', label: 'Length of a day (s, sky)', min: 20, max: 600, step: 5 },
   ] },
   { title: 'Camera', items: [
-    { key: 'camera', label: 'Move', options: ['auto', 'orbit', 'walk', 'spin', 'gaze', 'rise'],
+    { key: 'camera', label: 'Move', options: ['auto', ...CAMERAS.map((c) => c.name)],
       hint: 'orbit: circle the field / walk: wander through it / spin: look around from the centre / gaze: look up and down / rise: drift up and down' },
     { key: 'orbit', label: 'Move speed', min: 0, max: 0.2, step: 0.005 },
     { key: 'radius', label: 'Distance from the centre', min: 0, max: 10, step: 0.1 },
