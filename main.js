@@ -119,62 +119,63 @@ const STORAGE_KEY = 'rain-of-light:settings';
 const S = loadSettings(DEFAULTS, STORAGE_KEY, params);
 
 const SCHEMA = [
-  { title: '密度', items: [
-    { key: 'grid', label: '糸の本数 (一辺, 最大)', min: 8, max: 160, step: 1 },
-    { key: 'rows', label: '1本の粒の数 (最大)', min: 8, max: 256, step: 1 },
-    { key: 'layout', label: '配置', options: ['strands', 'scatter'],
-      hint: 'strands: 糸に沿って並ぶ / scatter: 糸1本分の幅の中にランダムに散らばる' },
-    { key: 'density', label: '密度の変化', options: ['auto', 'manual'],
-      hint: 'auto: 下限から最大の間でゆっくり変わる / manual: 下の割合で固定' },
-    { key: 'strandShare', label: '糸の割合 (manual)', min: 0.02, max: 1, step: 0.01 },
-    { key: 'rowShare', label: '粒の割合 (manual)', min: 0.02, max: 1, step: 0.01 },
-    { key: 'strandMin', label: '糸の割合の下限 (auto)', min: 0.02, max: 1, step: 0.01 },
-    { key: 'rowMin', label: '粒の割合の下限 (auto)', min: 0.02, max: 1, step: 0.01 },
+  { title: 'Density', items: [
+    { key: 'grid', label: 'Strands per side (max)', min: 8, max: 160, step: 1 },
+    { key: 'rows', label: 'LEDs per strand (max)', min: 8, max: 256, step: 1 },
+    { key: 'layout', label: 'Layout', options: ['strands', 'scatter'],
+      hint: 'strands: in lines along each strand / scatter: at random within one strand\'s width' },
+    { key: 'density', label: 'Density change', options: ['auto', 'manual'],
+      hint: 'auto: drifts slowly between the lower limits and full / manual: held at the shares below' },
+    { key: 'strandShare', label: 'Share of strands (manual)', min: 0.02, max: 1, step: 0.01 },
+    { key: 'rowShare', label: 'Share of LEDs (manual)', min: 0.02, max: 1, step: 0.01 },
+    { key: 'strandMin', label: 'Lowest share of strands (auto)', min: 0.02, max: 1, step: 0.01 },
+    { key: 'rowMin', label: 'Lowest share of LEDs (auto)', min: 0.02, max: 1, step: 0.01 },
   ] },
   { title: 'LED', items: [
-    { key: 'size', label: '粒の大きさ', min: 0.004, max: 0.05, step: 0.001 },
-    { key: 'maxPx', label: '最大サイズ (px)', min: 1.5, max: 16, step: 0.5 },
-    { key: 'rest', label: '消灯時の明るさ', min: 0, max: 0.1, step: 0.001 },
+    { key: 'size', label: 'LED size', min: 0.004, max: 0.05, step: 0.001 },
+    { key: 'maxPx', label: 'Largest size (px)', min: 1.5, max: 16, step: 0.5 },
+    { key: 'rest', label: 'Brightness at rest', min: 0, max: 0.1, step: 0.001 },
   ] },
-  { title: '光', items: [
-    { key: 'rainGain', label: '尾の明るさ', min: 0, max: 12, step: 0.1 },
-    { key: 'tipGain', label: '先頭の明るさ', min: 0, max: 15, step: 0.1 },
-    { key: 'exposure', label: '露出', min: 0.2, max: 4, step: 0.05 },
-    { key: 'bloom', label: 'にじみ', min: 0, max: 2, step: 0.05 },
-    { key: 'fog', label: '見える距離', min: 6, max: 40, step: 0.5 },
+  { title: 'Light', items: [
+    { key: 'rainGain', label: 'Trail brightness', min: 0, max: 12, step: 0.1 },
+    { key: 'tipGain', label: 'Head brightness', min: 0, max: 15, step: 0.1 },
+    { key: 'exposure', label: 'Exposure', min: 0.2, max: 4, step: 0.05 },
+    { key: 'bloom', label: 'Glow', min: 0, max: 2, step: 0.05 },
+    { key: 'fog', label: 'Visible distance', min: 6, max: 40, step: 0.5 },
   ] },
-  { title: '雨', items: [
-    { key: 'weather', label: '天気', options: ['auto', 'drizzle', 'rain', 'shower', 'downpour'] },
-    { key: 'speed', label: '速さ (倍)', min: 0, max: 4, step: 0.05 },
-    { key: 'trail', label: '尾の長さ (倍)', min: 0.2, max: 4, step: 0.05 },
-    { key: 'flow', label: '向き', options: ['auto', 'down', 'across'],
-      hint: 'down: 上から下 / across: 水平 (向きは毎回ランダム)' },
-    { key: 'turnTime', label: '向きが変わる時間 (秒)', min: 1, max: 30, step: 0.5 },
-    { key: 'turnSteps', label: '回転の段数 (1でクロスフェード)', min: 1, max: 18, step: 1 },
+  { title: 'Rain', items: [
+    { key: 'weather', label: 'Weather', options: ['auto', 'drizzle', 'rain', 'shower', 'downpour'] },
+    { key: 'speed', label: 'Speed (x)', min: 0, max: 4, step: 0.05 },
+    { key: 'trail', label: 'Trail length (x)', min: 0.2, max: 4, step: 0.05 },
+    { key: 'flow', label: 'Direction', options: ['auto', 'down', 'across'],
+      hint: 'down: from above / across: sideways (a random way each time)' },
+    { key: 'turnTime', label: 'Turn time (s)', min: 1, max: 30, step: 0.5 },
+    { key: 'turnSteps', label: 'Turn steps (1: cross-fade)', min: 1, max: 18, step: 1 },
   ] },
-  { title: '色', items: [
-    { key: 'color', label: '色の出し方', options: ['auto', ...COLOR_MODES.map((m) => m.name)],
-      hint: 'mono 単色 / gradient 流れるグラデーション / rainbow 虹 / palette 色の組からしずくごと / '
-        + 'accent 白い雨にときどき色 / comet 白い先頭と色の尾 / speed 速さで色分け / cloud 漂う色の雲 / '
-        + 'depth 手前と奥 / repaint 波紋で塗り替え / sky 空の一日' },
-    { key: 'rainbow', label: '虹の色の付け方', options: ['drop', 'led', 'bands'],
-      hint: 'drop: しずくごとにランダム / led: LEDごとにランダム / bands: 流れる帯' },
-    { key: 'palette', label: 'パレット', options: ['auto', ...PALETTES.map((p) => p.name)] },
-    { key: 'bandSpeed', label: '色の流れる速さ', min: 0, max: 0.8, step: 0.01 },
-    { key: 'bandScale', label: '色の帯の細かさ', min: 0.1, max: 4, step: 0.05 },
-    { key: 'saturation', label: '彩度 (虹)', min: 0, max: 1, step: 0.01 },
-    { key: 'set', label: '色の組 (palette)', options: ['auto', ...SETS.map((x) => x.name)] },
-    { key: 'skyDay', label: '空の一日 (秒, sky)', min: 20, max: 600, step: 5 },
+  { title: 'Colour', items: [
+    { key: 'color', label: 'Colour mode', options: ['auto', ...COLOR_MODES.map((m) => m.name)],
+      hint: 'mono: one palette / gradient: flowing gradient / rainbow: a hue per drop / '
+        + 'palette: each drop picks from a set / accent: white rain, now and then a coloured drop / '
+        + 'comet: white heads, coloured trails / speed: colour by speed / cloud: drifting clouds of colour / '
+        + 'depth: near and far / repaint: waves repaint the field / sky: a day goes by' },
+    { key: 'rainbow', label: 'Rainbow style', options: ['drop', 'led', 'bands'],
+      hint: 'drop: a random hue per drop / led: a random hue per LED / bands: flowing bands' },
+    { key: 'palette', label: 'Palette', options: ['auto', ...PALETTES.map((p) => p.name)] },
+    { key: 'bandSpeed', label: 'Band speed', min: 0, max: 0.8, step: 0.01 },
+    { key: 'bandScale', label: 'Band scale', min: 0.1, max: 4, step: 0.05 },
+    { key: 'saturation', label: 'Saturation (rainbow)', min: 0, max: 1, step: 0.01 },
+    { key: 'set', label: 'Colour set (palette)', options: ['auto', ...SETS.map((x) => x.name)] },
+    { key: 'skyDay', label: 'Length of a day (s, sky)', min: 20, max: 600, step: 5 },
   ] },
-  { title: 'カメラ', items: [
-    { key: 'camera', label: '動き', options: ['auto', 'orbit', 'walk', 'spin', 'gaze', 'rise'],
-      hint: 'orbit: 周回 / walk: 歩く / spin: 中心で見回す / gaze: 見上げる・見下ろす / rise: 昇り降り' },
-    { key: 'orbit', label: '動きの速さ', min: 0, max: 0.2, step: 0.005 },
-    { key: 'radius', label: '中心からの距離', min: 0, max: 10, step: 0.1 },
-    { key: 'fov', label: '画角 (度)', min: 30, max: 110, step: 1 },
+  { title: 'Camera', items: [
+    { key: 'camera', label: 'Move', options: ['auto', 'orbit', 'walk', 'spin', 'gaze', 'rise'],
+      hint: 'orbit: circle the field / walk: wander through it / spin: look around from the centre / gaze: look up and down / rise: drift up and down' },
+    { key: 'orbit', label: 'Move speed', min: 0, max: 0.2, step: 0.005 },
+    { key: 'radius', label: 'Distance from the centre', min: 0, max: 10, step: 0.1 },
+    { key: 'fov', label: 'Field of view (deg)', min: 30, max: 110, step: 1 },
   ] },
-  { title: '波紋', items: [
-    { key: 'ripples', label: '自動の間隔 (秒, 0で無し)', min: 0, max: 30, step: 0.5 },
+  { title: 'Ripples', items: [
+    { key: 'ripples', label: 'Auto interval (s, 0: none)', min: 0, max: 30, step: 0.5 },
   ] },
 ];
 // A saved or linked choice that no longer exists falls back to its default.
