@@ -22,7 +22,6 @@ const BELLS = [62, 64, 66, 69, 71, 74, 76, 78, 81]; // D major pentatonic
 export function createAudio({ settings }) {
   let ctx = null, master = null, bus = null, verb = null, rainGain = null, clickBuf = null;
   let padBus = null;  // the pad, swelling with the breath
-  let dimK = 1;       // 0 .. 1: the timer's fade at the end
   let on = false, chord = -1, timers = [];
   let bright = null;                                    // the pad's brightness, shared by every voice
   const padSway = createSway({ fastest: 1, octaves: 6 });  // seconds: 1 s .. about a minute
@@ -234,7 +233,7 @@ export function createAudio({ settings }) {
     const t = ctx.currentTime;
     master.gain.cancelScheduledValues(t);
     master.gain.setValueAtTime(master.gain.value, t);
-    master.gain.linearRampToValueAtTime(settings.volume * dimK, t + 3);
+    master.gain.linearRampToValueAtTime(settings.volume, t + 3);
     nextChord();
     tick();
   }
@@ -263,17 +262,11 @@ export function createAudio({ settings }) {
       if (!ctx || !on) return;
       padBus.gain.setTargetAtTime(k, ctx.currentTime, 0.1);
     },
-    // Everything fades with the light at the end of a timer, 0 .. 1.
-    dim(k) {
-      if (Math.abs(k - dimK) < 0.002) return;
-      dimK = k;
-      this.volume();
-    },
     // The overall volume, 0 .. 1, eased so a dragged slider does not crackle.
     volume() {
       if (!ctx || !on) return;
       master.gain.cancelScheduledValues(ctx.currentTime);
-      master.gain.setTargetAtTime(settings.volume * dimK, ctx.currentTime, 0.05);
+      master.gain.setTargetAtTime(settings.volume, ctx.currentTime, 0.05);
     },
     // The hush follows the weather (0 light rain .. 1 downpour) and the sway
     // the light rain sways with (-1 .. 1), so sound and light swell together.
