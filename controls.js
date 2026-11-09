@@ -11,7 +11,11 @@ export function createControls({ sound, S, onVolume }) {
   soundBtn.type = 'button';
   soundBtn.title = 'Sound (m)';
   soundBtn.setAttribute('aria-label', 'Sound');
-  soundBtn.textContent = '♪';
+  // A note, struck through while the sound is off.
+  soundBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">'
+    + '<path d="M10 2.5v9"/><path d="M10 2.5c1.4.9 2.8 1.5 3.2 3.3"/>'
+    + '<ellipse cx="7.7" cy="11.7" rx="2.4" ry="1.8" transform="rotate(-20 7.7 11.7)" fill="currentColor" stroke="none"/>'
+    + '<path class="mute" d="M2.5 13.5 13.5 2.5" stroke-width="1.6"/></svg>';
   soundBtn.setAttribute('aria-pressed', 'false');
   // The volume bar beside the note button; it is the panel's Volume too.
   const volumeBar = document.createElement('input');

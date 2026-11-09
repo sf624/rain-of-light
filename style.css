@@ -92,7 +92,9 @@ body.no-fullscreen { --full-slot: 0px; }
 .full-toggle { right: calc(var(--controls-right) + 46px); display: grid; place-items: center; padding: 0; }
 .full-toggle svg { width: 16px; height: 16px; }
 body.no-fullscreen .full-toggle { display: none; }
-.sound-toggle { right: calc(var(--controls-right) + var(--full-slot) + 46px); font-size: 17px; }
+.sound-toggle { right: calc(var(--controls-right) + var(--full-slot) + 46px); display: grid; place-items: center; padding: 0; }
+.sound-toggle svg { width: 17px; height: 17px; }
+.sound-toggle.active .mute { display: none; }  /* struck through only while off */
 .tuner-toggle:hover, .tuner-toggle.active, .sound-toggle:hover, .full-toggle:hover { opacity: 1; }
 .sound-toggle.active { opacity: 0.9; border-color: rgba(156, 200, 255, 0.6); color: #cfe4ff; }
 body.idle .tuner-toggle:not(.active), body.idle .sound-toggle, body.idle .volume-bar,
