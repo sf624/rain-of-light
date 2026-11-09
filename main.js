@@ -74,7 +74,7 @@ const DEFAULTS = {
   size: 0.013, maxPx: 4.5, rest: 0.025,
   rainGain: 4.0, tipGain: 5.0, exposure: 1.5, bloom: 0.4, fog: 22,
   speed: 1.0, trail: 1.0, weather: 'auto',
-  color: 'auto', palette: 'auto', bandSpeed: 0.17, bandScale: 1.0, saturation: 1.0,
+  color: 'auto', palette: 'auto', rainbow: 'drop', bandSpeed: 0.17, bandScale: 1.0, saturation: 1.0,
   flow: 'auto',
   orbit: 0.025, radius: 7.5, fov: 60,
   ripples: 9,
@@ -108,6 +108,8 @@ const SCHEMA = [
   ] },
   { title: '色', items: [
     { key: 'color', label: '色の出し方', options: ['auto', 'mono', 'gradient', 'rainbow'] },
+    { key: 'rainbow', label: '虹の色の付け方', options: ['drop', 'led', 'bands'],
+      hint: 'drop: しずくごとにランダム / led: LEDごとにランダム / bands: 流れる帯' },
     { key: 'palette', label: 'パレット', options: ['auto', ...PALETTES.map((p) => p.name)] },
     { key: 'bandSpeed', label: '色の流れる速さ', min: 0, max: 0.8, step: 0.01 },
     { key: 'bandScale', label: '色の帯の細かさ', min: 0.1, max: 4, step: 0.05 },
@@ -155,6 +157,7 @@ uniform float uTrail;
 uniform float uBandSpeed;
 uniform float uBandScale;
 uniform float uSat;
+uniform float uBowStyle; // rainbow: 0 bands, 1 a random hue per drop, 2 per LED
 out vec3 vColor;
 out float vSize;
 
@@ -165,28 +168,44 @@ vec3 hsv2rgb(vec3 c) {
   return c.z * mix(vec3(1.0), clamp(p - 1.0, 0.0, 1.0), c.y);
 }
 
+// Rainbow colour of one hue; pure hues look darker, so lift them.
+vec3 bowAt(float hue) { return hsv2rgb(vec3(fract(hue), uSat, 1.0)) * 1.4; }
+
 // Colour flows with the light. "along" runs 0 .. 1 in the direction the light
 // travels (top to bottom, or far to near); the colour bands slide along it at
 // about the speed of an average drop, so they pour down (or in) with the rain.
+// The rainbow is added here only as bands; per drop and per LED come later.
 vec3 flowColor(float along, float spatial, float h) {
   float phase = along - uFlow * uBandSpeed + spatial;
   vec3 mono = mix(uColA, uColB, h);
   vec3 grad = mix(uGrad0, uGrad1, 0.5 + 0.5 * sin(phase * 6.2832 * 0.9 * uBandScale));
-  vec3 bow = hsv2rgb(vec3(fract(phase * 0.7 * uBandScale), uSat, 1.0)) * 1.4; // pure hues look darker: lift them
+  vec3 bow = uBowStyle < 0.5 ? bowAt(phase * 0.7 * uBandScale) : vec3(0.0);
   return mono * uMode.x + grad * uMode.y + bow * uMode.z;
 }
 
 // One drop runs along a line of LEDs (u: 0 start .. 1 end), then waits past the
-// end for the rest of its period. Returns (trail brightness, head brightness).
-vec2 drop(float sd, float u, float trailK) {
+// end for the rest of its period. Returns (trail of this drop, tail of the drop
+// before it, head brightness, number of this drop) so each drop can have a colour.
+vec4 drop(float sd, float u, float trailK) {
   float speed  = mix(0.07, 0.34, pow(hash(sd + 1.0), 1.5));
   float period = mix(1.3, 2.8, hash(sd + 2.0));
   float trail  = mix(0.04, 0.18, hash(sd + 3.0)) * trailK;
-  float s = mod(uFlow * speed + hash(sd + 4.0) * period, period);
-  float d = s - u;                                   // > 0: the LED is behind the head
+  float x = uFlow * speed + hash(sd + 4.0) * period;
+  float cycle = floor(x / period);
+  float d = x - cycle * period - u;                  // > 0: the LED is behind the head
   float rain = d >= 0.0 ? exp(-d / trail) : exp(d * 120.0);
-  rain += exp(-(d + period) / trail);                // tail of the previous drop
-  return vec2(rain, exp(-abs(d) * 90.0));
+  return vec4(rain, exp(-(d + period) / trail), exp(-abs(d) * 90.0), cycle);
+}
+
+// Light gathered from several drops, with each drop's own random hue.
+struct Lit { float rain; float tip; vec3 rainCol; vec3 tipCol; };
+void gather(inout Lit L, vec4 r, float sd, float w) {
+  vec3 now = bowAt(hash(sd + r.w * 13.37));
+  vec3 before = bowAt(hash(sd + (r.w - 1.0) * 13.37));
+  L.rain += (r.x + r.y) * w;
+  L.tip += r.z * w;
+  L.rainCol += (now * r.x + before * r.y) * w;
+  L.tipCol += now * r.z * w;
 }
 
 void main() {
@@ -195,15 +214,18 @@ void main() {
   vec3 pos = vec3(aData.x, (0.5 - u) * uHeight, aData.z);
   float h = hash(seed + 5.0);
   float spatial = (pos.x + pos.z) * 0.012;           // bands lean a little across the field
+  Lit L = Lit(0.0, 0.0, vec3(0.0), vec3(0.0));
 
   // Two drops run down each strand at their own pace; in heavy rain two more
   // join, one by one across the field, and every trail grows longer.
   float trailK = mix(1.0, 1.7, uRain) * uTrail;
+  float wd = 1.0 - uToward;
   float g3 = hash(seed + 6.0) * 0.6;
   float g4 = 0.3 + hash(seed + 7.0) * 0.6;
-  vec2 down = drop(seed, u, trailK) + drop(seed + 17.0, u, trailK)
-            + drop(seed + 31.0, u, trailK) * smoothstep(g3, g3 + 0.15, uRain)
-            + drop(seed + 53.0, u, trailK) * smoothstep(g4, g4 + 0.15, uRain);
+  gather(L, drop(seed, u, trailK), seed, wd);
+  gather(L, drop(seed + 17.0, u, trailK), seed + 17.0, wd);
+  gather(L, drop(seed + 31.0, u, trailK), seed + 31.0, wd * smoothstep(g3, g3 + 0.15, uRain));
+  gather(L, drop(seed + 53.0, u, trailK), seed + 53.0, wd * smoothstep(g4, g4 + 0.15, uRain));
   vec3 col = flowColor(u, spatial, h);
 
   // Flow towards the eye: LEDs in one thin lane along the flow light up in turn.
@@ -211,13 +233,23 @@ void main() {
     vec2 side = vec2(-uFlowDir.y, uFlowDir.x);
     float lane = floor(dot(pos.xz, side) / uLane.x) * 7.31 + floor(pos.y / uLane.y) * 131.7;
     float w = dot(pos.xz, uFlowDir) / (uSpan * 1.42) + 0.5; // 0 far side .. 1 near side
-    vec2 toward = drop(lane, w, trailK * 1.5)
-                + drop(lane + 97.0, w, trailK * 1.5) * smoothstep(0.2, 0.8, uRain);
-    down = mix(down, toward, uToward);
+    gather(L, drop(lane, w, trailK * 1.5), lane, uToward);
+    gather(L, drop(lane + 97.0, w, trailK * 1.5), lane + 97.0, uToward * smoothstep(0.2, 0.8, uRain));
     col = mix(col, flowColor(w, pos.y * 0.012, h), uToward);
   }
-  float rain = down.x;
-  float tip = down.y;
+  float rain = L.rain;
+  float tip = L.tip;
+
+  // The rainbow per drop (each drop keeps one random hue as it flows) or per
+  // LED (each LED has its own hue, shown as the light passes).
+  vec3 rainCol = col, tipCol = col, restCol = col;
+  if (uBowStyle > 0.5) {
+    vec3 led = bowAt(hash(seed * 0.37 + u * 91.7));
+    bool perDrop = uBowStyle < 1.5;
+    rainCol += uMode.z * (perDrop && rain > 1e-4 ? L.rainCol / rain : led);
+    tipCol += uMode.z * (perDrop && tip > 1e-4 ? L.tipCol / tip : led);
+    restCol += uMode.z * led;
+  }
 
   // Spherical waves of light.
   float ring = 0.0;
@@ -232,9 +264,9 @@ void main() {
 
   // Heads turn white, except in the rainbow, where they keep their colour.
   float white = mix(0.75, 0.15, uMode.z);
-  vec3 c = col * (uRest + rain * uRainGain)
-         + mix(col, vec3(1.0), white) * tip * uTipGain
-         + mix(col, vec3(1.0), 0.35) * ring * 1.6;
+  vec3 c = restCol * uRest + rainCol * rain * uRainGain
+         + mix(tipCol, vec3(1.0), white) * tip * uTipGain
+         + mix(restCol, vec3(1.0), 0.35) * ring * 1.6;
 
   vec4 mv = uView * vec4(pos, 1.0);
   float dist = -mv.z;
@@ -700,6 +732,7 @@ function frame(now) {
   gl.uniform1f(u.uBandSpeed, S.bandSpeed);
   gl.uniform1f(u.uBandScale, S.bandScale);
   gl.uniform1f(u.uSat, S.saturation);
+  gl.uniform1f(u.uBowStyle, { bands: 0, drop: 1, led: 2 }[S.rainbow] ?? 1);
   gl.uniform1f(u.uFlow, look.flow);
   gl.uniform1f(u.uRain, look.rain);
   gl.uniform1f(u.uToward, look.toward);
