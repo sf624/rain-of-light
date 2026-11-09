@@ -166,6 +166,7 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 
 addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return; // browser shortcuts, and a held key
   if (e.key === 'p') tuner.toggle();             // settings panel
   if (e.key === 'f') controls.toggleFullscreen(); // full screen
   if (e.key === 'w') step('weather', WEATHER);   // next weather
