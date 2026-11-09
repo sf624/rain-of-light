@@ -103,13 +103,13 @@ const SKY = [
 
 // ---------- tunable settings (panel: p key or the gear button; also ?key=value) ----------
 const DEFAULTS = {
-  grid: small ? 48 : 80,  rows: small ? 96 : 128,
+  grid: small ? 36 : 60,  rows: small ? 72 : 96,
   density: 'auto', strandShare: 1.0, rowShare: 1.0, strandMin: 0.3, rowMin: 0.35,
   size: 0.013, maxPx: 4.5, rest: 0.025,
   rainGain: 4.0, tipGain: 5.0, exposure: 1.5, bloom: 0.4, fog: 22,
   speed: 1.0, trail: 1.0, weather: 'auto', turnTime: 8, turnSteps: 9,
   color: 'auto', palette: 'auto', rainbow: 'drop', bandSpeed: 0.17, bandScale: 1.0, saturation: 1.0,
-  set: 'auto', skyDay: 90, lightning: 'downpour',
+  set: 'auto', skyDay: 90,
   flow: 'auto',
   camera: 'orbit', orbit: 0.025, radius: 7.5, fov: 60,
   ripples: 9,
@@ -163,8 +163,6 @@ const SCHEMA = [
     { key: 'saturation', label: '彩度 (虹)', min: 0, max: 1, step: 0.01 },
     { key: 'set', label: '色の組 (palette)', options: ['auto', ...SETS.map((x) => x.name)] },
     { key: 'skyDay', label: '空の一日 (秒, sky)', min: 20, max: 600, step: 5 },
-    { key: 'lightning', label: '稲光', options: ['downpour', 'off'],
-      hint: 'downpour: 豪雨のときに光る / off: 光らない / l キーでいつでも' },
   ] },
   { title: 'カメラ', items: [
     { key: 'camera', label: '動き', options: ['auto', 'orbit', 'walk', 'spin', 'gaze', 'rise'],
@@ -205,7 +203,6 @@ uniform float uCloudHue; // colour clouds: base hue
 uniform vec3 uSky0;    // sky: colour at the top
 uniform vec3 uSky1;    // sky: colour at the bottom
 uniform float uFlowRate; // how fast the rain falls now (weather)
-uniform float uFlash;  // lightning, 0 .. 1
 uniform vec3 uGrad0;
 uniform vec3 uGrad1;
 uniform float uTurn;       // 0 rain falls down .. 1 light flows sideways
@@ -422,8 +419,6 @@ void main() {
   vec3 c = restCol * uRest + rainCol * rain * uRainGain
          + mix(tipCol, vec3(1.0), white) * tip * uTipGain
          + mix(restCol, vec3(1.0), 0.35) * ring * 1.6;
-  // Lightning lights the whole field for a moment, most at the top.
-  c += vec3(0.8, 0.87, 1.0) * uFlash * mix(1.0, 0.35, u);
 
   float fog = 1.0 - smoothstep(uFogFar * 0.3, uFogFar, dist);
   c *= fog;
@@ -751,7 +746,6 @@ addEventListener('keydown', (e) => {
   if (e.key === 'c') step('color', COLOR_MODES); // next colour
   if (e.key === 'd') step('flow', FLOWS);        // switch direction
   if (e.key === 'v') step('camera', CAMERAS);    // next camera move
-  if (e.key === 'l') strike(time);               // lightning now
 });
 // A key moves on at random while the setting is auto, else to the next choice.
 function step(key, list) {
@@ -903,24 +897,6 @@ function nextColor(now) {
     if (look.mode[MODE[mode]] < 0.05) look[key] = [...goal[key]];
   }
   if (colorMode.name === 'repaint') nextAuto = Math.min(nextAuto, now + 1.5); // a first wave soon
-}
-
-// Lightning: two or three quick flashes, now and then in a downpour.
-let flashes = [], nextFlash = 0;
-function strike(now) {
-  flashes = [[now, 1]];
-  let t = now;
-  for (let i = 0, n = 1 + Math.floor(Math.random() * 2); i < n; i++) {
-    t += rand(0.07, 0.2);
-    flashes.push([t, rand(0.4, 0.9)]);
-  }
-  nextFlash = now + rand(5, 14);
-}
-function flashAt(now) {
-  if (S.lightning !== 'off' && look.rain > 0.8 && now > nextFlash) strike(now);
-  let f = 0;
-  for (const [t0, amp] of flashes) if (now >= t0) f += amp * Math.exp(-(now - t0) * 11);
-  return f;
 }
 
 // The sky's colours at this moment of its day.
@@ -1089,7 +1065,6 @@ function frame(now) {
   gl.uniform3fv(u.uSky0, sky0);
   gl.uniform3fv(u.uSky1, sky1);
   gl.uniform1f(u.uFlowRate, look.flowRate);
-  gl.uniform1f(u.uFlash, flashAt(time));
   gl.uniform3fv(u.uGrad0, look.g0);
   gl.uniform3fv(u.uGrad1, look.g1);
   gl.uniform1f(u.uFogFar, S.fog);
