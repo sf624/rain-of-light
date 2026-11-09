@@ -48,7 +48,12 @@ work, because the scripts are ES modules.
 | File | What |
 | --- | --- |
 | `index.html`, `style.css` | the page |
-| `main.js` | the lattice of lights, its shaders, and the director that changes weather, colour, flow and camera |
+| `main.js` | the director that changes weather, colour, flow and camera, and the frame loop |
+| `config.js` | palettes, colour modes, weathers, camera moves, default settings and the panel's layout |
+| `shaders.js` | the GLSL shaders: the points of light, bloom and tone mapping |
+| `lattice.js` | the strands and LEDs, and the order in which they thin out |
+| `gl.js` | WebGL helpers and vector maths |
+| `controls.js` | the sound, volume and full screen controls |
 | `audio.js` | the music: pad, bells, rain, reverb |
 | `sway.js` | 1/f fluctuation, used by the music and the rain |
 | `tuner.js` | the settings panel |
