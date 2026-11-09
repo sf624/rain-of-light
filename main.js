@@ -479,12 +479,12 @@ function frame(now) {
   const progs = [pointProg];
   if (wiresOn) progs.push(wireProg);
   if (rays) progs.push(rayProg);
-  const dprNow = H / Math.max(1, canvas.clientHeight);   // rays keep their length in CSS pixels
+  const rayScale = H / 1080;   // rays scale with the view like the lattice: their length is set for a 1080 px tall view
   for (const prog of progs) {
   gl.useProgram(prog.p);
   const u = prog.u;
   gl.uniform1f(u.uWire, prog === wireProg ? S.wire : 0);
-  gl.uniform1f(u.uRayLen, prog === rayProg ? Math.min(S.rayLength * dprNow, (MAX_POINT - 1) / 2) : 0);
+  gl.uniform1f(u.uRayLen, prog === rayProg ? Math.min(S.rayLength * rayScale, (MAX_POINT - 1) / 2) : 0);
   gl.uniform1f(u.uRayThreshold, S.rayThreshold);
   gl.uniform1f(u.uRays, rays);
   gl.uniform1f(u.uRayGain, S.rayGain);
