@@ -2,6 +2,8 @@
 // Plain WebGL2, no dependencies. Points are drawn additively into a half-float
 // buffer, then blurred for bloom and tone-mapped onto the screen.
 
+import { createTuner, loadSettings } from './tuner.js';
+
 // Show any error on the page, so a black screen is never silent.
 function showError(msg) {
   const el = document.getElementById('fallback');
@@ -29,25 +31,22 @@ if (!gl) {
 
 const hasFloat = !!gl.getExtension('EXT_color_buffer_float');
 
-// ---------- settings (override with ?grid=40&rows=70&dpr=1.5) ----------
+// ---------- fixed settings (also ?dpr=1.5) ----------
 const params = new URLSearchParams(location.search);
 const small = Math.min(innerWidth, innerHeight) < 700;
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const GRID = clampInt(params.get('grid'), small ? 48 : 80, 4, 200); // strands per side
-const ROWS = clampInt(params.get('rows'), small ? 96 : 128, 4, 300); // points per strand
 const MAX_DPR = Number(params.get('dpr')) || 2;
 const SPAN = 22;    // width and depth of the lattice
 const HEIGHT = 15;  // height of the lattice
-const FOV = 60 * Math.PI / 180;
 const SPEED = reducedMotion ? 0.4 : 1.0;
 
 const PALETTES = [
-  { a: [0.45, 0.70, 1.00], b: [0.95, 0.97, 1.00] }, // ice
-  { a: [1.00, 0.50, 0.12], b: [1.00, 0.82, 0.50] }, // amber
-  { a: [1.00, 0.30, 0.65], b: [0.65, 0.40, 1.00] }, // sakura
-  { a: [0.15, 1.00, 0.65], b: [0.35, 0.75, 1.00] }, // aurora
-  { a: [0.10, 0.35, 1.00], b: [0.30, 0.95, 1.00] }, // deep sea
-  { a: [1.00, 0.85, 0.55], b: [1.00, 1.00, 0.95] }, // candle
+  { name: 'ice',      a: [0.45, 0.70, 1.00], b: [0.95, 0.97, 1.00] },
+  { name: 'amber',    a: [1.00, 0.50, 0.12], b: [1.00, 0.82, 0.50] },
+  { name: 'sakura',   a: [1.00, 0.30, 0.65], b: [0.65, 0.40, 1.00] },
+  { name: 'aurora',   a: [0.15, 1.00, 0.65], b: [0.35, 0.75, 1.00] },
+  { name: 'deep sea', a: [0.10, 0.35, 1.00], b: [0.30, 0.95, 1.00] },
+  { name: 'candle',   a: [1.00, 0.85, 0.55], b: [1.00, 1.00, 0.95] },
 ];
 
 // Weather: how fast the drops fall (flow) and how many extra drops join (rain).
@@ -69,10 +68,61 @@ const COLOR_MODES = [
   { name: 'rainbow',  mode: [0, 0, 1], hold: [10, 18], weight: 1.5 },
 ];
 
-function clampInt(v, def, lo, hi) {
-  const n = parseInt(v, 10);
-  return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : def;
-}
+// ---------- tunable settings (panel: p key or the gear button; also ?key=value) ----------
+const DEFAULTS = {
+  grid: small ? 48 : 80,  rows: small ? 96 : 128,
+  size: 0.013, maxPx: 4.5, rest: 0.025,
+  rainGain: 4.0, tipGain: 5.0, exposure: 1.5, bloom: 0.4, fog: 22,
+  speed: 1.0, trail: 1.0, weather: 'auto',
+  color: 'auto', palette: 'auto', bandSpeed: 0.17, bandScale: 1.0, saturation: 1.0,
+  flow: 'auto',
+  orbit: 0.025, radius: 7.5, fov: 60,
+  ripples: 9,
+};
+// Older links used ?color=, ?weather= and ?flow= the same way, so they still work.
+const STORAGE_KEY = 'rain-of-light:settings';
+const S = loadSettings(DEFAULTS, STORAGE_KEY, params);
+
+const SCHEMA = [
+  { title: '密度', items: [
+    { key: 'grid', label: '糸の本数 (一辺)', min: 8, max: 160, step: 1 },
+    { key: 'rows', label: '1本の粒の数', min: 8, max: 256, step: 1 },
+  ] },
+  { title: 'LED', items: [
+    { key: 'size', label: '粒の大きさ', min: 0.004, max: 0.05, step: 0.001 },
+    { key: 'maxPx', label: '最大サイズ (px)', min: 1.5, max: 16, step: 0.5 },
+    { key: 'rest', label: '消灯時の明るさ', min: 0, max: 0.1, step: 0.001 },
+  ] },
+  { title: '光', items: [
+    { key: 'rainGain', label: '尾の明るさ', min: 0, max: 12, step: 0.1 },
+    { key: 'tipGain', label: '先頭の明るさ', min: 0, max: 15, step: 0.1 },
+    { key: 'exposure', label: '露出', min: 0.2, max: 4, step: 0.05 },
+    { key: 'bloom', label: 'にじみ', min: 0, max: 2, step: 0.05 },
+    { key: 'fog', label: '見える距離', min: 6, max: 40, step: 0.5 },
+  ] },
+  { title: '雨', items: [
+    { key: 'weather', label: '天気', options: ['auto', 'drizzle', 'rain', 'shower', 'downpour'] },
+    { key: 'speed', label: '速さ (倍)', min: 0, max: 4, step: 0.05 },
+    { key: 'trail', label: '尾の長さ (倍)', min: 0.2, max: 4, step: 0.05 },
+    { key: 'flow', label: '向き', options: ['auto', 'down', 'toward'] },
+  ] },
+  { title: '色', items: [
+    { key: 'color', label: '色の出し方', options: ['auto', 'mono', 'gradient', 'rainbow'] },
+    { key: 'palette', label: 'パレット', options: ['auto', ...PALETTES.map((p) => p.name)] },
+    { key: 'bandSpeed', label: '色の流れる速さ', min: 0, max: 0.8, step: 0.01 },
+    { key: 'bandScale', label: '色の帯の細かさ', min: 0.1, max: 4, step: 0.05 },
+    { key: 'saturation', label: '彩度 (虹)', min: 0, max: 1, step: 0.01 },
+  ] },
+  { title: 'カメラ', items: [
+    { key: 'orbit', label: '回る速さ', min: 0, max: 0.2, step: 0.005 },
+    { key: 'radius', label: '中心からの距離', min: 0, max: 10, step: 0.1 },
+    { key: 'fov', label: '画角 (度)', min: 30, max: 110, step: 1 },
+  ] },
+  { title: '波紋', items: [
+    { key: 'ripples', label: '自動の間隔 (秒, 0で無し)', min: 0, max: 30, step: 0.5 },
+  ] },
+];
+const fovRad = () => S.fov * Math.PI / 180;
 
 // ---------- shaders ----------
 const POINT_VS = `#version 300 es
@@ -97,6 +147,14 @@ uniform float uFogFar;
 uniform vec3 uColA;
 uniform vec3 uColB;
 uniform vec4 uRipples[8]; // xyz center, w start time
+uniform float uRest;
+uniform float uRainGain;
+uniform float uTipGain;
+uniform float uMaxPx;
+uniform float uTrail;
+uniform float uBandSpeed;
+uniform float uBandScale;
+uniform float uSat;
 out vec3 vColor;
 out float vSize;
 
@@ -111,10 +169,10 @@ vec3 hsv2rgb(vec3 c) {
 // travels (top to bottom, or far to near); the colour bands slide along it at
 // about the speed of an average drop, so they pour down (or in) with the rain.
 vec3 flowColor(float along, float spatial, float h) {
-  float phase = along - uFlow * 0.17 + spatial;
+  float phase = along - uFlow * uBandSpeed + spatial;
   vec3 mono = mix(uColA, uColB, h);
-  vec3 grad = mix(uGrad0, uGrad1, 0.5 + 0.5 * sin(phase * 6.2832 * 0.9));
-  vec3 bow = hsv2rgb(vec3(fract(phase * 0.7), 1.0, 1.0)) * 1.4; // pure hues look darker: lift them
+  vec3 grad = mix(uGrad0, uGrad1, 0.5 + 0.5 * sin(phase * 6.2832 * 0.9 * uBandScale));
+  vec3 bow = hsv2rgb(vec3(fract(phase * 0.7 * uBandScale), uSat, 1.0)) * 1.4; // pure hues look darker: lift them
   return mono * uMode.x + grad * uMode.y + bow * uMode.z;
 }
 
@@ -140,7 +198,7 @@ void main() {
 
   // Two drops run down each strand at their own pace; in heavy rain two more
   // join, one by one across the field, and every trail grows longer.
-  float trailK = mix(1.0, 1.7, uRain);
+  float trailK = mix(1.0, 1.7, uRain) * uTrail;
   float g3 = hash(seed + 6.0) * 0.6;
   float g4 = 0.3 + hash(seed + 7.0) * 0.6;
   vec2 down = drop(seed, u, trailK) + drop(seed + 17.0, u, trailK)
@@ -174,8 +232,8 @@ void main() {
 
   // Heads turn white, except in the rainbow, where they keep their colour.
   float white = mix(0.75, 0.15, uMode.z);
-  vec3 c = col * (0.025 + rain * 4.0)
-         + mix(col, vec3(1.0), white) * tip * 5.0
+  vec3 c = col * (uRest + rain * uRainGain)
+         + mix(col, vec3(1.0), white) * tip * uTipGain
          + mix(col, vec3(1.0), 0.35) * ring * 1.6;
 
   vec4 mv = uView * vec4(pos, 1.0);
@@ -195,7 +253,7 @@ void main() {
   // Every LED has the same physical size; only its brightness changes.
   // Below 1.5 px, keep the size and dim it instead, so far LEDs do not shimmer.
   float px = uSize * uFocal / dist;
-  float shown = clamp(px, 1.5, 4.5);
+  float shown = clamp(px, 1.5, max(1.5, uMaxPx));
   c *= min(1.0, px / shown);
   gl_Position = uProj * mv;
   gl_PointSize = shown;
@@ -264,11 +322,12 @@ in vec2 vUv;
 uniform sampler2D uScene;
 uniform sampler2D uBloom;
 uniform float uBloomK;
+uniform float uExposure;
 out vec4 outColor;
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 void main() {
   vec3 c = texture(uScene, vUv).rgb + texture(uBloom, vUv).rgb * uBloomK;
-  c = vec3(1.0) - exp(-c * 1.5);                       // tone map
+  c = vec3(1.0) - exp(-c * uExposure);                       // tone map
   float v = smoothstep(1.25, 0.35, length(vUv - 0.5) * 1.5);
   c *= mix(0.55, 1.0, v);                               // vignette
   c += (hash(gl_FragCoord.xy) - 0.5) / 255.0;           // dither against banding
@@ -364,8 +423,19 @@ const downProg = program(QUAD_VS, DOWN_FS);
 const blurProg = program(QUAD_VS, BLUR_FS);
 const compProg = program(QUAD_VS, COMPOSITE_FS);
 
-const count = GRID * GRID * ROWS;
-{
+const pointVao = gl.createVertexArray();
+const pointBuf = gl.createBuffer();
+gl.bindVertexArray(pointVao);
+gl.bindBuffer(gl.ARRAY_BUFFER, pointBuf);
+gl.enableVertexAttribArray(0);
+gl.vertexAttribPointer(0, 4, gl.FLOAT, false, 0, 0);
+gl.bindVertexArray(null);
+let count = 0, GRID = 0, ROWS = 0;
+
+function buildLattice() {
+  GRID = Math.max(2, Math.round(S.grid));
+  ROWS = Math.max(2, Math.round(S.rows));
+  count = GRID * GRID * ROWS;
   const data = new Float32Array(count * 4);
   const step = SPAN / (GRID - 1);
   let k = 0;
@@ -385,16 +455,11 @@ const count = GRID * GRID * ROWS;
       }
     }
   }
-  const vao = gl.createVertexArray();
-  gl.bindVertexArray(vao);
-  const buf = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bindBuffer(gl.ARRAY_BUFFER, pointBuf);
   gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(0);
-  gl.vertexAttribPointer(0, 4, gl.FLOAT, false, 0, 0);
 }
+buildLattice();
 const emptyVao = gl.createVertexArray();
-const pointVao = gl.getParameter(gl.VERTEX_ARRAY_BINDING);
 
 // ---------- render targets ----------
 let W = 0, H = 0, scene = null, bloomA = null, bloomB = null;
@@ -426,17 +491,28 @@ function addRipple(x, y, z, t) {
 const pointer = { x: 0, y: 0, sx: 0, sy: 0 };
 let camera = null; // last eye and basis, for picking
 
+// Hide the cursor (and the gear button) after a few still seconds.
+let idleTimer = 0;
+function wake() {
+  document.body.classList.remove('idle');
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => document.body.classList.add('idle'), 2500);
+}
+wake();
+
 addEventListener('pointermove', (e) => {
   pointer.x = e.clientX / innerWidth - 0.5;
   pointer.y = e.clientY / innerHeight - 0.5;
+  wake();
 });
+addEventListener('pointerdown', wake);
 
 canvas.addEventListener('pointerdown', (e) => {
   hideOverlay();
   if (!camera) return;
   const nx = (e.clientX / innerWidth) * 2 - 1;
   const ny = 1 - (e.clientY / innerHeight) * 2;
-  const th = Math.tan(FOV / 2);
+  const th = Math.tan(fovRad() / 2);
   const { eye, f, r, u, aspect } = camera;
   const dir = norm([
     f[0] + r[0] * nx * th * aspect + u[0] * ny * th,
@@ -448,16 +524,26 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 
 addEventListener('keydown', (e) => {
-  if (e.key === 'w') nextWeather(time); // next weather
-  if (e.key === 'c') nextColor(time);   // next colour
-  if (e.key === 'd') nextFlow(time);    // switch direction
+  if (e.key === 'p') tuner.toggle();             // settings panel
+  if (e.key === 'w') step('weather', WEATHER);   // next weather
+  if (e.key === 'c') step('color', COLOR_MODES); // next colour
+  if (e.key === 'd') step('flow', FLOWS);        // switch direction
 });
+// A key moves on at random while the setting is auto, else to the next choice.
+function step(key, list) {
+  if (S[key] === 'auto') { apply(key); return; }
+  const i = list.findIndex((x) => x.name === S[key]);
+  tuner.set(key, list[(i + 1) % list.length].name);
+  tuner.refresh();
+}
 
 let overlayTimer = setTimeout(hideOverlay, 7000);
 function hideOverlay() {
   clearTimeout(overlayTimer);
   overlay.classList.add('hidden');
 }
+
+let time = Number(params.get('t')) || 0;
 
 // ---------- director: weather and colour change on their own ----------
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -481,27 +567,51 @@ let flowDir = [0, 1];
 let aimFlow = false; // point flowDir at the eye on the next frame
 const goal = { mode: [1, 0, 0], a: PALETTES[0].a, b: PALETTES[0].b, g0: PALETTES[0].a, g1: PALETTES[1].b };
 
-function nextWeather(now, name) {
-  weather = pick(WEATHER, weather, name);
-  weatherUntil = now + rand(...weather.hold);
+// A setting other than auto holds its choice until it is changed.
+const forced = (key) => (S[key] === 'auto' ? undefined : S[key]);
+function nextWeather(now) {
+  weather = pick(WEATHER, weather, forced('weather'));
+  weatherUntil = forced('weather') ? Infinity : now + rand(...weather.hold);
 }
-function nextFlow(now, name) {
-  flowMode = pick(FLOWS, flowMode, name);
-  flowUntil = now + rand(...flowMode.hold);
+function nextFlow(now) {
+  flowMode = pick(FLOWS, flowMode, forced('flow'));
+  flowUntil = forced('flow') ? Infinity : now + rand(...flowMode.hold);
   // Keep the direction fixed for the whole episode, pointing at where the eye is now.
   if (flowMode.toward) aimFlow = true;
 }
-function nextColor(now, name) {
-  colorMode = pick(COLOR_MODES, colorMode, name);
-  colorUntil = now + rand(...colorMode.hold);
-  const p = pickPalette(), q = pickPalette(p);
+function nextColor(now) {
+  colorMode = pick(COLOR_MODES, colorMode, forced('color'));
+  colorUntil = forced('color') ? Infinity : now + rand(...colorMode.hold);
+  const p = PALETTES.find((x) => x.name === S.palette) || pickPalette();
+  const q = pickPalette(p);
   Object.assign(goal, { mode: colorMode.mode, a: p.a, b: p.b, g0: p.a, g1: q.b });
 }
 
-// Start from ?weather=…&color=… when given, else at random.
-nextWeather(0, params.get('weather') || 'rain');
-nextColor(0, params.get('color') || 'mono');
-nextFlow(0, params.get('flow') || 'down');
+// Start calm (light rain, one colour, falling) unless a setting says otherwise.
+weather = WEATHER[1]; colorMode = COLOR_MODES[0]; flowMode = FLOWS[0];
+if (forced('weather')) nextWeather(0); else weatherUntil = rand(...weather.hold);
+if (forced('flow')) nextFlow(0); else flowUntil = rand(...flowMode.hold);
+if (forced('color') || forced('palette')) nextColor(0);
+else {
+  colorUntil = rand(...colorMode.hold);
+  Object.assign(goal, { mode: colorMode.mode });
+}
+
+// What a change in the panel does at once.
+let rebuildTimer = 0;
+function apply(key) {
+  if (key === 'grid' || key === 'rows') {
+    clearTimeout(rebuildTimer);
+    rebuildTimer = setTimeout(buildLattice, 250); // wait for the slider to settle
+  }
+  if (key === 'weather') nextWeather(time);
+  if (key === 'flow') nextFlow(time);
+  if (key === 'color' || key === 'palette') nextColor(time);
+}
+const tuner = createTuner({
+  schema: SCHEMA, settings: S, defaults: DEFAULTS, storageKey: STORAGE_KEY,
+  onChange: (key) => apply(key),
+});
 const look = {
   flow: Number(params.get('t')) || 0,
   flowRate: weather.flow, rain: weather.rain, toward: flowMode.toward,
@@ -518,13 +628,13 @@ function ease(dt) {
   for (const key of ['mode', 'a', 'b', 'g0', 'g1']) {
     for (let i = 0; i < 3; i++) look[key][i] += (goal[key][i] - look[key][i]) * kc;
   }
-  look.flow += dt * look.flowRate * SPEED;
+  look.flow += dt * look.flowRate * SPEED * S.speed;
 }
 
 // ---------- frame ----------
-let time = Number(params.get('t')) || 0;
 let last = performance.now();
 let nextAuto = 2;
+let orbitAngle = 0;
 
 function frame(now) {
   const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)); // rAF time may precede `last`
@@ -535,15 +645,17 @@ function frame(now) {
   // Camera: a slow orbit inside the lattice, nudged by the pointer.
   pointer.sx += (pointer.x - pointer.sx) * 0.03;
   pointer.sy += (pointer.y - pointer.sy) * 0.03;
-  const ang = time * 0.025 * SPEED + pointer.sx * 0.7;
-  const R = 7.5;
+  orbitAngle += dt * S.orbit * SPEED; // integrated, so a new speed never makes the view jump
+  const ang = orbitAngle + pointer.sx * 0.7;
+  const R = S.radius;
   // Eye level stays horizontal; the pointer only raises or lowers the eye.
   const eyeY = Math.sin(time * 0.05) * 0.8 - pointer.sy * 2.0;
   const eye = [Math.sin(ang) * R, eyeY, Math.cos(ang) * R];
-  const at = [0, eyeY, 0];
+  // Look ahead along the orbit's inward direction; at the centre, look along -z.
+  const at = R > 0.01 ? [0, eyeY, 0] : [eye[0] - Math.sin(ang), eyeY, eye[2] - Math.cos(ang)];
   const aspect = W / H;
   const view = lookAt(eye, at, [0, 1, 0]);
-  const proj = perspective(FOV, aspect, 0.1, 60);
+  const proj = perspective(fovRad(), aspect, 0.1, 60);
   const f = norm(sub(at, eye));
   const r = norm(cross(f, [0, 1, 0]));
   camera = { eye, f, r, u: cross(r, f), aspect };
@@ -554,10 +666,10 @@ function frame(now) {
   }
 
   // A wave now and then, somewhere in the field.
-  if (time > nextAuto) {
+  if (S.ripples > 0 && time > nextAuto) {
     addRipple((Math.random() - 0.5) * SPAN * 0.6, (Math.random() - 0.5) * HEIGHT * 0.5,
       (Math.random() - 0.5) * SPAN * 0.6, time);
-    nextAuto = time + 6 + Math.random() * 6;
+    nextAuto = time + S.ripples * (0.7 + Math.random() * 0.6);
   }
 
   if (time > weatherUntil) nextWeather(time);
@@ -578,8 +690,16 @@ function frame(now) {
   gl.uniformMatrix4fv(u.uView, false, view);
   gl.uniform1f(u.uTime, time);
   gl.uniform1f(u.uHeight, HEIGHT);
-  gl.uniform1f(u.uFocal, (H / 2) / Math.tan(FOV / 2));
-  gl.uniform1f(u.uSize, 0.013);
+  gl.uniform1f(u.uFocal, (H / 2) / Math.tan(fovRad() / 2));
+  gl.uniform1f(u.uSize, S.size);
+  gl.uniform1f(u.uMaxPx, S.maxPx);
+  gl.uniform1f(u.uRest, S.rest);
+  gl.uniform1f(u.uRainGain, S.rainGain);
+  gl.uniform1f(u.uTipGain, S.tipGain);
+  gl.uniform1f(u.uTrail, S.trail);
+  gl.uniform1f(u.uBandSpeed, S.bandSpeed);
+  gl.uniform1f(u.uBandScale, S.bandScale);
+  gl.uniform1f(u.uSat, S.saturation);
   gl.uniform1f(u.uFlow, look.flow);
   gl.uniform1f(u.uRain, look.rain);
   gl.uniform1f(u.uToward, look.toward);
@@ -589,7 +709,7 @@ function frame(now) {
   gl.uniform3fv(u.uMode, look.mode);
   gl.uniform3fv(u.uGrad0, look.g0);
   gl.uniform3fv(u.uGrad1, look.g1);
-  gl.uniform1f(u.uFogFar, 22);
+  gl.uniform1f(u.uFogFar, S.fog);
   gl.uniform3fv(u.uColA, look.a);
   gl.uniform3fv(u.uColB, look.b);
   gl.uniform4fv(u.uRipples, ripples);
@@ -631,7 +751,8 @@ function frame(now) {
     gl.bindTexture(gl.TEXTURE_2D, bloomA.tex);
     gl.uniform1i(compProg.u.uScene, 0);
     gl.uniform1i(compProg.u.uBloom, 1);
-    gl.uniform1f(compProg.u.uBloomK, 0.4);
+    gl.uniform1f(compProg.u.uBloomK, S.bloom);
+  gl.uniform1f(compProg.u.uExposure, S.exposure);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
