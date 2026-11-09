@@ -93,6 +93,7 @@ uniform float uToward;  // 0 rain falls down .. 1 light flows from the far side 
 uniform vec2 uFlowDir;  // horizontal direction of that flow (towards the eye)
 uniform vec2 uLane;     // lane width across the flow, lane height
 uniform float uSpan;
+uniform float uMove;  // 0 fixed LEDs .. 1 moving rain (switches at 0.5)
 uniform float uFogFar;
 uniform vec3 uColA;
 uniform vec3 uColB;
@@ -131,32 +132,73 @@ vec2 drop(float sd, float u, float trailK) {
   return vec2(rain, exp(-abs(d) * 90.0));
 }
 
+// For moving rain: a lit streak fixed to the particles themselves (p: the
+// particle's place in its stream, 0 .. 1, wrapping). Returns (trail, head).
+vec2 streak(float sd, float p, float trailK) {
+  float head = hash(sd + 4.0);
+  float trail = mix(0.04, 0.18, hash(sd + 3.0)) * trailK;
+  float d = fract(head - p);                         // 0 at the head, growing up the trail
+  float rain = exp(-d / trail) + exp(-(1.0 - d) * 120.0);
+  return vec2(rain, exp(-min(d, 1.0 - d) * 90.0));
+}
+
 void main() {
   float seed = aData.w;
   float u = aData.y;
-  vec3 pos = vec3(aData.x, (0.5 - u) * uHeight, aData.z);
+  vec3 base = vec3(aData.x, (0.5 - u) * uHeight, aData.z);
+  vec3 pos = base;
   float h = hash(seed + 5.0);
   float spatial = (pos.x + pos.z) * 0.012;           // bands lean a little across the field
-
-  // Two drops run down each strand at their own pace; in heavy rain two more
-  // join, one by one across the field, and every trail grows longer.
   float trailK = mix(1.0, 1.7, uRain);
   float g3 = hash(seed + 6.0) * 0.6;
   float g4 = 0.3 + hash(seed + 7.0) * 0.6;
-  vec2 down = drop(seed, u, trailK) + drop(seed + 17.0, u, trailK)
-            + drop(seed + 31.0, u, trailK) * smoothstep(g3, g3 + 0.15, uRain)
-            + drop(seed + 53.0, u, trailK) * smoothstep(g4, g4 + 0.15, uRain);
-  vec3 col = flowColor(u, spatial, h);
+
+  // Two modes. Fixed LEDs: the particles stay put and light runs through them.
+  // Moving rain: the particles themselves fall, carrying their light.
+  bool moving = uMove > 0.5;
+  vec2 down;
+  vec3 col;
+  if (!moving) {
+    // Two drops run down each strand at their own pace; in heavy rain two more
+    // join, one by one across the field, and every trail grows longer.
+    down = drop(seed, u, trailK) + drop(seed + 17.0, u, trailK)
+         + drop(seed + 31.0, u, trailK) * smoothstep(g3, g3 + 0.15, uRain)
+         + drop(seed + 53.0, u, trailK) * smoothstep(g4, g4 + 0.15, uRain);
+    col = flowColor(u, spatial, h);
+  } else {
+    // The whole stream slides down at its own speed and wraps at the bottom.
+    float speed = mix(0.07, 0.34, pow(hash(seed + 1.0), 1.5));
+    float uw = fract(u + uFlow * speed);
+    pos.y = (0.5 - uw) * uHeight;
+    down = streak(seed, u, trailK) + streak(seed + 17.0, u, trailK)
+         + streak(seed + 31.0, u, trailK) * smoothstep(g3, g3 + 0.15, uRain)
+         + streak(seed + 53.0, u, trailK) * smoothstep(g4, g4 + 0.15, uRain);
+    down *= smoothstep(0.0, 0.04, uw) * smoothstep(1.0, 0.96, uw); // no pop at the wrap
+    col = flowColor(uw, spatial, h);
+  }
 
   // Flow towards the eye: LEDs in one thin lane along the flow light up in turn.
   if (uToward > 0.001) {
     vec2 side = vec2(-uFlowDir.y, uFlowDir.x);
-    float lane = floor(dot(pos.xz, side) / uLane.x) * 7.31 + floor(pos.y / uLane.y) * 131.7;
-    float w = dot(pos.xz, uFlowDir) / (uSpan * 1.42) + 0.5; // 0 far side .. 1 near side
-    vec2 toward = drop(lane, w, trailK * 1.5)
-                + drop(lane + 97.0, w, trailK * 1.5) * smoothstep(0.2, 0.8, uRain);
-    down = mix(down, toward, uToward);
-    col = mix(col, flowColor(w, pos.y * 0.012, h), uToward);
+    float lane = floor(dot(base.xz, side) / uLane.x) * 7.31 + floor(base.y / uLane.y) * 131.7;
+    float w = dot(base.xz, uFlowDir) / (uSpan * 1.42) + 0.5; // 0 far side .. 1 near side
+    float gate = smoothstep(0.2, 0.8, uRain);
+    if (!moving) {
+      vec2 toward = drop(lane, w, trailK * 1.5) + drop(lane + 97.0, w, trailK * 1.5) * gate;
+      down = mix(down, toward, uToward);
+      col = mix(col, flowColor(w, base.y * 0.012, h), uToward);
+    } else if (uToward > 0.5) {
+      // Moving particles cannot be in two places: switch over at the half-way
+      // point, through darkness, instead of blending.
+      float ww = fract(w + uFlow * mix(0.07, 0.34, pow(hash(lane + 1.0), 1.5)));
+      pos = base;
+      pos.xz += uFlowDir * (ww - w) * uSpan * 1.42;
+      down = (streak(lane, w, trailK * 1.5) + streak(lane + 97.0, w, trailK * 1.5) * gate)
+           * smoothstep(0.0, 0.04, ww) * smoothstep(1.0, 0.96, ww) * (2.0 * uToward - 1.0);
+      col = flowColor(ww, base.y * 0.012, h);
+    } else {
+      down *= 1.0 - 2.0 * uToward;
+    }
   }
   float rain = down.x;
   float tip = down.y;
@@ -174,7 +216,7 @@ void main() {
 
   // Heads turn white, except in the rainbow, where they keep their colour.
   float white = mix(0.75, 0.15, uMode.z);
-  vec3 c = col * (0.025 + rain * 4.0)
+  vec3 c = col * ((moving ? 0.0 : 0.025) + rain * 4.0)
          + mix(col, vec3(1.0), white) * tip * 5.0
          + mix(col, vec3(1.0), 0.35) * ring * 1.6;
 
@@ -182,6 +224,7 @@ void main() {
   float dist = -mv.z;
   float fog = 1.0 - smoothstep(uFogFar * 0.3, uFogFar, dist);
   c *= fog;
+  c *= abs(2.0 * uMove - 1.0);                       // dark for a moment while switching modes
 
   // LEDs right at the eye are skipped: as opaque squares they would block the view.
   if (dist <= 1.2 || max(c.r, max(c.g, c.b)) < 0.002) {
@@ -451,6 +494,7 @@ addEventListener('keydown', (e) => {
   if (e.key === 'w') nextWeather(time); // next weather
   if (e.key === 'c') nextColor(time);   // next colour
   if (e.key === 'd') nextFlow(time);    // switch direction
+  if (e.key === 'm') moving = !moving;  // fixed LEDs <-> moving rain
 });
 
 let overlayTimer = setTimeout(hideOverlay, 7000);
@@ -478,6 +522,7 @@ let weather = null, weatherUntil = 0;
 let colorMode = null, colorUntil = 0;
 let flowMode = null, flowUntil = 0;
 let flowDir = [0, 1];
+let moving = params.get('motion') === 'rain';
 let aimFlow = false; // point flowDir at the eye on the next frame
 const goal = { mode: [1, 0, 0], a: PALETTES[0].a, b: PALETTES[0].b, g0: PALETTES[0].a, g1: PALETTES[1].b };
 
@@ -504,7 +549,7 @@ nextColor(0, params.get('color') || 'mono');
 nextFlow(0, params.get('flow') || 'down');
 const look = {
   flow: Number(params.get('t')) || 0,
-  flowRate: weather.flow, rain: weather.rain, toward: flowMode.toward,
+  flowRate: weather.flow, rain: weather.rain, toward: flowMode.toward, move: moving ? 1 : 0,
   mode: [...goal.mode], a: [...goal.a], b: [...goal.b], g0: [...goal.g0], g1: [...goal.g1],
 };
 
@@ -515,6 +560,7 @@ function ease(dt) {
   look.flowRate += (weather.flow - look.flowRate) * kw;
   look.rain += (weather.rain - look.rain) * kw;
   look.toward += (flowMode.toward - look.toward) * kw;
+  look.move += ((moving ? 1 : 0) - look.move) * (1 - Math.exp(-dt / 0.4));
   for (const key of ['mode', 'a', 'b', 'g0', 'g1']) {
     for (let i = 0; i < 3; i++) look[key][i] += (goal[key][i] - look[key][i]) * kc;
   }
@@ -586,6 +632,7 @@ function frame(now) {
   gl.uniform2fv(u.uFlowDir, flowDir);
   gl.uniform2f(u.uLane, SPAN / (GRID - 1), HEIGHT / ROWS);
   gl.uniform1f(u.uSpan, SPAN);
+  gl.uniform1f(u.uMove, look.move);
   gl.uniform3fv(u.uMode, look.mode);
   gl.uniform3fv(u.uGrad0, look.g0);
   gl.uniform3fv(u.uGrad1, look.g1);
