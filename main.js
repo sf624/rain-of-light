@@ -74,7 +74,7 @@ const DEFAULTS = {
   density: 'auto', strandShare: 1.0, rowShare: 1.0, strandMin: 0.3, rowMin: 0.35,
   size: 0.013, maxPx: 4.5, rest: 0.025,
   rainGain: 4.0, tipGain: 5.0, exposure: 1.5, bloom: 0.4, fog: 22,
-  speed: 1.0, trail: 1.0, weather: 'auto',
+  speed: 1.0, trail: 1.0, weather: 'auto', turnTime: 8, turnSteps: 9,
   color: 'auto', palette: 'auto', rainbow: 'drop', bandSpeed: 0.17, bandScale: 1.0, saturation: 1.0,
   flow: 'auto',
   camera: 'orbit', orbit: 0.025, radius: 7.5, fov: 60,
@@ -113,6 +113,8 @@ const SCHEMA = [
     { key: 'trail', label: '尾の長さ (倍)', min: 0.2, max: 4, step: 0.05 },
     { key: 'flow', label: '向き', options: ['auto', 'down', 'across'],
       hint: 'down: 上から下 / across: 水平 (向きは毎回ランダム)' },
+    { key: 'turnTime', label: '向きが変わる時間 (秒)', min: 1, max: 30, step: 0.5 },
+    { key: 'turnSteps', label: '回転の段数 (1でクロスフェード)', min: 1, max: 18, step: 1 },
   ] },
   { title: '色', items: [
     { key: 'color', label: '色の出し方', options: ['auto', 'mono', 'gradient', 'rainbow'] },
@@ -156,7 +158,8 @@ uniform float uRain;  // 0 light rain .. 1 downpour
 uniform vec3 uMode;  // weights of mono, gradient, rainbow
 uniform vec3 uGrad0;
 uniform vec3 uGrad1;
-uniform float uToward;  // 0 rain falls down .. 1 light flows sideways
+uniform float uTurn;       // 0 rain falls down .. 1 light flows sideways
+uniform float uTurnSteps;  // steps the flow turns through on the way
 uniform vec2 uFlowDir;  // horizontal direction of that flow
 uniform vec2 uLane;     // lane width across the flow, lane height
 uniform float uSpan;
@@ -224,6 +227,36 @@ void gather(inout Lit L, vec4 r, float sd, float w) {
   L.tipCol += now * r.z * w;
 }
 
+// The rain on one strand: two drops at their own pace; in heavy rain two more
+// join, one by one across the field, and every trail grows longer.
+void strandRain(inout Lit L, float seed, float u, float trailK, float w) {
+  float g3 = hash(seed + 6.0) * 0.6;
+  float g4 = 0.3 + hash(seed + 7.0) * 0.6;
+  gather(L, drop(seed, u, trailK), seed, w);
+  gather(L, drop(seed + 17.0, u, trailK), seed + 17.0, w);
+  gather(L, drop(seed + 31.0, u, trailK), seed + 31.0, w * smoothstep(g3, g3 + 0.15, uRain));
+  gather(L, drop(seed + 53.0, u, trailK), seed + 53.0, w * smoothstep(g4, g4 + 0.15, uRain));
+}
+
+// Light flowing at theta from straight down, leaning towards uFlowDir: LEDs in
+// one thin tube along that direction light up in turn. Returns the place along
+// the tube (0 .. 1), for the colour.
+float tiltedRain(inout Lit L, vec3 pos, float theta, float trailK, float w) {
+  vec3 hz = vec3(uFlowDir.x, 0.0, uFlowDir.y);
+  float st = sin(theta), ct = cos(theta);
+  vec3 D = vec3(hz.x * st, -ct, hz.z * st);
+  vec3 s1 = vec3(-hz.z, 0.0, hz.x);                  // across the flow, horizontal
+  vec3 s2 = cross(D, s1);                            // across the flow, in its vertical plane
+  float size2 = uLane.x * ct + uLane.y * st;         // LED spacing along s2
+  float lane = floor(dot(pos, s1) / uLane.x) * 7.31 + floor(dot(pos, s2) / size2) * 131.7 + theta * 57.3;
+  float len = abs(D.x) * uSpan + abs(D.y) * uHeight + abs(D.z) * uSpan;
+  float along = dot(pos, D) / len + 0.5;
+  float k = trailK * mix(1.0, 1.5, st);
+  gather(L, drop(lane, along, k), lane, w);
+  gather(L, drop(lane + 97.0, along, k), lane + 97.0, w * smoothstep(0.2, 0.8, uRain));
+  return along;
+}
+
 void main() {
   float seed = aData.w;
   float u = aData.y;
@@ -232,26 +265,24 @@ void main() {
   float spatial = (pos.x + pos.z) * 0.012;           // bands lean a little across the field
   Lit L = Lit(0.0, 0.0, vec3(0.0), vec3(0.0));
 
-  // Two drops run down each strand at their own pace; in heavy rain two more
-  // join, one by one across the field, and every trail grows longer.
+  // The flow turns from straight down to sideways in uTurnSteps steps; each
+  // step's lanes cross-fade into the next, so the streaks seem to tilt over.
   float trailK = mix(1.0, 1.7, uRain) * uTrail;
-  float wd = 1.0 - uToward;
-  float g3 = hash(seed + 6.0) * 0.6;
-  float g4 = 0.3 + hash(seed + 7.0) * 0.6;
-  gather(L, drop(seed, u, trailK), seed, wd);
-  gather(L, drop(seed + 17.0, u, trailK), seed + 17.0, wd);
-  gather(L, drop(seed + 31.0, u, trailK), seed + 31.0, wd * smoothstep(g3, g3 + 0.15, uRain));
-  gather(L, drop(seed + 53.0, u, trailK), seed + 53.0, wd * smoothstep(g4, g4 + 0.15, uRain));
-  vec3 col = flowColor(u, spatial, h);
-
-  // Sideways flow: LEDs in one thin lane along the flow light up in turn.
-  if (uToward > 0.001) {
-    vec2 side = vec2(-uFlowDir.y, uFlowDir.x);
-    float lane = floor(dot(pos.xz, side) / uLane.x) * 7.31 + floor(pos.y / uLane.y) * 131.7;
-    float w = dot(pos.xz, uFlowDir) / (uSpan * 1.42) + 0.5; // 0 far side .. 1 near side
-    gather(L, drop(lane, w, trailK * 1.5), lane, uToward);
-    gather(L, drop(lane + 97.0, w, trailK * 1.5), lane + 97.0, uToward * smoothstep(0.2, 0.8, uRain));
-    col = mix(col, flowColor(w, pos.y * 0.012, h), uToward);
+  float t = uTurn * uTurnSteps;
+  float k0 = min(floor(t), uTurnSteps);
+  float f = t - k0;
+  vec3 col = vec3(0.0);
+  for (int i = 0; i < 2; i++) {
+    float k = k0 + float(i);
+    float w = i == 0 ? 1.0 - f : f;
+    if (w < 0.001 || k > uTurnSteps + 0.5) continue;
+    if (k < 0.5) {
+      strandRain(L, seed, u, trailK, w);
+      col += flowColor(u, spatial, h) * w;
+    } else {
+      float along = tiltedRain(L, pos, k / uTurnSteps * 1.5707963, trailK, w);
+      col += flowColor(along, spatial, h) * w;
+    }
   }
   float rain = L.rain;
   float tip = L.tip;
@@ -650,6 +681,8 @@ let flowMode = null, flowUntil = 0;
 const densityGoal = [1, 1];
 let densityUntil = 0;
 let flowDir = [0, 1];
+// Turning between falling (0) and sideways (1): from, to, progress 0..1, now.
+let turnFrom = 0, turnTo = 0, turnP = 1, turnNow = 0;
 const goal = { mode: [1, 0, 0], a: PALETTES[0].a, b: PALETTES[0].b, g0: PALETTES[0].a, g1: PALETTES[1].b };
 
 // A setting other than auto holds its choice until it is changed.
@@ -661,10 +694,16 @@ function nextWeather(now) {
 function nextFlow(now) {
   flowMode = pick(FLOWS, flowMode, forced('flow'));
   flowUntil = forced('flow') ? Infinity : now + rand(...flowMode.hold);
-  // A new horizontal direction for each sideways episode, kept until the next.
-  if (flowMode.toward) {
+  // A new horizontal direction for each sideways episode, picked while the
+  // rain still falls straight down, so the turn never swings round.
+  if (flowMode.toward && turnNow < 0.01) {
     const a = Math.random() * Math.PI * 2;
     flowDir = [Math.cos(a), Math.sin(a)];
+  }
+  if (flowMode.toward !== turnTo) {
+    turnFrom = turnNow;
+    turnTo = flowMode.toward;
+    turnP = 0;
   }
 }
 // Camera moves. All run on one clock, so any blend of them moves smoothly.
@@ -770,7 +809,7 @@ const tuner = createTuner({
 });
 const look = {
   flow: Number(params.get('t')) || 0,
-  flowRate: weather.flow, rain: weather.rain, toward: flowMode.toward,
+  flowRate: weather.flow, rain: weather.rain,
   density: [S.density === 'manual' ? S.strandShare : 1, S.density === 'manual' ? S.rowShare : 1],
   mode: [...goal.mode], a: [...goal.a], b: [...goal.b], g0: [...goal.g0], g1: [...goal.g1],
 };
@@ -781,7 +820,8 @@ function ease(dt) {
   const kc = 1 - Math.exp(-dt / 3.0);
   look.flowRate += (weather.flow - look.flowRate) * kw;
   look.rain += (weather.rain - look.rain) * kw;
-  look.toward += (flowMode.toward - look.toward) * kw;
+  turnP = Math.min(1, turnP + dt / Math.max(0.1, S.turnTime));
+  turnNow = turnFrom + (turnTo - turnFrom) * smooth(turnP);
   const kd = 1 - Math.exp(-dt / 5.0); // density drifts slowly
   for (let i = 0; i < 2; i++) look.density[i] += (densityGoal[i] - look.density[i]) * kd;
   for (const key of ['mode', 'a', 'b', 'g0', 'g1']) {
@@ -874,7 +914,8 @@ function frame(now) {
   gl.uniform1f(u.uBowStyle, { bands: 0, drop: 1, led: 2 }[S.rainbow] ?? 1);
   gl.uniform1f(u.uFlow, look.flow);
   gl.uniform1f(u.uRain, look.rain);
-  gl.uniform1f(u.uToward, look.toward);
+  gl.uniform1f(u.uTurn, turnNow);
+  gl.uniform1f(u.uTurnSteps, Math.max(1, Math.round(S.turnSteps)));
   gl.uniform2fv(u.uFlowDir, flowDir);
   gl.uniform2f(u.uLane, SPAN / (GRID - 1), HEIGHT / ROWS);
   gl.uniform1f(u.uSpan, SPAN);
