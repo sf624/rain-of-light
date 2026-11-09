@@ -14,16 +14,8 @@ import { createGL, sub, cross, dot, norm, perspective, lookAt } from './gl.js';
 import { createLattice, buildLattice as fillLattice } from './lattice.js';
 import { createControls } from './controls.js';
 
-// Show any error on the page, so a black screen is never silent.
-function showError(msg) {
-  const el = document.getElementById('fallback');
-  el.textContent = String(msg);
-  el.style.whiteSpace = 'pre-wrap';
-  el.style.fontSize = '13px';
-  el.hidden = false;
-}
-addEventListener('error', (e) => showError(e.message || e.error));
-addEventListener('unhandledrejection', (e) => showError(e.reason));
+// Errors show on the page (see the inline script in index.html), so a black screen is never silent.
+const showError = window.showError;
 
 const canvas = document.getElementById('stage');
 const overlay = document.getElementById('overlay');
@@ -39,7 +31,8 @@ if (!gl) {
   throw new Error('WebGL2 not available');
 }
 
-const hasFloat = !!gl.getExtension('EXT_color_buffer_float');
+// Either extension makes RGBA16F targets renderable.
+const hasFloat = !!(gl.getExtension('EXT_color_buffer_float') || gl.getExtension('EXT_color_buffer_half_float'));
 
 // ---------- fixed settings (also ?dpr=1.5) ----------
 const params = new URLSearchParams(location.search);
@@ -478,6 +471,7 @@ function frame(now) {
   gl.uniformMatrix4fv(u.uView, false, view);
   gl.uniform1f(u.uTime, time);
   gl.uniform1f(u.uHeight, HEIGHT);
+  gl.uniform1f(u.uGain, hasFloat ? 1 : S.exposure * glow); // without float buffers the points go to the screen
   gl.uniform1f(u.uFocal, (H / 2) / Math.tan(fovRad() / 2));
   gl.uniform1f(u.uSize, S.size);
   gl.uniform1f(u.uMaxPx, S.maxPx);

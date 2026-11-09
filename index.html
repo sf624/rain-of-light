@@ -28,6 +28,18 @@
   <noscript><p class="fallback">This page needs JavaScript and WebGL.</p></noscript>
   <p class="fallback" id="fallback" hidden>This browser does not support WebGL2.</p>
 
+  <!-- Before the module: a module that fails to load or throws still shows its error. -->
+  <script>
+    function showError(msg) {
+      var el = document.getElementById('fallback');
+      el.textContent = String(msg);
+      el.style.whiteSpace = 'pre-wrap';
+      el.style.fontSize = '13px';
+      el.hidden = false;
+    }
+    addEventListener('error', function (e) { showError(e.message || e.error); });
+    addEventListener('unhandledrejection', function (e) { showError(e.reason); });
+  </script>
   <script type="module" src="main.js"></script>
 </body>
 </html>

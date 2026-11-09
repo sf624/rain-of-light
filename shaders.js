@@ -278,6 +278,7 @@ export const POINT_FS = `#version 300 es
 precision mediump float;
 in vec3 vColor;
 in float vSize;
+uniform float uGain; // 1 with float buffers (the composite pass applies exposure); else exposure and breath
 out vec4 outColor;
 void main() {
   // An opaque round LED. Its rim pixel is darkened rather than blended,
@@ -287,7 +288,7 @@ void main() {
   float edge = vSize < 3.5 ? 1.0 : 1.0 - smoothstep(1.0 - 2.0 / vSize, 1.0, r);
   if (edge <= 0.15) discard;
   float a = edge * (0.85 + 0.15 * (1.0 - r * r));   // slightly brighter centre
-  outColor = vec4(vColor * a, 1.0);
+  outColor = vec4(vColor * a * uGain, 1.0);
 }`;
 
 export const QUAD_VS = `#version 300 es
