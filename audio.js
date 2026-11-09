@@ -21,6 +21,8 @@ const BELLS = [62, 64, 66, 69, 71, 74, 76, 78, 81]; // D major pentatonic
 
 export function createAudio({ settings }) {
   let ctx = null, master = null, bus = null, verb = null, rainGain = null, clickBuf = null;
+  let padBus = null;  // the pad, swelling with the breath
+  let dimK = 1;       // 0 .. 1: the timer's fade at the end
   let on = false, chord = -1, timers = [];
   let bright = null;                                    // the pad's brightness, shared by every voice
   const padSway = createSway({ fastest: 1, octaves: 6 });  // seconds: 1 s .. about a minute
@@ -63,6 +65,10 @@ export function createAudio({ settings }) {
     const hp = ctx.createBiquadFilter();
     hp.type = 'highpass';
     hp.frequency.value = 250;
+    padBus = ctx.createGain();
+    padBus.connect(bus);
+    padBus.connect(send(0.7));
+
     rainGain = ctx.createGain();
     rainGain.gain.value = 0;
     noise.connect(lp).connect(hp).connect(rainGain);
@@ -130,8 +136,7 @@ export function createAudio({ settings }) {
       const pan = ctx.createStereoPanner();
       pan.pan.value = rand(-0.6, 0.6);
       filter.connect(out).connect(pan);
-      pan.connect(bus);
-      pan.connect(send(0.7));
+      pan.connect(padBus);
       const layers = [['sine', 0, -4, 1], ['triangle', 0, 4, 0.8], ['sawtooth', 0, rand(-8, 8), 0.12]];
       if (i >= notes.length - 2) layers.push(['sine', 12, rand(-3, 3), 0.22]); // the airy top
       for (const [type, up, cents, gain] of layers) {
@@ -229,7 +234,7 @@ export function createAudio({ settings }) {
     const t = ctx.currentTime;
     master.gain.cancelScheduledValues(t);
     master.gain.setValueAtTime(master.gain.value, t);
-    master.gain.linearRampToValueAtTime(settings.volume, t + 3);
+    master.gain.linearRampToValueAtTime(settings.volume * dimK, t + 3);
     nextChord();
     tick();
   }
@@ -253,11 +258,22 @@ export function createAudio({ settings }) {
     toggle() { if (on) stop(); else start(); },
     // A wave of light rings a bell, panned to where it is seen.
     ripple(pan) { bell(pan, 0.65 + 0.3 * bellLoud(1)); },
+    // The pad's level with the breath, 0 .. 1.
+    breath(k) {
+      if (!ctx || !on) return;
+      padBus.gain.setTargetAtTime(k, ctx.currentTime, 0.1);
+    },
+    // Everything fades with the light at the end of a timer, 0 .. 1.
+    dim(k) {
+      if (Math.abs(k - dimK) < 0.002) return;
+      dimK = k;
+      this.volume();
+    },
     // The overall volume, 0 .. 1, eased so a dragged slider does not crackle.
     volume() {
       if (!ctx || !on) return;
       master.gain.cancelScheduledValues(ctx.currentTime);
-      master.gain.setTargetAtTime(settings.volume, ctx.currentTime, 0.05);
+      master.gain.setTargetAtTime(settings.volume * dimK, ctx.currentTime, 0.05);
     },
     // The hush follows the weather (0 light rain .. 1 downpour) and the sway
     // the light rain sways with (-1 .. 1), so sound and light swell together.

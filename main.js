@@ -115,11 +115,13 @@ const DEFAULTS = {
   flow: 'auto',
   camera: 'orbit', orbit: 0.025, radius: 7.5, fov: 60,
   ripples: 12,
+  breath: 'on', breathRate: 6, breathDepth: 0.3, timer: 'off',
   volume: 0.8, music: 0.6, chimes: 0.6, rainSound: 0.3,
 };
 // Older links used ?color=, ?weather= and ?flow= the same way, so they still work.
 const STORAGE_KEY = 'rain-of-light:settings';
 const S = loadSettings(DEFAULTS, STORAGE_KEY, params);
+S.timer = 'off'; // a timer runs only when started, never on its own after a reload
 
 const SCHEMA = [
   { title: 'Density', items: [
@@ -179,6 +181,14 @@ const SCHEMA = [
   ] },
   { title: 'Ripples', items: [
     { key: 'ripples', label: 'Auto interval, about (s, 0: none)', min: 0, max: 30, step: 0.5 },
+  ] },
+  { title: 'Meditation', items: [
+    { key: 'breath', label: 'Breathing guide', options: ['on', 'off'],
+      hint: 'The light and the pad swell as you breathe in (4 parts) and fade as you breathe out (6 parts)' },
+    { key: 'breathRate', label: 'Breaths per minute', min: 3, max: 12, step: 0.5 },
+    { key: 'breathDepth', label: 'Depth of the swell', min: 0, max: 0.8, step: 0.05 },
+    { key: 'timer', label: 'Timer (min)', options: ['off', '5', '10', '20', '30'],
+      hint: 'Starts at once with a bell; at the end three bells ring and light and sound fade out. Click to come back.' },
   ] },
   { title: 'Sound (m key or the note button)', items: [
     { key: 'volume', label: 'Volume', min: 0, max: 1, step: 0.01 },
@@ -786,6 +796,50 @@ addEventListener('pointermove', (e) => {
 });
 addEventListener('pointerdown', wake);
 
+// ---------- breath and timer ----------
+let breathPhase = 0;                 // 0 .. 1 through one breath
+const INHALE = 0.4;                  // breathing in takes 4 parts of 10
+function breathAt(dt) {
+  breathPhase = (breathPhase + dt * S.breathRate / 60) % 1;
+  const p = breathPhase;
+  return p < INHALE ? 0.5 - 0.5 * Math.cos(Math.PI * p / INHALE)       // in: rise
+    : 0.5 + 0.5 * Math.cos(Math.PI * (p - INHALE) / (1 - INHALE));    // out: fall
+}
+
+let timerEnd = Infinity, timerBells = [], fadeAt = Infinity, fadeGoal = 1, fade = 1, ended = false;
+function bellAhead() {             // a wave (and its bell) straight ahead
+  if (!camera) return;
+  const { eye, f } = camera;
+  addRipple(eye[0] + f[0] * 7, eye[1] + f[1] * 7, eye[2] + f[2] * 7, time);
+}
+function startTimer(minutes) {
+  timerEnd = time + minutes * 60;
+  timerBells = [time + 0.5];
+  fadeAt = Infinity; fadeGoal = 1; ended = false;
+}
+function stopTimer() {
+  timerEnd = Infinity; timerBells = []; fadeAt = Infinity; fadeGoal = 1; ended = false;
+}
+function timerStep(dt) {
+  if (time > timerEnd) {           // the end: three bells, then fade out
+    timerEnd = Infinity;
+    timerBells = [time, time + 4, time + 8];
+    fadeAt = time + 10;
+  }
+  while (timerBells.length && time >= timerBells[0]) { timerBells.shift(); bellAhead(); }
+  if (time > fadeAt) { fadeAt = Infinity; fadeGoal = 0; ended = true; }
+  fade += (fadeGoal - fade) * (1 - Math.exp(-dt / (fadeGoal ? 2 : 6)));
+}
+// After the end, a click (or a key) brings light and sound back.
+function comeBack() {
+  if (!ended) return;
+  stopTimer();
+  tuner.set('timer', 'off');
+  tuner.refresh();
+}
+addEventListener('pointerdown', comeBack);
+addEventListener('keydown', comeBack);
+
 canvas.addEventListener('pointerdown', (e) => {
   hideOverlay();
   if (!camera) return;
@@ -990,6 +1044,7 @@ function apply(key) {
     rebuildTimer = setTimeout(buildLattice, 250); // wait for the slider to settle
   }
   if (key === 'volume') { sound.volume(); volumeBar.value = S.volume; }
+  if (key === 'timer') { if (S.timer === 'off') stopTimer(); else startTimer(Number(S.timer)); }
   if (key === 'weather') nextWeather(time);
   if (key === 'flow') nextFlow(time);
   if (key === 'camera') nextCamera(time);
@@ -1079,7 +1134,7 @@ function frame(now) {
   camera = { eye, f, r, u: cross(r, f), aspect };
 
   // A wave now and then, somewhere in the field.
-  if (S.ripples > 0 && time > nextAuto) {
+  if (S.ripples > 0 && time > nextAuto && fadeGoal > 0) {
     addRipple((Math.random() - 0.5) * SPAN * 0.6, (Math.random() - 0.5) * HEIGHT * 0.5,
       (Math.random() - 0.5) * SPAN * 0.6, time);
     // While waves repaint the field, they come more often.
@@ -1095,6 +1150,12 @@ function frame(now) {
   if (time > camUntil) nextCamera(time);
   ease(dt);
   sound.rain(look.rain, sway);
+  // Breath: light and pad swell and ease; the timer's fade dims them both.
+  timerStep(dt);
+  const breath = S.breath === 'on' ? breathAt(dt) : 1;
+  const glow = (1 - S.breathDepth * (1 - breath)) * fade;
+  sound.breath(1 - S.breathDepth * 0.8 * (1 - breath));
+  sound.dim(fade);
 
   // Points.
   gl.bindFramebuffer(gl.FRAMEBUFFER, hasFloat ? scene.fb : null);
@@ -1183,7 +1244,7 @@ function frame(now) {
     gl.uniform1i(compProg.u.uScene, 0);
     gl.uniform1i(compProg.u.uBloom, 1);
     gl.uniform1f(compProg.u.uBloomK, S.bloom);
-  gl.uniform1f(compProg.u.uExposure, S.exposure);
+  gl.uniform1f(compProg.u.uExposure, S.exposure * glow);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
