@@ -114,7 +114,7 @@ const DEFAULTS = {
   set: 'auto', skyDay: 90,
   flow: 'auto',
   camera: 'orbit', orbit: 0.025, radius: 7.5, fov: 60,
-  ripples: 9,
+  ripples: 12,
   volume: 0.8, music: 0.6, chimes: 0.6, rainSound: 0.3,
 };
 // Older links used ?color=, ?weather= and ?flow= the same way, so they still work.
@@ -178,7 +178,7 @@ const SCHEMA = [
     { key: 'fov', label: 'Field of view (deg)', min: 30, max: 110, step: 1 },
   ] },
   { title: 'Ripples', items: [
-    { key: 'ripples', label: 'Auto interval (s, 0: none)', min: 0, max: 30, step: 0.5 },
+    { key: 'ripples', label: 'Auto interval, about (s, 0: none)', min: 0, max: 30, step: 0.5 },
   ] },
   { title: 'Sound (m key or the note button)', items: [
     { key: 'volume', label: 'Volume', min: 0, max: 1, step: 0.01 },
@@ -715,11 +715,10 @@ function resize() {
 // ---------- interaction ----------
 const ripples = new Float32Array(8 * 4).fill(-1e4);
 let rippleIndex = 0;
-function addRipple(x, y, z, t, ring = true) {
+function addRipple(x, y, z, t) {
   ripples.set([x, y, z, t], rippleIndex * 4);
   rippleIndex = (rippleIndex + 1) % 8;
-  // A wave rings a bell, from the side where it is seen.
-  if (!ring) return;
+  // Every wave rings a bell, from the side where it is seen.
   const pan = camera ? dot([x - camera.eye[0], y - camera.eye[1], z - camera.eye[2]], camera.r) / 6 : 0;
   sound.ripple(pan);
 }
@@ -827,6 +826,7 @@ function hideOverlay() {
 
 let time = Number(params.get('t')) || 0;
 let nextAuto = 2;   // the next automatic wave
+const rippleGap = createSway({ fastest: 1, octaves: 5 }); // per wave: how long until the next
 let look = null;    // the look now, easing towards the goal (set up below)
 
 // ---------- director: weather and colour change on their own ----------
@@ -1081,10 +1081,11 @@ function frame(now) {
   // A wave now and then, somewhere in the field.
   if (S.ripples > 0 && time > nextAuto) {
     addRipple((Math.random() - 0.5) * SPAN * 0.6, (Math.random() - 0.5) * HEIGHT * 0.5,
-      (Math.random() - 0.5) * SPAN * 0.6, time, Math.random() < 0.3); // a click always rings, these seldom
+      (Math.random() - 0.5) * SPAN * 0.6, time);
     // While waves repaint the field, they come more often.
+    // The gaps sway with 1/f fluctuation: about half to twice the setting.
     const every = colorMode.name === 'repaint' ? Math.min(S.ripples, 6) : S.ripples;
-    nextAuto = time + every * (0.7 + Math.random() * 0.6);
+    nextAuto = time + every * Math.exp(0.7 * rippleGap(1));
   }
 
   if (time > weatherUntil) nextWeather(time);

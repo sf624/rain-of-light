@@ -1,8 +1,8 @@
-// Calm generative music for the rain: a slow pad in D major, soft bells now
-// and then (and with every wave of light), the hush of rain, and a long reverb.
+// Calm generative music for the rain: a slow pad in D major, a soft bell with
+// every wave of light, the hush of rain, and a long reverb.
 // Web Audio only, no files. Browsers start sound only after a click or a key.
-// What changes slowly (the bells' timing, pitch and strength, the pad's
-// brightness, the hush of rain) sways with 1/f fluctuation, see sway.js.
+// What changes slowly (the bells' pitch and strength, the pad's brightness,
+// the hush of rain) sways with 1/f fluctuation, see sway.js.
 
 import { createSway } from './sway.js';
 
@@ -24,7 +24,6 @@ export function createAudio({ settings }) {
   let on = false, chord = -1, timers = [];
   let bright = null;                                    // the pad's brightness, shared by every voice
   const padSway = createSway({ fastest: 1, octaves: 6 });  // seconds: 1 s .. about a minute
-  const bellGap = createSway({ fastest: 1, octaves: 5 });  // per bell: how long until the next
   const bellPitch = createSway({ fastest: 1, octaves: 5 }); // per bell: which note (a 1/f melody)
   const bellLoud = createSway({ fastest: 1, octaves: 4 });  // per bell: how strong
   const TICK = 0.25;                                    // seconds between brightness updates
@@ -217,12 +216,6 @@ export function createAudio({ settings }) {
     n.start(t);
   }
 
-  function bells() {
-    if (!on) return;
-    bell(rand(-0.7, 0.7), 0.6 + 0.3 * bellLoud(1));
-    later(bells, 16 * Math.exp(0.7 * bellGap(1)) * 1000); // about 8 .. 32 s
-  }
-
   function later(fn, ms) {
     const id = setTimeout(() => { timers = timers.filter((x) => x !== id); fn(); }, ms);
     timers.push(id);
@@ -239,7 +232,6 @@ export function createAudio({ settings }) {
     master.gain.linearRampToValueAtTime(settings.volume, t + 3);
     nextChord();
     tick();
-    later(bells, 4000);
   }
 
   function stop() {
@@ -260,7 +252,7 @@ export function createAudio({ settings }) {
     stop,
     toggle() { if (on) stop(); else start(); },
     // A wave of light rings a bell, panned to where it is seen.
-    ripple(pan) { bell(pan, 1); },
+    ripple(pan) { bell(pan, 0.65 + 0.3 * bellLoud(1)); },
     // The overall volume, 0 .. 1, eased so a dragged slider does not crackle.
     volume() {
       if (!ctx || !on) return;
