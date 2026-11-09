@@ -481,17 +481,12 @@ gl.enableVertexAttribArray(1);
 gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 0, 0);
 gl.bindVertexArray(null);
 
-// Ranks in 0..1 whose every prefix is spread evenly: a Bayer matrix for the
-// strands (2-D), bit reversal for the LEDs along a strand (1-D).
+// Ranks in 0..1 for thinning. Along a strand, bit reversal: every prefix is
+// spread evenly. Each strand starts that order at its own row, and strands
+// get random ranks: an order shared by all strands (or a Bayer matrix across
+// them) put the dark LEDs at the same heights or in the same rows of strands,
+// which showed as straight dark lines across the view.
 const bitsFor = (n) => Math.max(1, Math.ceil(Math.log2(n)));
-function bayer(x, y, bits) {
-  let v = 0;
-  for (let b = 0; b < bits; b++) {
-    const xb = (x >> b) & 1, yb = (y >> b) & 1;
-    v = v * 4 + 2 * (xb ^ yb) + yb;
-  }
-  return v; // bits are taken low first, so the finest level varies slowest
-}
 function bitReverse(n, bits) {
   let v = 0;
   for (let b = 0; b < bits; b++) v = (v << 1) | ((n >> b) & 1);
@@ -506,13 +501,8 @@ function buildLattice() {
   const data = new Float32Array(count * 4);
   const rank = new Float32Array(count * 2);
   const step = SPAN / (GRID - 1);
-  const gb = bitsFor(GRID), rb = bitsFor(ROWS);
-  // Rank only among the cells in use, so shares map evenly onto 0..1.
-  const strandOrder = [];
-  for (let i = 0; i < GRID; i++) for (let j = 0; j < GRID; j++) strandOrder.push([bayer(i, j, gb), i * GRID + j]);
-  strandOrder.sort((a, b) => a[0] - b[0]);
-  const strandRank = new Float32Array(GRID * GRID);
-  strandOrder.forEach(([, id], n) => { strandRank[id] = (n + 0.5) / (GRID * GRID); });
+  const rb = bitsFor(ROWS);
+  // Rank only among the rows in use, so shares map evenly onto 0..1.
   const rowOrder = [];
   for (let r = 0; r < ROWS; r++) rowOrder.push([bitReverse(r, rb), r]);
   rowOrder.sort((a, b) => a[0] - b[0]);
@@ -523,17 +513,19 @@ function buildLattice() {
     for (let j = 0; j < GRID; j++) {
       // Jitter each strand, and shift its LEDs by up to one row, so that rows
       // and columns never line up into dark lines across the view.
-      const x = -SPAN / 2 + i * step + (Math.random() - 0.5) * step * 0.7;
-      const z = -SPAN / 2 + j * step + (Math.random() - 0.5) * step * 0.7;
+      const x = -SPAN / 2 + i * step + (Math.random() - 0.5) * step;
+      const z = -SPAN / 2 + j * step + (Math.random() - 0.5) * step;
       const shift = Math.random();
       const seed = Math.random() * 1000;
+      const strandRank = Math.random();
+      const rowStart = Math.floor(Math.random() * ROWS);
       for (let r = 0; r < ROWS; r++) {
         data[k++] = x;
         data[k++] = (r + shift) / ROWS;
         data[k++] = z;
         data[k++] = seed;
-        rank[q++] = strandRank[i * GRID + j];
-        rank[q++] = rowRank[r];
+        rank[q++] = strandRank;
+        rank[q++] = rowRank[(r + rowStart) % ROWS];
       }
     }
   }
