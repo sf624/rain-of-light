@@ -131,13 +131,13 @@ export function createAudio({ settings }) {
       filter.frequency.value = rand(1100, 1600);
       filter.Q.value = 0.7;
       bright.connect(filter.frequency);
-      later(() => bright.disconnect(filter.frequency), (end - t + 0.5) * 1000);
       const pan = ctx.createStereoPanner();
       pan.pan.value = rand(-0.6, 0.6);
       filter.connect(out).connect(pan);
       pan.connect(padBus);
       const layers = [['sine', 0, -4, 1], ['triangle', 0, 4, 0.8], ['sawtooth', 0, rand(-8, 8), 0.12]];
       if (i >= notes.length - 2) layers.push(['sine', 12, rand(-3, 3), 0.22]); // the airy top
+      let last = null;
       for (const [type, up, cents, gain] of layers) {
         const o = ctx.createOscillator();
         o.type = type;
@@ -148,7 +148,11 @@ export function createAudio({ settings }) {
         o.connect(g).connect(filter);
         o.start(t);
         o.stop(end);
+        last = o;
       }
+      // Let go of the shared brightness when the voice ends (a timer would not
+      // survive the sound being turned off).
+      last.onended = () => bright.disconnect(filter.frequency);
     }
   }
 
