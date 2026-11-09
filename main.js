@@ -71,6 +71,7 @@ const COLOR_MODES = [
 // ---------- tunable settings (panel: p key or the gear button; also ?key=value) ----------
 const DEFAULTS = {
   grid: small ? 48 : 80,  rows: small ? 96 : 128,
+  density: 'auto', strandShare: 1.0, rowShare: 1.0, strandMin: 0.3, rowMin: 0.35,
   size: 0.013, maxPx: 4.5, rest: 0.025,
   rainGain: 4.0, tipGain: 5.0, exposure: 1.5, bloom: 0.4, fog: 22,
   speed: 1.0, trail: 1.0, weather: 'auto',
@@ -85,8 +86,14 @@ const S = loadSettings(DEFAULTS, STORAGE_KEY, params);
 
 const SCHEMA = [
   { title: '密度', items: [
-    { key: 'grid', label: '糸の本数 (一辺)', min: 8, max: 160, step: 1 },
-    { key: 'rows', label: '1本の粒の数', min: 8, max: 256, step: 1 },
+    { key: 'grid', label: '糸の本数 (一辺, 最大)', min: 8, max: 160, step: 1 },
+    { key: 'rows', label: '1本の粒の数 (最大)', min: 8, max: 256, step: 1 },
+    { key: 'density', label: '密度の変化', options: ['auto', 'manual'],
+      hint: 'auto: 下限から最大の間でゆっくり変わる / manual: 下の割合で固定' },
+    { key: 'strandShare', label: '糸の割合 (manual)', min: 0.02, max: 1, step: 0.01 },
+    { key: 'rowShare', label: '粒の割合 (manual)', min: 0.02, max: 1, step: 0.01 },
+    { key: 'strandMin', label: '糸の割合の下限 (auto)', min: 0.02, max: 1, step: 0.01 },
+    { key: 'rowMin', label: '粒の割合の下限 (auto)', min: 0.02, max: 1, step: 0.01 },
   ] },
   { title: 'LED', items: [
     { key: 'size', label: '粒の大きさ', min: 0.004, max: 0.05, step: 0.001 },
@@ -130,6 +137,7 @@ const fovRad = () => S.fov * Math.PI / 180;
 const POINT_VS = `#version 300 es
 precision highp float;
 layout(location = 0) in vec4 aData; // x, u (0 top .. 1 bottom), z, seed
+layout(location = 1) in vec2 aRank; // order in which strands and LEDs go dark when thinning
 uniform mat4 uProj;
 uniform mat4 uView;
 uniform float uTime;
@@ -157,6 +165,7 @@ uniform float uTrail;
 uniform float uBandSpeed;
 uniform float uBandScale;
 uniform float uSat;
+uniform vec2 uDensity;  // share of strands, share of LEDs per strand, that are on
 uniform float uBowStyle; // rainbow: 0 bands, 1 a random hue per drop, 2 per LED
 out vec3 vColor;
 out float vSize;
@@ -272,6 +281,11 @@ void main() {
   float dist = -mv.z;
   float fog = 1.0 - smoothstep(uFogFar * 0.3, uFogFar, dist);
   c *= fog;
+
+  // Thinning: LEDs past the shown share fade out, in an order that leaves the
+  // rest evenly spread, so density can change smoothly.
+  vec2 on = clamp((uDensity * 1.04 - aRank) / 0.04, 0.0, 1.0);
+  c *= on.x * on.y;
 
   // LEDs right at the eye are skipped: as opaque squares they would block the view.
   if (dist <= 1.2 || max(c.r, max(c.g, c.b)) < 0.002) {
@@ -461,7 +475,28 @@ gl.bindVertexArray(pointVao);
 gl.bindBuffer(gl.ARRAY_BUFFER, pointBuf);
 gl.enableVertexAttribArray(0);
 gl.vertexAttribPointer(0, 4, gl.FLOAT, false, 0, 0);
+const rankBuf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, rankBuf);
+gl.enableVertexAttribArray(1);
+gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 0, 0);
 gl.bindVertexArray(null);
+
+// Ranks in 0..1 whose every prefix is spread evenly: a Bayer matrix for the
+// strands (2-D), bit reversal for the LEDs along a strand (1-D).
+const bitsFor = (n) => Math.max(1, Math.ceil(Math.log2(n)));
+function bayer(x, y, bits) {
+  let v = 0;
+  for (let b = 0; b < bits; b++) {
+    const xb = (x >> b) & 1, yb = (y >> b) & 1;
+    v = v * 4 + 2 * (xb ^ yb) + yb;
+  }
+  return v; // bits are taken low first, so the finest level varies slowest
+}
+function bitReverse(n, bits) {
+  let v = 0;
+  for (let b = 0; b < bits; b++) v = (v << 1) | ((n >> b) & 1);
+  return v;
+}
 let count = 0, GRID = 0, ROWS = 0;
 
 function buildLattice() {
@@ -469,8 +504,21 @@ function buildLattice() {
   ROWS = Math.max(2, Math.round(S.rows));
   count = GRID * GRID * ROWS;
   const data = new Float32Array(count * 4);
+  const rank = new Float32Array(count * 2);
   const step = SPAN / (GRID - 1);
-  let k = 0;
+  const gb = bitsFor(GRID), rb = bitsFor(ROWS);
+  // Rank only among the cells in use, so shares map evenly onto 0..1.
+  const strandOrder = [];
+  for (let i = 0; i < GRID; i++) for (let j = 0; j < GRID; j++) strandOrder.push([bayer(i, j, gb), i * GRID + j]);
+  strandOrder.sort((a, b) => a[0] - b[0]);
+  const strandRank = new Float32Array(GRID * GRID);
+  strandOrder.forEach(([, id], n) => { strandRank[id] = (n + 0.5) / (GRID * GRID); });
+  const rowOrder = [];
+  for (let r = 0; r < ROWS; r++) rowOrder.push([bitReverse(r, rb), r]);
+  rowOrder.sort((a, b) => a[0] - b[0]);
+  const rowRank = new Float32Array(ROWS);
+  rowOrder.forEach(([, r], n) => { rowRank[r] = (n + 0.5) / ROWS; });
+  let k = 0, q = 0;
   for (let i = 0; i < GRID; i++) {
     for (let j = 0; j < GRID; j++) {
       // Jitter each strand, and shift its LEDs by up to one row, so that rows
@@ -484,11 +532,15 @@ function buildLattice() {
         data[k++] = (r + shift) / ROWS;
         data[k++] = z;
         data[k++] = seed;
+        rank[q++] = strandRank[i * GRID + j];
+        rank[q++] = rowRank[r];
       }
     }
   }
   gl.bindBuffer(gl.ARRAY_BUFFER, pointBuf);
   gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER, rankBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, rank, gl.STATIC_DRAW);
 }
 buildLattice();
 const emptyVao = gl.createVertexArray();
@@ -595,6 +647,8 @@ const pickPalette = (not) => {
 let weather = null, weatherUntil = 0;
 let colorMode = null, colorUntil = 0;
 let flowMode = null, flowUntil = 0;
+const densityGoal = [1, 1];
+let densityUntil = 0;
 let flowDir = [0, 1];
 let aimFlow = false; // point flowDir at the eye on the next frame
 const goal = { mode: [1, 0, 0], a: PALETTES[0].a, b: PALETTES[0].b, g0: PALETTES[0].a, g1: PALETTES[1].b };
@@ -610,6 +664,18 @@ function nextFlow(now) {
   flowUntil = forced('flow') ? Infinity : now + rand(...flowMode.hold);
   // Keep the direction fixed for the whole episode, pointing at where the eye is now.
   if (flowMode.toward) aimFlow = true;
+}
+// Density wanders between its lower limits and full, or holds the manual shares.
+function nextDensity(now) {
+  if (S.density === 'manual') {
+    densityGoal[0] = S.strandShare;
+    densityGoal[1] = S.rowShare;
+    densityUntil = Infinity;
+    return;
+  }
+  densityGoal[0] = rand(Math.min(1, S.strandMin), 1);
+  densityGoal[1] = rand(Math.min(1, S.rowMin), 1);
+  densityUntil = now + rand(15, 30);
 }
 function nextColor(now) {
   colorMode = pick(COLOR_MODES, colorMode, forced('color'));
@@ -638,8 +704,11 @@ function apply(key) {
   }
   if (key === 'weather') nextWeather(time);
   if (key === 'flow') nextFlow(time);
+  if (['density', 'strandShare', 'rowShare', 'strandMin', 'rowMin'].includes(key)) nextDensity(time);
   if (key === 'color' || key === 'palette') nextColor(time);
 }
+if (S.density === 'manual') nextDensity(0); else densityUntil = rand(12, 20);
+
 const tuner = createTuner({
   schema: SCHEMA, settings: S, defaults: DEFAULTS, storageKey: STORAGE_KEY,
   onChange: (key) => apply(key),
@@ -647,6 +716,7 @@ const tuner = createTuner({
 const look = {
   flow: Number(params.get('t')) || 0,
   flowRate: weather.flow, rain: weather.rain, toward: flowMode.toward,
+  density: [S.density === 'manual' ? S.strandShare : 1, S.density === 'manual' ? S.rowShare : 1],
   mode: [...goal.mode], a: [...goal.a], b: [...goal.b], g0: [...goal.g0], g1: [...goal.g1],
 };
 
@@ -657,6 +727,8 @@ function ease(dt) {
   look.flowRate += (weather.flow - look.flowRate) * kw;
   look.rain += (weather.rain - look.rain) * kw;
   look.toward += (flowMode.toward - look.toward) * kw;
+  const kd = 1 - Math.exp(-dt / 5.0); // density drifts slowly
+  for (let i = 0; i < 2; i++) look.density[i] += (densityGoal[i] - look.density[i]) * kd;
   for (const key of ['mode', 'a', 'b', 'g0', 'g1']) {
     for (let i = 0; i < 3; i++) look[key][i] += (goal[key][i] - look[key][i]) * kc;
   }
@@ -707,6 +779,7 @@ function frame(now) {
   if (time > weatherUntil) nextWeather(time);
   if (time > colorUntil) nextColor(time);
   if (time > flowUntil) nextFlow(time);
+  if (time > densityUntil) nextDensity(time);
   ease(dt);
 
   // Points.
@@ -732,6 +805,7 @@ function frame(now) {
   gl.uniform1f(u.uBandSpeed, S.bandSpeed);
   gl.uniform1f(u.uBandScale, S.bandScale);
   gl.uniform1f(u.uSat, S.saturation);
+  gl.uniform2fv(u.uDensity, look.density);
   gl.uniform1f(u.uBowStyle, { bands: 0, drop: 1, led: 2 }[S.rainbow] ?? 1);
   gl.uniform1f(u.uFlow, look.flow);
   gl.uniform1f(u.uRain, look.rain);
