@@ -562,8 +562,15 @@ function frame(now) {
     if (err !== gl.NO_ERROR) showError(`WebGL error 0x${err.toString(16)} (float buffers: ${hasFloat})`);
   }
 
-  requestAnimationFrame(frame);
+  frameId = requestAnimationFrame(frame);
 }
 
 let checked = false;
-requestAnimationFrame(frame);
+let frameId = requestAnimationFrame(frame);
+
+// A lost context stops the loop; when the browser gives it back, start afresh.
+canvas.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault();
+  cancelAnimationFrame(frameId);
+});
+canvas.addEventListener('webglcontextrestored', () => location.reload());
