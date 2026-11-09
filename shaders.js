@@ -1,6 +1,9 @@
 // The GLSL sources: a vertex and fragment pair for the points, and three
 // full-screen passes (downsample, blur, composite) that share QUAD_VS.
 
+// The falling time wraps at this many flow units (see drop() in POINT_VS).
+export const FLOW_WRAP = 1000;
+
 export const POINT_VS = `#version 300 es
 precision highp float;
 layout(location = 0) in vec4 aData; // x, u (0 top .. 1 bottom), z, seed
@@ -11,7 +14,8 @@ uniform float uTime;
 uniform float uHeight;
 uniform float uFocal;
 uniform float uSize;
-uniform float uFlow;  // falling time: integrated, so speed changes never make drops jump
+const float FLOW_WRAP = ${FLOW_WRAP}.0;
+uniform float uFlow;  // falling time: integrated, so speed changes never make drops jump; wrapped at FLOW_WRAP
 uniform float uRain;  // 0 light rain .. 1 downpour
 uniform float uW[11]; // weights of the colour modes, in the order of COLOR_MODES
 uniform vec3 uSet[4];  // palette rain: the colours drops pick from
@@ -38,7 +42,7 @@ uniform float uRainGain;
 uniform float uTipGain;
 uniform float uMaxPx;
 uniform float uTrail;
-uniform float uBandSpeed;
+uniform float uBandShift; // how far the colour bands have slid (integrated and wrapped in JS)
 uniform float uBandScale;
 uniform float uSat;
 uniform vec2 uDensity;  // share of strands, share of LEDs per strand, that are on
@@ -69,7 +73,7 @@ vec3 bowAt(float hue) { return hsv2rgb(vec3(fract(hue), uSat, 1.0)) * 1.4; }
 // about the speed of an average drop, so they pour down (or in) with the rain.
 // The rainbow is added here only as bands; per drop and per LED come later.
 vec3 flowColor(float along, float spatial, float h) {
-  float phase = along - uFlow * uBandSpeed + spatial;
+  float phase = along - uBandShift + spatial;
   vec3 mono = mix(uColA, uColB, h);
   vec3 grad = mix(uGrad0, uGrad1, 0.5 + 0.5 * sin(phase * 6.2832 * 0.9 * uBandScale));
   vec3 bow = uBowStyle < 0.5 ? bowAt(phase * 0.7 * uBandScale) : vec3(0.0);
@@ -125,11 +129,14 @@ vec4 drop(float sd, float u, float trailK) {
   float speed  = mix(0.07, 0.34, pow(hash(sd + 1.0), 1.5));
   float period = mix(1.3, 2.8, hash(sd + 2.0));
   float trail  = mix(0.04, 0.18, hash(sd + 3.0)) * trailK;
-  float x = uFlow * speed + hash(sd + 4.0) * period;
-  float cycle = floor(x / period);
-  float d = x - cycle * period - u;                  // > 0: the LED is behind the head
+  // The falling time wraps every FLOW_WRAP, so each drop runs a whole number of
+  // cycles (k) in that time: its rate is rounded to k / FLOW_WRAP cycles per unit.
+  float k = round(speed / period * FLOW_WRAP);
+  float c = uFlow * (k / FLOW_WRAP) + hash(sd + 4.0);
+  float cycle = floor(c);
+  float d = fract(c) * period - u;                   // > 0: the LED is behind the head
   float rain = d >= 0.0 ? exp(-d / trail) : exp(d * 120.0);
-  return vec4(rain, exp(-(d + period) / trail), exp(-abs(d) * 90.0), cycle);
+  return vec4(rain, exp(-(d + period) / trail), exp(-abs(d) * 90.0), mod(cycle, k));
 }
 
 // Light gathered from several drops, with each drop's own random hue.

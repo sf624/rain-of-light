@@ -9,7 +9,7 @@ import {
   PALETTES, WEATHER, FLOWS, COLOR_MODES, MODE, SETS, ACCENTS, DEPTHS, SKY, CAMERAS,
   DEFAULTS, STORAGE_KEY, SCHEMA,
 } from './config.js';
-import { POINT_VS, POINT_FS, QUAD_VS, DOWN_FS, BLUR_FS, COMPOSITE_FS } from './shaders.js';
+import { FLOW_WRAP, POINT_VS, POINT_FS, QUAD_VS, DOWN_FS, BLUR_FS, COMPOSITE_FS } from './shaders.js';
 import { createGL, sub, cross, dot, norm, perspective, lookAt } from './gl.js';
 import { createLattice, buildLattice as fillLattice } from './lattice.js';
 import { createControls } from './controls.js';
@@ -368,6 +368,8 @@ look = {
   density: [S.density === 'manual' ? S.strandShare : 1, S.density === 'manual' ? S.rowShare : 1],
 };
 for (const key of EASED) look[key] = [...goal[key]];
+let bandShift = (look.flow * S.bandSpeed) % (10 / S.bandScale);
+look.flow %= FLOW_WRAP;
 
 // The rain swells and eases within its weather, with 1/f fluctuation
 // (2 s .. about 2 min); the sound of rain follows the same sway.
@@ -389,7 +391,11 @@ function ease(dt) {
     for (let i = 0; i < goal[key].length; i++) look[key][i] += (goal[key][i] - look[key][i]) * kc;
   }
   skyClock = (skyClock + dt / Math.max(1, S.skyDay)) % 1;
-  look.flow += dt * look.flowRate * SPEED * S.speed;
+  const advance = dt * look.flowRate * SPEED * S.speed;
+  look.flow = (look.flow + advance) % FLOW_WRAP; // the shader's drops repeat exactly at the wrap
+  // The colour bands slide by the same amount, times their speed; both of their
+  // periods (1 / (0.9 scale) and 1 / (0.7 scale)) divide 10 / scale.
+  bandShift = (bandShift + advance * S.bandSpeed) % (10 / S.bandScale);
 }
 
 // ---------- frame ----------
@@ -476,7 +482,7 @@ function frame(now) {
   gl.uniform1f(u.uRainGain, S.rainGain);
   gl.uniform1f(u.uTipGain, S.tipGain);
   gl.uniform1f(u.uTrail, S.trail);
-  gl.uniform1f(u.uBandSpeed, S.bandSpeed);
+  gl.uniform1f(u.uBandShift, bandShift);
   gl.uniform1f(u.uBandScale, S.bandScale);
   gl.uniform1f(u.uSat, S.saturation);
   gl.uniform2fv(u.uDensity, look.density);
