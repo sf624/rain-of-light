@@ -220,7 +220,7 @@ export function createAudio({ settings }) {
   function bells() {
     if (!on) return;
     bell(rand(-0.7, 0.7), 0.6 + 0.3 * bellLoud(1));
-    later(bells, 8 * Math.exp(0.7 * bellGap(1)) * 1000); // about 4 .. 16 s
+    later(bells, 16 * Math.exp(0.7 * bellGap(1)) * 1000); // about 8 .. 32 s
   }
 
   function later(fn, ms) {

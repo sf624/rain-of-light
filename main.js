@@ -715,10 +715,11 @@ function resize() {
 // ---------- interaction ----------
 const ripples = new Float32Array(8 * 4).fill(-1e4);
 let rippleIndex = 0;
-function addRipple(x, y, z, t) {
+function addRipple(x, y, z, t, ring = true) {
   ripples.set([x, y, z, t], rippleIndex * 4);
   rippleIndex = (rippleIndex + 1) % 8;
-  // Each wave rings a bell, from the side where it is seen.
+  // A wave rings a bell, from the side where it is seen.
+  if (!ring) return;
   const pan = camera ? dot([x - camera.eye[0], y - camera.eye[1], z - camera.eye[2]], camera.r) / 6 : 0;
   sound.ripple(pan);
 }
@@ -1080,7 +1081,7 @@ function frame(now) {
   // A wave now and then, somewhere in the field.
   if (S.ripples > 0 && time > nextAuto) {
     addRipple((Math.random() - 0.5) * SPAN * 0.6, (Math.random() - 0.5) * HEIGHT * 0.5,
-      (Math.random() - 0.5) * SPAN * 0.6, time);
+      (Math.random() - 0.5) * SPAN * 0.6, time, Math.random() < 0.3); // a click always rings, these seldom
     // While waves repaint the field, they come more often.
     const every = colorMode.name === 'repaint' ? Math.min(S.ripples, 6) : S.ripples;
     nextAuto = time + every * (0.7 + Math.random() * 0.6);
