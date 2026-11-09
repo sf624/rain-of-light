@@ -12,6 +12,7 @@ export function createControls({ sound, S, onVolume }) {
   soundBtn.title = 'Sound (m)';
   soundBtn.setAttribute('aria-label', 'Sound');
   soundBtn.textContent = '♪';
+  soundBtn.setAttribute('aria-pressed', 'false');
   // The volume bar beside the note button; it is the panel's Volume too.
   const volumeBar = document.createElement('input');
   volumeBar.className = 'volume-bar';
@@ -44,6 +45,10 @@ export function createControls({ sound, S, onVolume }) {
     else document.documentElement.requestFullscreen().catch(() => { /* refused: stay as is */ });
   }
   fullBtn.addEventListener('click', toggleFullscreen);
+  fullBtn.setAttribute('aria-pressed', 'false');
+  document.addEventListener('fullscreenchange', () => {
+    fullBtn.setAttribute('aria-pressed', String(!!document.fullscreenElement));
+  });
   // A note on the sound controls when the page opens; it goes after a while,
   // or as soon as the controls are used.
   const soundHint = document.createElement('p');
@@ -61,6 +66,7 @@ export function createControls({ sound, S, onVolume }) {
   function setSound(want) {
     if (want) sound.start(); else sound.stop();
     soundBtn.classList.toggle('active', sound.on);
+    soundBtn.setAttribute('aria-pressed', String(sound.on));
     volumeBar.classList.toggle('active', sound.on);
     try { localStorage.setItem(SOUND_KEY, sound.on ? '1' : '0'); } catch { /* storage blocked */ }
   }

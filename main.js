@@ -137,6 +137,8 @@ addEventListener('pointermove', (e) => {
   wake();
 });
 addEventListener('pointerdown', wake);
+addEventListener('keydown', wake);
+addEventListener('focusin', wake); // the controls show while one has the focus
 
 // ---------- breath ----------
 let breathPhase = 0;                 // 0 .. 1 through one breath

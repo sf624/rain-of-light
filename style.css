@@ -97,6 +97,15 @@ body.no-fullscreen .full-toggle { display: none; }
 .sound-toggle.active { opacity: 0.9; border-color: rgba(156, 200, 255, 0.6); color: #cfe4ff; }
 body.idle .tuner-toggle:not(.active), body.idle .sound-toggle, body.idle .volume-bar,
 body.idle .full-toggle { opacity: 0; }
+/* A control with the keyboard focus stays visible, idle or not. */
+.tuner-toggle:focus-visible, .sound-toggle:focus-visible, .full-toggle:focus-visible,
+.volume-bar:focus-visible,
+body.idle .tuner-toggle:focus-visible, body.idle .sound-toggle:focus-visible,
+body.idle .full-toggle:focus-visible, body.idle .volume-bar:focus-visible {
+  opacity: 1;
+  outline: 2px solid #9cc8ff;
+  outline-offset: 2px;
+}
 
 /* ---------- volume bar, left of the note button ---------- */
 .volume-bar {
