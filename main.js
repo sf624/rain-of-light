@@ -755,6 +755,20 @@ volumeBar.addEventListener('input', () => {
   if (!sound.on && Number(volumeBar.value) > 0) setSound(true); // turning it up turns it on
 });
 document.body.append(volumeBar, soundBtn);
+// A note on the sound controls when the page opens; it goes after a while,
+// or as soon as the controls are used.
+const soundHint = document.createElement('p');
+soundHint.className = 'sound-hint';
+soundHint.textContent = '♪ sound on / off · slider: volume';
+document.body.append(soundHint);
+document.body.classList.add('hinting');
+function hideSoundHint() {
+  soundHint.classList.add('hidden');
+  document.body.classList.remove('hinting');
+}
+setTimeout(hideSoundHint, 10000);
+soundBtn.addEventListener('click', hideSoundHint);
+volumeBar.addEventListener('input', hideSoundHint);
 function setSound(want) {
   if (want) sound.start(); else sound.stop();
   soundBtn.classList.toggle('active', sound.on);
@@ -826,7 +840,7 @@ addEventListener('keydown', (e) => {
   if (e.key === 'c') step('color', COLOR_MODES); // next colour
   if (e.key === 'd') step('flow', FLOWS);        // switch direction
   if (e.key === 'v') step('camera', CAMERAS);    // next camera move
-  if (e.key === 'm') setSound(!sound.on);        // sound on and off
+  if (e.key === 'm') { setSound(!sound.on); hideSoundHint(); } // sound on and off
 });
 // A key moves on at random while the setting is auto, else to the next choice.
 function step(key, list) {
