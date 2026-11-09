@@ -730,7 +730,7 @@ function addRipple(x, y, z, t) {
   sound.ripple(pan);
 }
 
-// ---------- sound: off until asked for; once turned on, it starts again with the first click ----------
+// ---------- sound: on unless turned off; browsers let it start only with the first click or key ----------
 const SOUND_KEY = 'rain-of-light:sound';
 const sound = createAudio({ settings: S });
 const soundBtn = document.createElement('button');
@@ -762,8 +762,8 @@ function setSound(want) {
   try { localStorage.setItem(SOUND_KEY, sound.on ? '1' : '0'); } catch { /* storage blocked */ }
 }
 soundBtn.addEventListener('click', () => setSound(!sound.on));
-let soundWanted = false;
-try { soundWanted = localStorage.getItem(SOUND_KEY) === '1'; } catch { /* storage blocked */ }
+let soundWanted = true;
+try { soundWanted = localStorage.getItem(SOUND_KEY) !== '0'; } catch { /* storage blocked */ }
 if (soundWanted) {
   const resume = (e) => {
     removeEventListener('pointerdown', resume, true);
