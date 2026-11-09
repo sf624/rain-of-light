@@ -1,0 +1,87 @@
+// The page's sound and full screen controls: the note button, the volume bar,
+// the full screen button and the hint about them.
+
+// sound is the audio engine; S the settings; onVolume(v) hands a volume set
+// with the bar to the settings panel.
+export function createControls({ sound, S, onVolume }) {
+  // ---------- sound: on unless turned off; browsers let it start only with the first click or key ----------
+  const SOUND_KEY = 'rain-of-light:sound';
+  const soundBtn = document.createElement('button');
+  soundBtn.className = 'sound-toggle';
+  soundBtn.type = 'button';
+  soundBtn.title = 'Sound (m)';
+  soundBtn.setAttribute('aria-label', 'Sound');
+  soundBtn.textContent = '♪';
+  // The volume bar beside the note button; it is the panel's Volume too.
+  const volumeBar = document.createElement('input');
+  volumeBar.className = 'volume-bar';
+  volumeBar.type = 'range';
+  volumeBar.min = 0;
+  volumeBar.max = 1;
+  volumeBar.step = 0.01;
+  volumeBar.value = S.volume;
+  volumeBar.title = 'Volume';
+  volumeBar.setAttribute('aria-label', 'Volume');
+  volumeBar.addEventListener('input', () => {
+    onVolume(Number(volumeBar.value));
+    if (!sound.on && Number(volumeBar.value) > 0) setSound(true); // turning it up turns it on
+  });
+  document.body.append(volumeBar, soundBtn);
+
+  // Full screen: a button and the f key, where the browser allows it (not on iPhone).
+  const fullBtn = document.createElement('button');
+  fullBtn.className = 'full-toggle';
+  fullBtn.type = 'button';
+  fullBtn.title = 'Full screen (f)';
+  fullBtn.setAttribute('aria-label', 'Full screen');
+  fullBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">'
+    + '<path d="M1 5V1h4M11 1h4v4M15 11v4h-4M5 15H1v-4"/></svg>';
+  document.body.append(fullBtn);
+  if (!document.fullscreenEnabled) document.body.classList.add('no-fullscreen');
+  function toggleFullscreen() {
+    if (!document.fullscreenEnabled) return;
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen().catch(() => { /* refused: stay as is */ });
+  }
+  fullBtn.addEventListener('click', toggleFullscreen);
+  // A note on the sound controls when the page opens; it goes after a while,
+  // or as soon as the controls are used.
+  const soundHint = document.createElement('p');
+  soundHint.className = 'sound-hint';
+  soundHint.textContent = '♪ sound on / off · slider: volume';
+  document.body.append(soundHint);
+  document.body.classList.add('hinting');
+  function hideSoundHint() {
+    soundHint.classList.add('hidden');
+    document.body.classList.remove('hinting');
+  }
+  setTimeout(hideSoundHint, 10000);
+  soundBtn.addEventListener('click', hideSoundHint);
+  volumeBar.addEventListener('input', hideSoundHint);
+  function setSound(want) {
+    if (want) sound.start(); else sound.stop();
+    soundBtn.classList.toggle('active', sound.on);
+    volumeBar.classList.toggle('active', sound.on);
+    try { localStorage.setItem(SOUND_KEY, sound.on ? '1' : '0'); } catch { /* storage blocked */ }
+  }
+  soundBtn.addEventListener('click', () => setSound(!sound.on));
+  let soundWanted = true;
+  try { soundWanted = localStorage.getItem(SOUND_KEY) !== '0'; } catch { /* storage blocked */ }
+  if (soundWanted) {
+    const resume = (e) => {
+      removeEventListener('pointerdown', resume, true);
+      removeEventListener('keydown', resume, true);
+      if (e.target !== soundBtn && e.target !== volumeBar && e.key !== 'm' && !sound.on) setSound(true);
+    };
+    addEventListener('pointerdown', resume, true);
+    addEventListener('keydown', resume, true);
+  }
+
+  return {
+    toggleFullscreen,
+    // The m key: sound on and off.
+    toggleSound() { setSound(!sound.on); hideSoundHint(); },
+    // The panel changed the volume: move the bar.
+    setVolume(v) { volumeBar.value = v; },
+  };
+}
