@@ -41,6 +41,9 @@ uniform float uRest;
 uniform float uRainGain;
 uniform float uTipGain;
 uniform float uMaxPx;
+uniform float uWire;   // 0: drawing the LEDs; > 0: drawing the wires between them, this bright
+uniform float uRayLen; // > 0: drawing the light rays, this long (px)
+uniform float uRayThreshold; // head light needed to cast rays
 uniform float uTrail;
 uniform float uBandShift; // how far the colour bands have slid (integrated and wrapped in JS)
 uniform float uBandScale;
@@ -49,6 +52,7 @@ uniform vec2 uDensity;  // share of strands, share of LEDs per strand, that are 
 uniform float uBowStyle; // rainbow: 0 bands, 1 a random hue per drop, 2 per LED
 out vec3 vColor;
 out float vSize;
+out float vEnd;  // wires: 0 at one LED, 1 at the next, alternating along a strand
 
 float hash(float n) { return fract(sin(n * 127.1 + 311.7) * 43758.5453); }
 float hash3(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
@@ -245,14 +249,31 @@ void main() {
   vec3 c = restCol * uRest + rainCol * rain * uRainGain
          + mix(tipCol, vec3(1.0), white) * tip * uTipGain
          + mix(restCol, vec3(1.0), 0.35) * ring * 1.6;
+  vec3 glint = tipCol * tip * uTipGain;  // the head's light in its own colour: the light rays
 
   float fog = 1.0 - smoothstep(uFogFar * 0.3, uFogFar, dist);
   c *= fog;
+  glint *= fog;
 
   // Thinning: LEDs past the shown share fade out, in an order that leaves the
   // rest evenly spread, so density can change smoothly.
   vec2 on = clamp((uDensity * 1.04 - aRank) / 0.04, 0.0, 1.0);
+
+  // The wires: a strand's wire glows with the light of the LEDs along it, and
+  // runs on past LEDs that are thinned out. Never skipped, so no line breaks.
+  // Near the eye a wire reads as a hard line, so wires fade in with distance:
+  // what remains is a glow in the middle distance, where they blur together.
+  if (uWire > 0.0) {
+    gl_Position = uProj * mv;
+    gl_PointSize = 1.0;
+    vSize = 1.0;
+    vEnd = float(gl_VertexID % 2);   // neighbours on a strand alternate, so each segment runs 0 .. 1
+    vColor = c * on.x * uWire * smoothstep(2.5, 8.0, dist);
+    return;
+  }
+  vEnd = 0.0;
   c *= on.x * on.y;
+  glint *= on.x * on.y;
 
   // LEDs right at the eye are skipped: as opaque squares they would block the view.
   if (dist <= 1.2 || max(c.r, max(c.g, c.b)) < 0.002) {
@@ -268,10 +289,39 @@ void main() {
   float px = uSize * uFocal / dist;
   float shown = clamp(px, 1.5, max(1.5, uMaxPx));
   c *= min(1.0, px / shown);
+  glint *= min(1.0, px / shown);
   gl_Position = uProj * mv;
   gl_PointSize = shown;
   vSize = shown;
   vColor = c;
+  // Light rays: only LEDs whose head light passes the threshold, drawn as a
+  // larger sprite of thin rays around the LED, in the LED's own colour.
+  if (uRayLen > 0.0) {
+    float g = max(glint.r, max(glint.g, glint.b));
+    if (g < uRayThreshold) {
+      gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+      gl_PointSize = 0.0;
+      return;
+    }
+    gl_PointSize = 2.0 * uRayLen + 1.0;
+    vSize = gl_PointSize;
+    vColor = glint * smoothstep(uRayThreshold, uRayThreshold * 2.0, g);
+  }
+}`;
+
+// The wires between the LEDs: each LED lights its wire a little way up and
+// down, fading towards the middle, so the wires never show as joined lines;
+// added up, they make the air between the LEDs glow.
+export const WIRE_FS = `#version 300 es
+precision mediump float;
+in vec3 vColor;
+in float vSize;
+in float vEnd;
+uniform float uGain;
+out vec4 outColor;
+void main() {
+  float d = min(vEnd, 1.0 - vEnd) * 2.0;    // 0 at an LED, 1 halfway to the next
+  outColor = vec4(vColor * uGain * exp(-d * 4.0), 1.0);
 }`;
 
 export const POINT_FS = `#version 300 es
@@ -289,6 +339,32 @@ void main() {
   if (edge <= 0.15) discard;
   float a = edge * (0.85 + 0.15 * (1.0 - r * r));   // slightly brighter centre
   outColor = vec4(vColor * a * uGain, 1.0);
+}`;
+
+// Light rays around one bright LED: uRays thin lines through its centre (2:
+// up and down), about a pixel wide, fading towards their tips.
+export const RAY_FS = `#version 300 es
+precision mediump float;
+in vec3 vColor;
+in float vSize;
+uniform float uGain;
+uniform float uRays;
+uniform float uRayGain;
+out vec4 outColor;
+void main() {
+  vec2 p = (gl_PointCoord - 0.5) * vSize;       // pixels from the LED
+  float half_ = vSize * 0.5;
+  float light = 0.0;
+  for (int k = 0; k < 4; k++) {
+    if (float(k) >= uRays * 0.5) break;
+    float a = float(k) * 3.14159265 / (uRays * 0.5);
+    vec2 dir = vec2(sin(a), cos(a));
+    float along = abs(dot(p, dir)) / half_;      // 0 at the LED, 1 at the tip
+    float across = abs(dot(p, vec2(dir.y, -dir.x)));
+    float fade = 1.0 - smoothstep(0.0, 1.0, along);
+    light += exp(-across * across * 1.5) * fade * fade;
+  }
+  outColor = vec4(vColor * light * uRayGain * uGain, 1.0);
 }`;
 
 export const QUAD_VS = `#version 300 es

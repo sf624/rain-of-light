@@ -12,9 +12,12 @@ export function createLattice(gl) {
   gl.bindBuffer(gl.ARRAY_BUFFER, rankBuf);
   gl.enableVertexAttribArray(1);
   gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 0, 0);
+  // The wires: pairs of neighbouring LEDs on a strand, drawn as lines.
+  const wireBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, wireBuf);
   gl.bindVertexArray(null);
 
-  return { pointVao, pointBuf, rankBuf };
+  return { pointVao, pointBuf, rankBuf, wireBuf };
 }
 
 // Ranks in 0..1 for thinning. Along a strand, bit reversal: every prefix is
@@ -30,7 +33,7 @@ function bitReverse(n, bits) {
 }
 
 // Fills the buffers from the settings S and returns the sizes drawn.
-export function fillLattice(gl, { pointBuf, rankBuf }, S, SPAN) {
+export function fillLattice(gl, { pointVao, pointBuf, rankBuf, wireBuf }, S, SPAN) {
   const GRID = Math.max(2, Math.round(S.grid));
   const ROWS = Math.max(2, Math.round(S.rows));
   const count = GRID * GRID * ROWS;
@@ -72,5 +75,17 @@ export function fillLattice(gl, { pointBuf, rankBuf }, S, SPAN) {
   gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
   gl.bindBuffer(gl.ARRAY_BUFFER, rankBuf);
   gl.bufferData(gl.ARRAY_BUFFER, rank, gl.STATIC_DRAW);
-  return { count, GRID, ROWS };
+  // Wires join each LED to the next on its strand (scattered LEDs have none).
+  const wires = S.layout === 'scatter' ? new Uint32Array(0) : new Uint32Array(GRID * GRID * (ROWS - 1) * 2);
+  if (wires.length) {
+    let w = 0;
+    for (let s = 0; s < GRID * GRID; s++) {
+      for (let r = 0; r < ROWS - 1; r++) { wires[w++] = s * ROWS + r; wires[w++] = s * ROWS + r + 1; }
+    }
+  }
+  gl.bindVertexArray(pointVao);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, wireBuf);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, wires, gl.STATIC_DRAW);
+  gl.bindVertexArray(null);
+  return { count, GRID, ROWS, wireCount: wires.length };
 }

@@ -9,7 +9,7 @@ import {
   PALETTES, WEATHER, FLOWS, COLOR_MODES, MODE, SETS, ACCENTS, DEPTHS, SKY, CAMERAS,
   DEFAULTS, STORAGE_KEY, SCHEMA,
 } from './config.js';
-import { FLOW_WRAP, POINT_VS, POINT_FS, QUAD_VS, DOWN_FS, BLUR_FS, COMPOSITE_FS } from './shaders.js';
+import { FLOW_WRAP, POINT_VS, POINT_FS, WIRE_FS, RAY_FS, QUAD_VS, DOWN_FS, BLUR_FS, COMPOSITE_FS } from './shaders.js';
 import { createGL, sub, cross, dot, norm, perspective, lookAt } from './gl.js';
 import { createLattice, fillLattice } from './lattice.js';
 import { createControls } from './controls.js';
@@ -62,14 +62,17 @@ const { program, target, freeTarget } = createGL(gl);
 
 // ---------- the lattice ----------
 const pointProg = program(POINT_VS, POINT_FS);
+const wireProg = program(POINT_VS, WIRE_FS);
 const downProg = program(QUAD_VS, DOWN_FS);
 const blurProg = program(QUAD_VS, BLUR_FS);
 const compProg = program(QUAD_VS, COMPOSITE_FS);
+const rayProg = program(POINT_VS, RAY_FS);
+const MAX_POINT = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1]; // the largest sprite this GPU draws
 
 const lattice = createLattice(gl);
-let count = 0, GRID = 0, ROWS = 0;
+let count = 0, GRID = 0, ROWS = 0, wireCount = 0;
 function buildLattice() {
-  ({ count, GRID, ROWS } = fillLattice(gl, lattice, S, SPAN));
+  ({ count, GRID, ROWS, wireCount } = fillLattice(gl, lattice, S, SPAN));
 }
 buildLattice();
 const pointVao = lattice.pointVao;
@@ -466,8 +469,21 @@ function frame(now) {
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   gl.enable(gl.DEPTH_TEST);
   gl.depthFunc(gl.LESS);
-  gl.useProgram(pointProg.p);
-  const u = pointProg.u;
+  // The LEDs and their wires share one vertex shader, so both get the same uniforms.
+  const wiresOn = S.wire > 0 && wireCount > 0;
+  const rays = S.rays === 'off' ? 0 : Number(S.rays);
+  const progs = [pointProg];
+  if (wiresOn) progs.push(wireProg);
+  if (rays) progs.push(rayProg);
+  const dprNow = H / Math.max(1, canvas.clientHeight);   // rays keep their length in CSS pixels
+  for (const prog of progs) {
+  gl.useProgram(prog.p);
+  const u = prog.u;
+  gl.uniform1f(u.uWire, prog === wireProg ? S.wire : 0);
+  gl.uniform1f(u.uRayLen, prog === rayProg ? Math.min(S.rayLength * dprNow, (MAX_POINT - 1) / 2) : 0);
+  gl.uniform1f(u.uRayThreshold, S.rayThreshold);
+  gl.uniform1f(u.uRays, rays);
+  gl.uniform1f(u.uRayGain, S.rayGain);
   gl.uniformMatrix4fv(u.uProj, false, proj);
   gl.uniformMatrix4fv(u.uView, false, view);
   gl.uniform1f(u.uTime, time);
@@ -508,8 +524,32 @@ function frame(now) {
   gl.uniform3fv(u.uColA, look.a);
   gl.uniform3fv(u.uColB, look.b);
   gl.uniform4fv(u.uRipples, ripples);
+  }
+  gl.useProgram(pointProg.p);
   gl.bindVertexArray(pointVao);
   gl.drawArrays(gl.POINTS, 0, count);
+  if (wiresOn) {
+    // Wires after the LEDs: hidden behind near LEDs, added up, never hiding anything.
+    gl.useProgram(wireProg.p);
+    gl.depthFunc(gl.LEQUAL);
+    gl.depthMask(false);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE);
+    gl.drawElements(gl.LINES, wireCount, gl.UNSIGNED_INT, 0);
+    gl.disable(gl.BLEND);
+    gl.depthMask(true);
+  }
+  if (rays) {
+    // Rays after everything: hidden behind near LEDs, added up, never hiding anything.
+    gl.useProgram(rayProg.p);
+    gl.depthFunc(gl.LEQUAL);
+    gl.depthMask(false);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE);
+    gl.drawArrays(gl.POINTS, 0, count);
+    gl.disable(gl.BLEND);
+    gl.depthMask(true);
+  }
   gl.disable(gl.DEPTH_TEST);
 
   if (hasFloat) {
