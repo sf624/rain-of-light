@@ -1,10 +1,13 @@
 // Calm generative music for the rain: a slow pad in D major, soft bells now
 // and then (and with every wave of light), the hush of rain, and a long reverb.
 // Web Audio only, no files. Browsers start sound only after a click or a key.
+// What changes slowly (the bells' timing, pitch and strength, the pad's
+// brightness, the hush of rain) sways with 1/f fluctuation, see sway.js.
+
+import { createSway } from './sway.js';
 
 const mtof = (m) => 440 * 2 ** ((m - 69) / 12);
 const rand = (a, b) => a + Math.random() * (b - a);
-const pickOf = (list) => list[Math.floor(Math.random() * list.length)];
 
 // Chords as MIDI notes, all within D major, so any one may follow any other.
 const CHORDS = [
@@ -19,6 +22,12 @@ const BELLS = [62, 64, 66, 69, 71, 74, 76, 78, 81]; // D major pentatonic
 export function createAudio({ settings }) {
   let ctx = null, master = null, bus = null, verb = null, rainGain = null, clickBuf = null;
   let on = false, chord = -1, timers = [];
+  let bright = null;                                    // the pad's brightness, shared by every voice
+  const padSway = createSway({ fastest: 1, octaves: 6 });  // seconds: 1 s .. about a minute
+  const bellGap = createSway({ fastest: 1, octaves: 5 });  // per bell: how long until the next
+  const bellPitch = createSway({ fastest: 1, octaves: 5 }); // per bell: which note (a 1/f melody)
+  const bellLoud = createSway({ fastest: 1, octaves: 4 });  // per bell: how strong
+  const TICK = 0.25;                                    // seconds between brightness updates
 
   function build() {
     ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -28,6 +37,9 @@ export function createAudio({ settings }) {
     comp.threshold.value = -18;
     comp.ratio.value = 3;
     master.connect(comp).connect(ctx.destination);
+    bright = ctx.createConstantSource();
+    bright.offset.value = 0;
+    bright.start();
 
     // Everything goes to the bus (dry) and, through a send, to the reverb.
     bus = ctx.createGain();
@@ -114,11 +126,8 @@ export function createAudio({ settings }) {
       filter.type = 'lowpass';
       filter.frequency.value = rand(1100, 1600);
       filter.Q.value = 0.7;
-      const lfo = ctx.createOscillator();
-      lfo.frequency.value = rand(0.03, 0.08);
-      const depth = ctx.createGain();
-      depth.gain.value = 500;
-      lfo.connect(depth).connect(filter.frequency);
+      bright.connect(filter.frequency);
+      later(() => bright.disconnect(filter.frequency), (end - t + 0.5) * 1000);
       const pan = ctx.createStereoPanner();
       pan.pan.value = rand(-0.6, 0.6);
       filter.connect(out).connect(pan);
@@ -137,9 +146,14 @@ export function createAudio({ settings }) {
         o.start(t);
         o.stop(end);
       }
-      lfo.start(t);
-      lfo.stop(end);
     }
+  }
+
+  // The pad opens and closes slowly, with 1/f fluctuation.
+  function tick() {
+    if (!on) return;
+    bright.offset.setTargetAtTime(650 * padSway(TICK), ctx.currentTime, 0.6);
+    later(tick, TICK * 1000);
   }
 
   function nextChord() {
@@ -161,7 +175,8 @@ export function createAudio({ settings }) {
   function bell(pan = rand(-0.7, 0.7), strength = 1) {
     if (!on || settings.chimes <= 0) return;
     const t = ctx.currentTime;
-    const f = mtof(pickOf(BELLS));
+    const step = (bellPitch(1) + 1) / 2 * (BELLS.length - 1);
+    const f = mtof(BELLS[Math.round(step)]);
     const peak = 0.06 * settings.chimes * strength;
     const center = Math.max(-1, Math.min(1, pan));
     for (const [ratio, level, decay] of PARTIALS) {
@@ -204,12 +219,13 @@ export function createAudio({ settings }) {
 
   function bells() {
     if (!on) return;
-    bell(rand(-0.7, 0.7), rand(0.4, 0.8));
-    later(bells, rand(5, 13) * 1000);
+    bell(rand(-0.7, 0.7), 0.6 + 0.3 * bellLoud(1));
+    later(bells, 8 * Math.exp(0.7 * bellGap(1)) * 1000); // about 4 .. 16 s
   }
 
   function later(fn, ms) {
-    timers.push(setTimeout(fn, ms));
+    const id = setTimeout(() => { timers = timers.filter((x) => x !== id); fn(); }, ms);
+    timers.push(id);
   }
 
   function start() {
@@ -222,6 +238,7 @@ export function createAudio({ settings }) {
     master.gain.setValueAtTime(master.gain.value, t);
     master.gain.linearRampToValueAtTime(settings.volume, t + 3);
     nextChord();
+    tick();
     later(bells, 4000);
   }
 
@@ -250,10 +267,12 @@ export function createAudio({ settings }) {
       master.gain.cancelScheduledValues(ctx.currentTime);
       master.gain.setTargetAtTime(settings.volume, ctx.currentTime, 0.05);
     },
-    // The hush follows the weather: 0 light rain .. 1 downpour.
-    rain(amount) {
+    // The hush follows the weather (0 light rain .. 1 downpour) and the sway
+    // the light rain sways with (-1 .. 1), so sound and light swell together.
+    rain(amount, sway = 0) {
       if (!ctx || !on) return;
-      rainGain.gain.setTargetAtTime((0.15 + 0.85 * amount) * settings.rainSound * 0.5, ctx.currentTime, 1.5);
+      const level = (0.15 + 0.85 * amount) * (1 + 0.4 * sway) * settings.rainSound * 0.5;
+      rainGain.gain.setTargetAtTime(level, ctx.currentTime, 1.5);
     },
   };
 }

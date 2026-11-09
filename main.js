@@ -4,6 +4,7 @@
 
 import { createTuner, loadSettings } from './tuner.js';
 import { createAudio } from './audio.js';
+import { createSway } from './sway.js';
 
 // Show any error on the page, so a black screen is never silent.
 function showError(msg) {
@@ -1011,11 +1012,17 @@ look = {
 };
 for (const key of EASED) look[key] = [...goal[key]];
 
+// The rain swells and eases within its weather, with 1/f fluctuation
+// (2 s .. about 2 min); the sound of rain follows the same sway.
+const rainSway = createSway({ fastest: 2, octaves: 6 });
+let sway = 0;
+
 // Ease the current look towards the targets, over about tau seconds.
 function ease(dt) {
   const kw = 1 - Math.exp(-dt / 2.5);
   const kc = 1 - Math.exp(-dt / 3.0);
-  look.flowRate += (weather.flow - look.flowRate) * kw;
+  sway = rainSway(dt);
+  look.flowRate += (weather.flow * (1 + 0.22 * sway) - look.flowRate) * kw;
   look.rain += (weather.rain - look.rain) * kw;
   turnP = Math.min(1, turnP + dt / Math.max(0.1, S.turnTime));
   turnNow = turnFrom + (turnTo - turnFrom) * smooth(turnP);
@@ -1085,7 +1092,7 @@ function frame(now) {
   if (time > densityUntil) nextDensity(time);
   if (time > camUntil) nextCamera(time);
   ease(dt);
-  sound.rain(look.rain);
+  sound.rain(look.rain, sway);
 
   // Points.
   gl.bindFramebuffer(gl.FRAMEBUFFER, hasFloat ? scene.fb : null);
