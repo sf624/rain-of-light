@@ -546,6 +546,7 @@ function frame(now) {
     gl.uniform1i(compProg.u.uBloom, 1);
     gl.uniform1f(compProg.u.uBloomK, S.bloom);
     gl.uniform1f(compProg.u.uExposure, S.exposure * glow);
+    gl.uniform1f(compProg.u.uFloor, S.blackFloor / 255);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 

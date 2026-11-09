@@ -76,7 +76,7 @@ export const DEFAULTS = {
   grid: small ? 36 : 60,  rows: small ? 72 : 96,
   layout: 'strands', density: 'auto', strandShare: 1.0, rowShare: 1.0, strandMin: 0.3, rowMin: 0.35,
   size: 0.013, maxPx: 4.5, rest: 0.025,
-  rainGain: 4.0, tipGain: 5.0, exposure: 1.5, bloom: 0.4, fog: 22,
+  rainGain: 4.0, tipGain: 5.0, exposure: 1.5, bloom: 0.4, fog: 22, blackFloor: 4,
   speed: 1.0, trail: 1.0, weather: 'auto', turnTime: 8, turnSteps: 9,
   color: 'auto', palette: 'auto', rainbow: 'drop', bandSpeed: 0.17, bandScale: 1.0, saturation: 1.0,
   set: 'auto', skyDay: 90,
@@ -113,6 +113,8 @@ export const SCHEMA = [
     { key: 'exposure', label: 'Exposure', min: 0.2, max: 4, step: 0.05 },
     { key: 'bloom', label: 'Glow', min: 0, max: 2, step: 0.05 },
     { key: 'fog', label: 'Visible distance', min: 6, max: 40, step: 0.5 },
+    { key: 'blackFloor', label: 'Black floor (/255, 0: off)', min: 0, max: 16, step: 0.5,
+      hint: 'Glow fainter than this is dropped, so the space between the points is true black (most visible on OLED screens)' },
   ] },
   { title: 'Rain', items: [
     { key: 'weather', label: 'Weather', options: ['auto', 'drizzle', 'rain', 'shower', 'downpour'] },

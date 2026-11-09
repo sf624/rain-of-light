@@ -337,13 +337,21 @@ uniform sampler2D uScene;
 uniform sampler2D uBloom;
 uniform float uBloomK;
 uniform float uExposure;
+uniform float uFloor;  // black floor: glow fainter than about this (on screen, 0..1) is dropped
 out vec4 outColor;
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 void main() {
-  vec3 c = texture(uScene, vUv).rgb + texture(uBloom, vUv).rgb * uBloomK;
+  // Black floor: the haze between the points is all glow (the blurred light
+  // of countless dim LEDs). Glow fainter than the floor fades to nothing, so
+  // the space between the points is true black; the points stay untouched.
+  vec3 b = texture(uBloom, vUv).rgb * uBloomK;
+  float tb = uFloor / max(uExposure, 1e-3);             // the floor before tone mapping
+  if (uFloor > 0.0) b *= smoothstep(tb, 3.0 * tb, max(b.r, max(b.g, b.b)));
+  vec3 c = texture(uScene, vUv).rgb + b;
   c = vec3(1.0) - exp(-c * uExposure);                       // tone map
   float v = smoothstep(1.25, 0.35, length(vUv - 0.5) * 1.5);
   c *= mix(0.55, 1.0, v);                               // vignette
-  c += (hash(gl_FragCoord.xy) - 0.5) / 255.0;           // dither against banding
+  // Dither against banding, faded out near black so it does not lift it again.
+  c += (hash(gl_FragCoord.xy) - 0.5) / 255.0 * smoothstep(0.0, 2.0 / 255.0, c);
   outColor = vec4(c, 1.0);
 }`;
