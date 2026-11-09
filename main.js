@@ -56,10 +56,10 @@ const WEATHER = [
   { name: 'shower',   flow: 1.9, rain: 0.6,  hold: [8, 14],  weight: 2 },
   { name: 'downpour', flow: 3.6, rain: 1.0,  hold: [6, 12],  weight: 1.5 },
 ];
-// Direction: rain falls from above, or now and then flows from the far side to the eye.
+// Direction: rain falls from above, or now and then flows sideways, each time a new way.
 const FLOWS = [
   { name: 'down',   toward: 0, hold: [20, 40], weight: 3 },
-  { name: 'toward', toward: 1, hold: [8, 14],  weight: 1 },
+  { name: 'across', toward: 1, hold: [8, 14],  weight: 1 },
 ];
 // Colour: one palette, a gradient between two palettes, or a rainbow.
 const COLOR_MODES = [
@@ -77,7 +77,7 @@ const DEFAULTS = {
   speed: 1.0, trail: 1.0, weather: 'auto',
   color: 'auto', palette: 'auto', rainbow: 'drop', bandSpeed: 0.17, bandScale: 1.0, saturation: 1.0,
   flow: 'auto',
-  camera: 'auto', orbit: 0.025, radius: 7.5, fov: 60,
+  camera: 'orbit', orbit: 0.025, radius: 7.5, fov: 60,
   ripples: 9,
 };
 // Older links used ?color=, ?weather= and ?flow= the same way, so they still work.
@@ -111,7 +111,8 @@ const SCHEMA = [
     { key: 'weather', label: '天気', options: ['auto', 'drizzle', 'rain', 'shower', 'downpour'] },
     { key: 'speed', label: '速さ (倍)', min: 0, max: 4, step: 0.05 },
     { key: 'trail', label: '尾の長さ (倍)', min: 0.2, max: 4, step: 0.05 },
-    { key: 'flow', label: '向き', options: ['auto', 'down', 'toward'] },
+    { key: 'flow', label: '向き', options: ['auto', 'down', 'across'],
+      hint: 'down: 上から下 / across: 水平 (向きは毎回ランダム)' },
   ] },
   { title: '色', items: [
     { key: 'color', label: '色の出し方', options: ['auto', 'mono', 'gradient', 'rainbow'] },
@@ -133,6 +134,10 @@ const SCHEMA = [
     { key: 'ripples', label: '自動の間隔 (秒, 0で無し)', min: 0, max: 30, step: 0.5 },
   ] },
 ];
+// A saved or linked choice that no longer exists falls back to its default.
+for (const item of SCHEMA.flatMap((g) => g.items)) {
+  if (item.options && !item.options.includes(S[item.key])) S[item.key] = DEFAULTS[item.key];
+}
 const fovRad = () => S.fov * Math.PI / 180;
 
 // ---------- shaders ----------
@@ -151,8 +156,8 @@ uniform float uRain;  // 0 light rain .. 1 downpour
 uniform vec3 uMode;  // weights of mono, gradient, rainbow
 uniform vec3 uGrad0;
 uniform vec3 uGrad1;
-uniform float uToward;  // 0 rain falls down .. 1 light flows from the far side to the eye
-uniform vec2 uFlowDir;  // horizontal direction of that flow (towards the eye)
+uniform float uToward;  // 0 rain falls down .. 1 light flows sideways
+uniform vec2 uFlowDir;  // horizontal direction of that flow
 uniform vec2 uLane;     // lane width across the flow, lane height
 uniform float uSpan;
 uniform float uFogFar;
@@ -239,7 +244,7 @@ void main() {
   gather(L, drop(seed + 53.0, u, trailK), seed + 53.0, wd * smoothstep(g4, g4 + 0.15, uRain));
   vec3 col = flowColor(u, spatial, h);
 
-  // Flow towards the eye: LEDs in one thin lane along the flow light up in turn.
+  // Sideways flow: LEDs in one thin lane along the flow light up in turn.
   if (uToward > 0.001) {
     vec2 side = vec2(-uFlowDir.y, uFlowDir.x);
     float lane = floor(dot(pos.xz, side) / uLane.x) * 7.31 + floor(pos.y / uLane.y) * 131.7;
@@ -645,7 +650,6 @@ let flowMode = null, flowUntil = 0;
 const densityGoal = [1, 1];
 let densityUntil = 0;
 let flowDir = [0, 1];
-let aimFlow = false; // point flowDir at the eye on the next frame
 const goal = { mode: [1, 0, 0], a: PALETTES[0].a, b: PALETTES[0].b, g0: PALETTES[0].a, g1: PALETTES[1].b };
 
 // A setting other than auto holds its choice until it is changed.
@@ -657,8 +661,11 @@ function nextWeather(now) {
 function nextFlow(now) {
   flowMode = pick(FLOWS, flowMode, forced('flow'));
   flowUntil = forced('flow') ? Infinity : now + rand(...flowMode.hold);
-  // Keep the direction fixed for the whole episode, pointing at where the eye is now.
-  if (flowMode.toward) aimFlow = true;
+  // A new horizontal direction for each sideways episode, kept until the next.
+  if (flowMode.toward) {
+    const a = Math.random() * Math.PI * 2;
+    flowDir = [Math.cos(a), Math.sin(a)];
+  }
 }
 // Camera moves. All run on one clock, so any blend of them moves smoothly.
 const CAMERAS = [
@@ -825,12 +832,6 @@ function frame(now) {
   const f = norm(sub(at, eye));
   const r = norm(cross(f, [0, 1, 0]));
   camera = { eye, f, r, u: cross(r, f), aspect };
-  if (aimFlow) {
-    // Light comes from where the eye looks, towards the eye.
-    const l = Math.hypot(dir[0], dir[2]) || 1;
-    flowDir = [-dir[0] / l, -dir[2] / l];
-    aimFlow = false;
-  }
 
   // A wave now and then, somewhere in the field.
   if (S.ripples > 0 && time > nextAuto) {
