@@ -104,7 +104,7 @@ const SKY = [
 // ---------- tunable settings (panel: p key or the gear button; also ?key=value) ----------
 const DEFAULTS = {
   grid: small ? 36 : 60,  rows: small ? 72 : 96,
-  density: 'auto', strandShare: 1.0, rowShare: 1.0, strandMin: 0.3, rowMin: 0.35,
+  layout: 'strands', density: 'auto', strandShare: 1.0, rowShare: 1.0, strandMin: 0.3, rowMin: 0.35,
   size: 0.013, maxPx: 4.5, rest: 0.025,
   rainGain: 4.0, tipGain: 5.0, exposure: 1.5, bloom: 0.4, fog: 22,
   speed: 1.0, trail: 1.0, weather: 'auto', turnTime: 8, turnSteps: 9,
@@ -122,6 +122,8 @@ const SCHEMA = [
   { title: '密度', items: [
     { key: 'grid', label: '糸の本数 (一辺, 最大)', min: 8, max: 160, step: 1 },
     { key: 'rows', label: '1本の粒の数 (最大)', min: 8, max: 256, step: 1 },
+    { key: 'layout', label: '配置', options: ['strands', 'scatter'],
+      hint: 'strands: 糸に沿って並ぶ / scatter: 糸1本分の幅の中にランダムに散らばる' },
     { key: 'density', label: '密度の変化', options: ['auto', 'manual'],
       hint: 'auto: 下限から最大の間でゆっくり変わる / manual: 下の割合で固定' },
     { key: 'strandShare', label: '糸の割合 (manual)', min: 0.02, max: 1, step: 0.01 },
@@ -660,10 +662,13 @@ function buildLattice() {
       const seed = Math.random() * 1000;
       const strandRank = Math.random();
       const rowStart = Math.floor(Math.random() * ROWS);
+      // Scattered: every LED at a random place in its strand's cell, so no lines
+      // show at all; the rain still falls down through each cell.
+      const scatter = S.layout === 'scatter';
       for (let r = 0; r < ROWS; r++) {
-        data[k++] = x;
-        data[k++] = (r + shift) / ROWS;
-        data[k++] = z;
+        data[k++] = scatter ? x + (Math.random() - 0.5) * step : x;
+        data[k++] = scatter ? Math.random() : (r + shift) / ROWS;
+        data[k++] = scatter ? z + (Math.random() - 0.5) * step : z;
         data[k++] = seed;
         rank[q++] = strandRank;
         rank[q++] = rowRank[(r + rowStart) % ROWS];
@@ -921,7 +926,7 @@ else {
 // What a change in the panel does at once.
 let rebuildTimer = 0;
 function apply(key) {
-  if (key === 'grid' || key === 'rows') {
+  if (key === 'grid' || key === 'rows' || key === 'layout') {
     clearTimeout(rebuildTimer);
     rebuildTimer = setTimeout(buildLattice, 250); // wait for the slider to settle
   }
