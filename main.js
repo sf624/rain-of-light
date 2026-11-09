@@ -77,7 +77,7 @@ const DEFAULTS = {
   speed: 1.0, trail: 1.0, weather: 'auto',
   color: 'auto', palette: 'auto', rainbow: 'drop', bandSpeed: 0.17, bandScale: 1.0, saturation: 1.0,
   flow: 'auto',
-  orbit: 0.025, radius: 7.5, fov: 60,
+  camera: 'auto', orbit: 0.025, radius: 7.5, fov: 60,
   ripples: 9,
 };
 // Older links used ?color=, ?weather= and ?flow= the same way, so they still work.
@@ -123,7 +123,9 @@ const SCHEMA = [
     { key: 'saturation', label: '彩度 (虹)', min: 0, max: 1, step: 0.01 },
   ] },
   { title: 'カメラ', items: [
-    { key: 'orbit', label: '回る速さ', min: 0, max: 0.2, step: 0.005 },
+    { key: 'camera', label: '動き', options: ['auto', 'orbit', 'walk', 'spin', 'gaze', 'rise'],
+      hint: 'orbit: 周回 / walk: 歩く / spin: 中心で見回す / gaze: 見上げる・見下ろす / rise: 昇り降り' },
+    { key: 'orbit', label: '動きの速さ', min: 0, max: 0.2, step: 0.005 },
     { key: 'radius', label: '中心からの距離', min: 0, max: 10, step: 0.1 },
     { key: 'fov', label: '画角 (度)', min: 30, max: 110, step: 1 },
   ] },
@@ -604,6 +606,7 @@ addEventListener('keydown', (e) => {
   if (e.key === 'w') step('weather', WEATHER);   // next weather
   if (e.key === 'c') step('color', COLOR_MODES); // next colour
   if (e.key === 'd') step('flow', FLOWS);        // switch direction
+  if (e.key === 'v') step('camera', CAMERAS);    // next camera move
 });
 // A key moves on at random while the setting is auto, else to the next choice.
 function step(key, list) {
@@ -657,6 +660,54 @@ function nextFlow(now) {
   // Keep the direction fixed for the whole episode, pointing at where the eye is now.
   if (flowMode.toward) aimFlow = true;
 }
+// Camera moves. All run on one clock, so any blend of them moves smoothly.
+const CAMERAS = [
+  { name: 'orbit', hold: [30, 50], weight: 3 },
+  { name: 'walk',  hold: [25, 40], weight: 2 },
+  { name: 'spin',  hold: [20, 35], weight: 1.5 },
+  { name: 'gaze',  hold: [20, 30], weight: 1 },
+  { name: 'rise',  hold: [25, 40], weight: 1.5 },
+];
+const CAMERA_BLEND = 8; // seconds to turn one move into the next
+const smooth = (x) => x * x * (3 - 2 * x);
+let camMode = CAMERAS[0], camUntil = 0, camClock = 0, camBlend = 1;
+const camW = CAMERAS.map((c) => (c === camMode ? 1 : 0));
+let camFrom = [...camW];
+let lastDir = [0, 0, -1];
+
+function nextCamera(now) {
+  camMode = pick(CAMERAS, camMode, forced('camera'));
+  camUntil = forced('camera') ? Infinity : now + rand(...camMode.hold);
+  camFrom = [...camW];
+  camBlend = 0;
+}
+
+// Where one move puts the eye at clock t, and which way it looks.
+function cameraPose(name, t, R, bob) {
+  const a = t * 0.025;                                   // orbit angle
+  const inward = [-Math.sin(a), 0, -Math.cos(a)];        // towards the centre
+  const onOrbit = (y) => [Math.sin(a) * R, y, Math.cos(a) * R];
+  switch (name) {
+    case 'walk': {                                       // a slow figure through the lattice
+      const x = 7 * Math.sin(t * 0.031), z = 7 * Math.sin(t * 0.023 + 1.0);
+      const dx = Math.cos(t * 0.031) * 0.031, dz = Math.cos(t * 0.023 + 1.0) * 0.023;
+      return { eye: [x, bob, z], dir: norm([dx, 0, dz]) };
+    }
+    case 'spin': {                                       // stand at the centre, look around
+      const b = t * 0.04;
+      return { eye: [0, bob, 0], dir: [Math.sin(b), 0, Math.cos(b)] };
+    }
+    case 'gaze': {                                       // look up into the rain, then down
+      const p = 0.6 * Math.sin(t * 0.08);
+      return { eye: onOrbit(bob), dir: [inward[0] * Math.cos(p), Math.sin(p), inward[2] * Math.cos(p)] };
+    }
+    case 'rise':                                         // drift up and down through the lattice
+      return { eye: onOrbit(Math.sin(t * 0.035) * 5.5), dir: inward };
+    default:                                             // orbit
+      return { eye: onOrbit(bob), dir: inward };
+  }
+}
+
 // Density wanders between its lower limits and full, or holds the manual shares.
 function nextDensity(now) {
   if (S.density === 'manual') {
@@ -696,10 +747,15 @@ function apply(key) {
   }
   if (key === 'weather') nextWeather(time);
   if (key === 'flow') nextFlow(time);
+  if (key === 'camera') nextCamera(time);
   if (['density', 'strandShare', 'rowShare', 'strandMin', 'rowMin'].includes(key)) nextDensity(time);
   if (key === 'color' || key === 'palette') nextColor(time);
 }
 if (S.density === 'manual') nextDensity(0); else densityUntil = rand(12, 20);
+if (forced('camera')) {
+  nextCamera(0);
+  camW.fill(0); camW[CAMERAS.indexOf(camMode)] = 1; camFrom = [...camW]; camBlend = 1;
+} else camUntil = rand(...CAMERAS[0].hold);
 
 const tuner = createTuner({
   schema: SCHEMA, settings: S, defaults: DEFAULTS, storageKey: STORAGE_KEY,
@@ -730,7 +786,6 @@ function ease(dt) {
 // ---------- frame ----------
 let last = performance.now();
 let nextAuto = 2;
-let orbitAngle = 0;
 
 function frame(now) {
   const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)); // rAF time may precede `last`
@@ -738,17 +793,32 @@ function frame(now) {
   time += dt;
   resize();
 
-  // Camera: a slow orbit inside the lattice, nudged by the pointer.
+  // Camera: one of several moves, blended while one turns into the next.
   pointer.sx += (pointer.x - pointer.sx) * 0.03;
   pointer.sy += (pointer.y - pointer.sy) * 0.03;
-  orbitAngle += dt * S.orbit * SPEED; // integrated, so a new speed never makes the view jump
-  const ang = orbitAngle + pointer.sx * 0.7;
-  const R = S.radius;
-  // Eye level stays horizontal; the pointer only raises or lowers the eye.
-  const eyeY = Math.sin(time * 0.05) * 0.8 - pointer.sy * 2.0;
-  const eye = [Math.sin(ang) * R, eyeY, Math.cos(ang) * R];
-  // Look ahead along the orbit's inward direction; at the centre, look along -z.
-  const at = R > 0.01 ? [0, eyeY, 0] : [eye[0] - Math.sin(ang), eyeY, eye[2] - Math.cos(ang)];
+  camClock += dt * SPEED * (S.orbit / DEFAULTS.orbit); // integrated: a new speed never jumps
+  camBlend = Math.min(1, camBlend + dt / CAMERA_BLEND);
+  const kb = smooth(camBlend);
+  let eye = [0, 0, 0], dir = [0, 0, 0];
+  const bob = Math.sin(time * 0.05) * 0.8;
+  CAMERAS.forEach((cam, i) => {
+    camW[i] = camFrom[i] + ((cam === camMode ? 1 : 0) - camFrom[i]) * kb;
+    if (camW[i] < 1e-4) return;
+    const pose = cameraPose(cam.name, camClock, S.radius, bob);
+    for (let k = 0; k < 3; k++) {
+      eye[k] += pose.eye[k] * camW[i];
+      dir[k] += pose.dir[k] * camW[i];
+    }
+  });
+  dir = Math.hypot(...dir) > 1e-3 ? norm(dir) : lastDir;
+  lastDir = dir;
+  // The pointer turns the whole view about the centre and raises or lowers the eye.
+  const yaw = pointer.sx * 0.7, cy = Math.cos(yaw), sy = Math.sin(yaw);
+  const turn = (v) => [v[0] * cy + v[2] * sy, v[1], -v[0] * sy + v[2] * cy];
+  eye = turn(eye);
+  eye[1] -= pointer.sy * 2.0;
+  dir = turn(dir);
+  const at = [eye[0] + dir[0], eye[1] + dir[1], eye[2] + dir[2]];
   const aspect = W / H;
   const view = lookAt(eye, at, [0, 1, 0]);
   const proj = perspective(fovRad(), aspect, 0.1, 60);
@@ -756,8 +826,9 @@ function frame(now) {
   const r = norm(cross(f, [0, 1, 0]));
   camera = { eye, f, r, u: cross(r, f), aspect };
   if (aimFlow) {
-    const l = Math.hypot(eye[0], eye[2]) || 1;
-    flowDir = [eye[0] / l, eye[2] / l];
+    // Light comes from where the eye looks, towards the eye.
+    const l = Math.hypot(dir[0], dir[2]) || 1;
+    flowDir = [-dir[0] / l, -dir[2] / l];
     aimFlow = false;
   }
 
@@ -772,6 +843,7 @@ function frame(now) {
   if (time > colorUntil) nextColor(time);
   if (time > flowUntil) nextFlow(time);
   if (time > densityUntil) nextDensity(time);
+  if (time > camUntil) nextCamera(time);
   ease(dt);
 
   // Points.
