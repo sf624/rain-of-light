@@ -7,6 +7,10 @@ light rings a bell.
 
 Plain WebGL2 and Web Audio: no build step, no dependencies, no media files.
 
+Live: <https://sf624.github.io/rain-of-light/>
+
+Inspired by teamLab's *Light Sculpture - Point*.
+
 ## Use
 
 - **Click or tap**: a ripple of light (and a bell).
