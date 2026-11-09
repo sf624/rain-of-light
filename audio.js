@@ -186,7 +186,7 @@ export function createAudio({ settings }) {
     const t = ctx.currentTime;
     master.gain.cancelScheduledValues(t);
     master.gain.setValueAtTime(master.gain.value, t);
-    master.gain.linearRampToValueAtTime(1, t + 3);
+    master.gain.linearRampToValueAtTime(settings.volume, t + 3);
     nextChord();
     later(bells, 4000);
   }
@@ -210,6 +210,12 @@ export function createAudio({ settings }) {
     toggle() { if (on) stop(); else start(); },
     // A wave of light rings a bell, panned to where it is seen.
     ripple(pan) { bell(pan, 1); },
+    // The overall volume, 0 .. 1, eased so a dragged slider does not crackle.
+    volume() {
+      if (!ctx || !on) return;
+      master.gain.cancelScheduledValues(ctx.currentTime);
+      master.gain.setTargetAtTime(settings.volume, ctx.currentTime, 0.05);
+    },
     // The hush follows the weather: 0 light rain .. 1 downpour.
     rain(amount) {
       if (!ctx || !on) return;

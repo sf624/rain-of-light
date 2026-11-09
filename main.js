@@ -114,7 +114,7 @@ const DEFAULTS = {
   flow: 'auto',
   camera: 'orbit', orbit: 0.025, radius: 7.5, fov: 60,
   ripples: 9,
-  music: 0.6, chimes: 0.6, rainSound: 0.3,
+  volume: 0.8, music: 0.6, chimes: 0.6, rainSound: 0.3,
 };
 // Older links used ?color=, ?weather= and ?flow= the same way, so they still work.
 const STORAGE_KEY = 'rain-of-light:settings';
@@ -180,6 +180,7 @@ const SCHEMA = [
     { key: 'ripples', label: 'Auto interval (s, 0: none)', min: 0, max: 30, step: 0.5 },
   ] },
   { title: 'Sound (m key or the note button)', items: [
+    { key: 'volume', label: 'Volume', min: 0, max: 1, step: 0.01 },
     { key: 'music', label: 'Pad', min: 0, max: 1, step: 0.05 },
     { key: 'chimes', label: 'Bells', min: 0, max: 1, step: 0.05 },
     { key: 'rainSound', label: 'Rain', min: 0, max: 1, step: 0.05 },
@@ -730,10 +731,26 @@ soundBtn.type = 'button';
 soundBtn.title = 'Sound (m)';
 soundBtn.setAttribute('aria-label', 'Sound');
 soundBtn.textContent = '♪';
-document.body.append(soundBtn);
+// The volume bar beside the note button; it is the panel's Volume too.
+const volumeBar = document.createElement('input');
+volumeBar.className = 'volume-bar';
+volumeBar.type = 'range';
+volumeBar.min = 0;
+volumeBar.max = 1;
+volumeBar.step = 0.01;
+volumeBar.value = S.volume;
+volumeBar.title = 'Volume';
+volumeBar.setAttribute('aria-label', 'Volume');
+volumeBar.addEventListener('input', () => {
+  tuner.set('volume', Number(volumeBar.value));
+  tuner.refresh();
+  if (!sound.on && Number(volumeBar.value) > 0) setSound(true); // turning it up turns it on
+});
+document.body.append(volumeBar, soundBtn);
 function setSound(want) {
   if (want) sound.start(); else sound.stop();
   soundBtn.classList.toggle('active', sound.on);
+  volumeBar.classList.toggle('active', sound.on);
   try { localStorage.setItem(SOUND_KEY, sound.on ? '1' : '0'); } catch { /* storage blocked */ }
 }
 soundBtn.addEventListener('click', () => setSound(!sound.on));
@@ -743,7 +760,7 @@ if (soundWanted) {
   const resume = (e) => {
     removeEventListener('pointerdown', resume, true);
     removeEventListener('keydown', resume, true);
-    if (e.target !== soundBtn && e.key !== 'm' && !sound.on) setSound(true);
+    if (e.target !== soundBtn && e.target !== volumeBar && e.key !== 'm' && !sound.on) setSound(true);
   };
   addEventListener('pointerdown', resume, true);
   addEventListener('keydown', resume, true);
@@ -970,6 +987,7 @@ function apply(key) {
     clearTimeout(rebuildTimer);
     rebuildTimer = setTimeout(buildLattice, 250); // wait for the slider to settle
   }
+  if (key === 'volume') { sound.volume(); volumeBar.value = S.volume; }
   if (key === 'weather') nextWeather(time);
   if (key === 'flow') nextFlow(time);
   if (key === 'camera') nextCamera(time);

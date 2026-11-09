@@ -36,6 +36,10 @@ html, body {
 }
 
 .overlay.hidden { opacity: 0; }
+/* On narrow screens the title sits above the buttons and the volume bar. */
+@media (max-width: 520px) {
+  .overlay { bottom: calc(max(16px, env(safe-area-inset-bottom)) + 52px); }
+}
 
 .overlay h1 {
   margin: 0 0 6px;
@@ -85,7 +89,22 @@ body.idle, body.idle #stage { cursor: none; }
 .sound-toggle { right: calc(max(16px, env(safe-area-inset-right)) + 46px); font-size: 17px; }
 .tuner-toggle:hover, .tuner-toggle.active, .sound-toggle:hover { opacity: 1; }
 .sound-toggle.active { opacity: 0.9; border-color: rgba(156, 200, 255, 0.6); color: #cfe4ff; }
-body.idle .tuner-toggle:not(.active), body.idle .sound-toggle { opacity: 0; }
+body.idle .tuner-toggle:not(.active), body.idle .sound-toggle, body.idle .volume-bar { opacity: 0; }
+
+/* ---------- volume bar, left of the note button ---------- */
+.volume-bar {
+  position: fixed;
+  right: calc(max(16px, env(safe-area-inset-right)) + 92px);
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 11px);
+  width: min(120px, calc(100vw - 140px));
+  height: 14px;
+  margin: 0;
+  accent-color: #9cc8ff;
+  opacity: 0.5;
+  cursor: pointer;
+  transition: opacity 0.6s ease;
+}
+.volume-bar:hover, .volume-bar.active { opacity: 0.85; }
 
 .tuner {
   position: fixed;
