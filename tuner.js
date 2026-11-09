@@ -26,6 +26,10 @@ export function createTuner({ schema, settings, defaults, storageKey, onChange }
   root.append(head);
 
   const inputs = new Map(); // key -> { input, out, item }
+  // What this browser keeps: only values changed in the panel. A value given
+  // in the URL is used for this visit but not kept, unless it is changed here.
+  let kept = {};
+  try { kept = JSON.parse(localStorage.getItem(storageKey) || '{}') || {}; } catch { /* storage blocked */ }
 
   for (const group of schema) {
     const section = document.createElement('section');
@@ -84,6 +88,7 @@ export function createTuner({ schema, settings, defaults, storageKey, onChange }
 
   function set(key, value) {
     settings[key] = value;
+    if (value === defaults[key]) delete kept[key]; else kept[key] = value;
     const entry = inputs.get(key);
     if (entry && entry.out) entry.out.textContent = format(entry.item, value);
     save();
@@ -99,11 +104,8 @@ export function createTuner({ schema, settings, defaults, storageKey, onChange }
 
   function save() {
     try {
-      const changed = {};
-      for (const key of Object.keys(defaults)) {
-        if (settings[key] !== defaults[key]) changed[key] = settings[key];
-      }
-      localStorage.setItem(storageKey, JSON.stringify(changed));
+      for (const key of Object.keys(kept)) if (!(key in defaults)) delete kept[key];
+      localStorage.setItem(storageKey, JSON.stringify(kept));
     } catch { /* storage may be blocked: tuning still works for this visit */ }
   }
 
@@ -121,6 +123,7 @@ export function createTuner({ schema, settings, defaults, storageKey, onChange }
         onChange(key, defaults[key]);
       }
     }
+    kept = {};
     refresh();
     save();
   });
