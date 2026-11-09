@@ -3,6 +3,7 @@
 // buffer, then blurred for bloom and tone-mapped onto the screen.
 
 import { createTuner, loadSettings } from './tuner.js';
+import { createAudio } from './audio.js';
 
 // Show any error on the page, so a black screen is never silent.
 function showError(msg) {
@@ -113,6 +114,7 @@ const DEFAULTS = {
   flow: 'auto',
   camera: 'orbit', orbit: 0.025, radius: 7.5, fov: 60,
   ripples: 9,
+  music: 0.6, chimes: 0.6, rainSound: 0.3,
 };
 // Older links used ?color=, ?weather= and ?flow= the same way, so they still work.
 const STORAGE_KEY = 'rain-of-light:settings';
@@ -176,6 +178,11 @@ const SCHEMA = [
   ] },
   { title: 'Ripples', items: [
     { key: 'ripples', label: 'Auto interval (s, 0: none)', min: 0, max: 30, step: 0.5 },
+  ] },
+  { title: 'Sound (m key or the note button)', items: [
+    { key: 'music', label: 'Pad', min: 0, max: 1, step: 0.05 },
+    { key: 'chimes', label: 'Bells', min: 0, max: 1, step: 0.05 },
+    { key: 'rainSound', label: 'Rain', min: 0, max: 1, step: 0.05 },
   ] },
 ];
 // A saved or linked choice that no longer exists falls back to its default.
@@ -709,6 +716,37 @@ let rippleIndex = 0;
 function addRipple(x, y, z, t) {
   ripples.set([x, y, z, t], rippleIndex * 4);
   rippleIndex = (rippleIndex + 1) % 8;
+  // Each wave rings a bell, from the side where it is seen.
+  const pan = camera ? dot([x - camera.eye[0], y - camera.eye[1], z - camera.eye[2]], camera.r) / 6 : 0;
+  sound.ripple(pan);
+}
+
+// ---------- sound: off until asked for; once turned on, it starts again with the first click ----------
+const SOUND_KEY = 'rain-of-light:sound';
+const sound = createAudio({ settings: S });
+const soundBtn = document.createElement('button');
+soundBtn.className = 'sound-toggle';
+soundBtn.type = 'button';
+soundBtn.title = 'Sound (m)';
+soundBtn.setAttribute('aria-label', 'Sound');
+soundBtn.textContent = '♪';
+document.body.append(soundBtn);
+function setSound(want) {
+  if (want) sound.start(); else sound.stop();
+  soundBtn.classList.toggle('active', sound.on);
+  try { localStorage.setItem(SOUND_KEY, sound.on ? '1' : '0'); } catch { /* storage blocked */ }
+}
+soundBtn.addEventListener('click', () => setSound(!sound.on));
+let soundWanted = false;
+try { soundWanted = localStorage.getItem(SOUND_KEY) === '1'; } catch { /* storage blocked */ }
+if (soundWanted) {
+  const resume = (e) => {
+    removeEventListener('pointerdown', resume, true);
+    removeEventListener('keydown', resume, true);
+    if (e.target !== soundBtn && e.key !== 'm' && !sound.on) setSound(true);
+  };
+  addEventListener('pointerdown', resume, true);
+  addEventListener('keydown', resume, true);
 }
 
 const pointer = { x: 0, y: 0, sx: 0, sy: 0 };
@@ -752,6 +790,7 @@ addEventListener('keydown', (e) => {
   if (e.key === 'c') step('color', COLOR_MODES); // next colour
   if (e.key === 'd') step('flow', FLOWS);        // switch direction
   if (e.key === 'v') step('camera', CAMERAS);    // next camera move
+  if (e.key === 'm') setSound(!sound.on);        // sound on and off
 });
 // A key moves on at random while the setting is auto, else to the next choice.
 function step(key, list) {
@@ -1028,6 +1067,7 @@ function frame(now) {
   if (time > densityUntil) nextDensity(time);
   if (time > camUntil) nextCamera(time);
   ease(dt);
+  sound.rain(look.rain);
 
   // Points.
   gl.bindFramebuffer(gl.FRAMEBUFFER, hasFloat ? scene.fb : null);
