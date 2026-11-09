@@ -755,6 +755,23 @@ volumeBar.addEventListener('input', () => {
   if (!sound.on && Number(volumeBar.value) > 0) setSound(true); // turning it up turns it on
 });
 document.body.append(volumeBar, soundBtn);
+
+// Full screen: a button and the f key, where the browser allows it (not on iPhone).
+const fullBtn = document.createElement('button');
+fullBtn.className = 'full-toggle';
+fullBtn.type = 'button';
+fullBtn.title = 'Full screen (f)';
+fullBtn.setAttribute('aria-label', 'Full screen');
+fullBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">'
+  + '<path d="M1 5V1h4M11 1h4v4M15 11v4h-4M5 15H1v-4"/></svg>';
+document.body.append(fullBtn);
+if (!document.fullscreenEnabled) document.body.classList.add('no-fullscreen');
+function toggleFullscreen() {
+  if (!document.fullscreenEnabled) return;
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen().catch(() => { /* refused: stay as is */ });
+}
+fullBtn.addEventListener('click', toggleFullscreen);
 // A note on the sound controls when the page opens; it goes after a while,
 // or as soon as the controls are used.
 const soundHint = document.createElement('p');
@@ -836,6 +853,7 @@ canvas.addEventListener('pointerdown', (e) => {
 
 addEventListener('keydown', (e) => {
   if (e.key === 'p') tuner.toggle();             // settings panel
+  if (e.key === 'f') toggleFullscreen();         // full screen
   if (e.key === 'w') step('weather', WEATHER);   // next weather
   if (e.key === 'c') step('color', COLOR_MODES); // next colour
   if (e.key === 'd') step('flow', FLOWS);        // switch direction

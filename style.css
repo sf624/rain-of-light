@@ -70,7 +70,7 @@ html, body {
 body.idle, body.idle #stage { cursor: none; }
 
 /* ---------- settings panel ---------- */
-.tuner-toggle, .sound-toggle {
+.tuner-toggle, .sound-toggle, .full-toggle {
   position: fixed;
   right: max(16px, env(safe-area-inset-right));
   bottom: max(16px, env(safe-area-inset-bottom));
@@ -86,17 +86,24 @@ body.idle, body.idle #stage { cursor: none; }
   opacity: 0.6;
   transition: opacity 0.6s ease;
 }
-.sound-toggle { right: calc(max(16px, env(safe-area-inset-right)) + 46px); font-size: 17px; }
-.tuner-toggle:hover, .tuner-toggle.active, .sound-toggle:hover { opacity: 1; }
+/* From the right: settings, full screen (where the browser has it), sound, volume. */
+:root { --controls-right: max(16px, env(safe-area-inset-right)); --full-slot: 46px; }
+body.no-fullscreen { --full-slot: 0px; }
+.full-toggle { right: calc(var(--controls-right) + 46px); display: grid; place-items: center; padding: 0; }
+.full-toggle svg { width: 16px; height: 16px; }
+body.no-fullscreen .full-toggle { display: none; }
+.sound-toggle { right: calc(var(--controls-right) + var(--full-slot) + 46px); font-size: 17px; }
+.tuner-toggle:hover, .tuner-toggle.active, .sound-toggle:hover, .full-toggle:hover { opacity: 1; }
 .sound-toggle.active { opacity: 0.9; border-color: rgba(156, 200, 255, 0.6); color: #cfe4ff; }
-body.idle .tuner-toggle:not(.active), body.idle .sound-toggle, body.idle .volume-bar { opacity: 0; }
+body.idle .tuner-toggle:not(.active), body.idle .sound-toggle, body.idle .volume-bar,
+body.idle .full-toggle { opacity: 0; }
 
 /* ---------- volume bar, left of the note button ---------- */
 .volume-bar {
   position: fixed;
-  right: calc(max(16px, env(safe-area-inset-right)) + 92px);
+  right: calc(var(--controls-right) + var(--full-slot) + 92px);
   bottom: calc(max(16px, env(safe-area-inset-bottom)) + 11px);
-  width: min(120px, calc(100vw - 140px));
+  width: min(120px, calc(100vw - 186px));
   height: 14px;
   margin: 0;
   accent-color: #9cc8ff;
