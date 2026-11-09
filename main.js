@@ -908,8 +908,8 @@ function skyColors() {
   return [lerp(SKY[i][0], SKY[j][0]), lerp(SKY[i][1], SKY[j][1])];
 }
 
-// Start calm (light rain, one colour, falling) unless a setting says otherwise.
-weather = WEATHER[1]; colorMode = COLOR_MODES[0]; flowMode = FLOWS[0];
+// Start with light rain falling in a rainbow, unless a setting says otherwise.
+weather = WEATHER[1]; colorMode = COLOR_MODES[MODE.rainbow]; flowMode = FLOWS[0];
 if (forced('weather')) nextWeather(0); else weatherUntil = rand(...weather.hold);
 if (forced('flow')) nextFlow(0); else flowUntil = rand(...flowMode.hold);
 if (forced('color') || forced('palette')) nextColor(0);
