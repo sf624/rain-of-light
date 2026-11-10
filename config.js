@@ -18,8 +18,7 @@ export const WEATHER = [
   { name: 'shower',   flow: 1.9, rain: 0.6,  hold: [8, 14],  weight: 2 },
   { name: 'downpour', flow: 3.6, rain: 1.0,  hold: [6, 12],  weight: 0 },   // never on its own: the w key or the Weather setting
 ];
-// Direction: rain falls from above. Sideways (each time a new way) is a choice,
-// by the d key or the Direction setting; 'auto' changes between the two.
+// Direction: rain falls from above, or now and then flows sideways, each time a new way.
 export const FLOWS = [
   { name: 'down',   toward: 0, hold: [20, 40], weight: 3 },
   { name: 'across', toward: 1, hold: [20, 40], weight: 1 },
@@ -111,10 +110,10 @@ export const DEFAULTS = {
   size: 0.018, maxPx: 4.5, rest: 0.03, wire: 0.2,
   rainGain: 4.0, tipGain: 5.0, exposure: 1.8, bloom: 0.8, fog: 34, blackFloor: 3,
   rays: '2', rayGain: 0.3, rayLength: 20, rayThreshold: 0.7,
-  speed: 1.0, trail: 1.0, weather: 'auto', turnTime: 8, turnSteps: 9,
+  speed: 1.0, trail: 1.0, weather: 'auto', turnTime: 8, turnSteps: 1,
   color: 'auto', palette: 'auto', rainbow: 'drop', bandSpeed: 0.17, bandScale: 1.0, saturation: 1.0,
   set: 'auto', skyDay: 90,
-  flow: 'down',
+  flow: 'auto',
   camera: 'orbit', orbit: 0.025, radius: 10, fov: 76,
   ripples: 14,
   quality: 'auto',
@@ -185,7 +184,7 @@ export const SCHEMA = [
     { key: 'speed', label: 'Speed (x)', min: 0, max: 4, step: 0.05 },
     { key: 'trail', label: 'Trail length (x)', min: 0.2, max: 4, step: 0.05 },
     { key: 'flow', label: 'Direction', options: ['auto', 'down', 'across'],
-      hint: 'down: from above / across: sideways (a random way each time) / auto: changes between them' },
+      hint: 'down: from above / across: sideways (a random way each time)' },
     { key: 'turnTime', label: 'Turn time (s)', min: 1, max: 30, step: 0.5 },
     { key: 'turnSteps', label: 'Turn steps (1: cross-fade)', min: 1, max: 18, step: 1 },
   ] },
