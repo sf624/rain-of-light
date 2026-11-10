@@ -118,7 +118,7 @@ export const DEFAULTS = {
   ripples: 14,
   quality: 'auto',
   breath: 'on', breathRate: 6, breathDepth: 0.3,
-  volume: 0.8, music: 0.6, chimes: 0.6, rainSound: 0.3,
+  volume: 0.8, music: 0.6, chimes: 0.6, rainSound: 0.3, formSound: 0.6,
 };
 // Older links used ?color=, ?weather= and ?flow= the same way, so they still work.
 export const STORAGE_KEY = 'rain-of-light:settings';
@@ -224,5 +224,7 @@ export const SCHEMA = [
     { key: 'music', label: 'Pad', min: 0, max: 1, step: 0.05 },
     { key: 'chimes', label: 'Bells', min: 0, max: 1, step: 0.05 },
     { key: 'rainSound', label: 'Rain', min: 0, max: 1, step: 0.05 },
+    { key: 'formSound', label: 'Forms', min: 0, max: 1, step: 0.05,
+      hint: 'The voice each form of light brings: the orb a low hum, the spiral a turning figure, the cloud a high shimmer' },
   ] },
 ];

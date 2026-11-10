@@ -9,6 +9,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { renderSound, levels, RATE } from './render-audio.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TIMEOUT_MS = 780_000;
@@ -247,6 +248,21 @@ await visit(cdp, base, '#tune', false);
 await visit(cdp, base, '?scene=rain', true);
 await visit(cdp, base, '?scene=crystal', true);
 await visit(cdp, base, '?seed=7&t=100', false);
+
+// The sound follows the show: rendered offline on the page's own clock (see
+// render-audio.mjs), a held orb sounds (its voice, the pad) and a still room
+// is near silence; neither clips. The fake clock makes this independent of
+// how fast frames are drawn.
+const [orb, still] = await renderSound([
+  { query: '?scene=crystal&form=orb&seed=1', seconds: 12 },
+  { query: '?scene=crystal&form=none&layer=on&seed=1', seconds: 12 },
+], { root: ROOT }).catch((e) => fail(`sound render: ${e.message}`));
+const a = levels(orb.L, orb.R, 6 * RATE), b = levels(still.L, still.R, 6 * RATE);
+const say = (x) => `RMS ${x.rms.toFixed(1)} dBFS, peak ${x.peak.toFixed(1)} dBFS`;
+if (a.over || b.over || a.peak > -3 || b.peak > -3) fail(`sound too loud: orb ${say(a)}, still room ${say(b)}`);
+if (a.rms < -40) fail(`a held orb is (almost) silent: ${say(a)}`);
+if (a.rms - b.rms < 3) fail(`a still room is not quieter than a form: orb ${say(a)}, still room ${say(b)}`);
+console.log(`ok  sound: a held orb ${say(a)}; a still room ${say(b)}`);
 
 clearTimeout(overall);
 cleanup();

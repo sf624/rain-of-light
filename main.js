@@ -221,9 +221,10 @@ function addRipple(x, y, z, t) {
   ripples.set([x, y, z, t], rippleIndex * 4);
   rippleIndex = (rippleIndex + 1) % 8;
   // Every wave rings a bell, from the side where it is seen.
-  const pan = camera ? dot([x - camera.eye[0], y - camera.eye[1], z - camera.eye[2]], camera.r) / 6 : 0;
-  sound.ripple(pan);
+  sound.ripple(panOf([x, y, z]));
 }
+// Left (-1) .. right (1): where a point in the room is seen, for the sound.
+const panOf = (p) => (camera ? dot(sub(p, camera.eye), camera.r) / 6 : 0);
 
 const sound = createAudio({ settings: S });
 const controls = createControls({
@@ -665,6 +666,9 @@ function frame(now) {
   const breath = S.breath === 'on' ? breathAt(dt) : 1;
   const glow = 1 - S.breathDepth * (1 - breath);
   sound.breath(1 - S.breathDepth * 0.8 * (1 - breath));
+  // Each form's voice swells and fades with it, from where it is seen.
+  for (const f of shown.forms) f.pan = panOf(f.at);
+  sound.forms(shown.forms);
 
   // Points.
   gl.bindFramebuffer(gl.FRAMEBUFFER, hasFloat ? scene.fb : null);
