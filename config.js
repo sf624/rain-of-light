@@ -118,7 +118,7 @@ export const DEFAULTS = {
   ripples: 14,
   quality: 'auto',
   breath: 'on', breathRate: 6, breathDepth: 0.3,
-  volume: 0.8, music: 0.6, chimes: 0.6, rainSound: 0.3, formSound: 0.6,
+  volume: 0.8, music: 0.6, chimes: 0.6, rainSound: 0.3, formSound: 0.4,
 };
 // Older links used ?color=, ?weather= and ?flow= the same way, so they still work.
 export const STORAGE_KEY = 'rain-of-light:settings';

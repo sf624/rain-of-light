@@ -128,7 +128,7 @@ export function createAudio({ settings }) {
     air.frequency.value = 3800;
     air.Q.value = 0.9;
     const airGain = ctx.createGain();
-    airGain.gain.value = 0.025;
+    airGain.gain.value = 0.012;
     noise.connect(air).connect(airGain).connect(voice.cloud.g);
   }
 
@@ -234,7 +234,7 @@ export function createAudio({ settings }) {
   // tick); the orb's and the cloud's are held, like the pad.
   function formLayer(name, notes, t, hold) {
     if (name === 'spiral' || settings.formSound <= 0) return;
-    const level = name === 'orb' ? 0.035 : 0.05;
+    const level = name === 'orb' ? 0.035 : 0.025;
     const dest = fadeTo(voice[name].g);
     if (name === 'orb') {
       // Warm and low: the root, its fifth and its octave, soft and dark.
@@ -303,9 +303,9 @@ export function createAudio({ settings }) {
         const path = [0, 1, 2, 3, 4, 3, 2, 1];
         const m = notes[path[arpStep % path.length]] + 12;
         arpStep++;
-        arpPan += 0.55;
-        ping(m, arpAt, { peak: 0.06 * (arpStep % 4 === 1 ? 1 : 0.7), decay: 2.6, pan: 0.6 * Math.sin(arpPan), dest: voice.spiral.g, verbSend: 0 });
-        arpAt += 1.15 + 0.25 * Math.sin(arpStep * 0.7);
+        arpPan += 0.9;
+        ping(m, arpAt, { peak: 0.05 * (arpStep % 4 === 1 ? 1 : 0.7), decay: 4.5, pan: 0.6 * Math.sin(arpPan), dest: voice.spiral.g, verbSend: 0 });
+        arpAt += 3.2 + 0.7 * Math.sin(arpStep * 0.7);   // unhurried: a note, and room after it
       }
     }
     // The still room: now and then a high, soft note, like a pale drop.
