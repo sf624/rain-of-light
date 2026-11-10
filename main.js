@@ -88,7 +88,7 @@ const pointVao = lattice.pointVao;
 const emptyVao = gl.createVertexArray();
 
 // ---------- render targets ----------
-let W = 0, H = 0, scene = null, bloomA = null, bloomB = null, hazeA = null, hazeB = null;
+let W = 0, H = 0, scene = null, bloomA = null, bloomB = null, hazeA = null, hazeB = null, wideA = null, wideB = null;
 
 // Render scale, on top of the device pixel ratio. In 'auto' quality it steps
 // down when frames are persistently slow and back up when a probe holds.
@@ -115,6 +115,7 @@ function resize() {
   settleUntil = performance.now() + SETTLE_MS; // frame times right after a change say little
   if (hasFloat) {
     freeTarget(scene); freeTarget(bloomA); freeTarget(bloomB); freeTarget(hazeA); freeTarget(hazeB);
+    freeTarget(wideA); freeTarget(wideB);
     scene = target(W, H, true);
     const bw = Math.max(1, W >> 2), bh = Math.max(1, H >> 2);
     bloomA = target(bw, bh);
@@ -123,6 +124,10 @@ function resize() {
     const hw = Math.max(1, W >> 4), hh = Math.max(1, H >> 4);
     hazeA = target(hw, hh);
     hazeB = target(hw, hh);
+    // And a wider haze, at a quarter of that.
+    const ww = Math.max(1, W >> 6), wh = Math.max(1, H >> 6);
+    wideA = target(ww, wh);
+    wideB = target(ww, wh);
   }
 }
 
@@ -383,6 +388,8 @@ function nextFlow(now) {
     turnP = 0;
   }
 }
+// The haze spreads bright light wide; dimmer light, less (so the room keeps its contrast).
+const HAZE_KNEE = 1.5;
 const CAMERA_BLEND = 8; // seconds to turn one move into the next
 const smooth = (x) => x * x * (3 - 2 * x);
 // The crystal scene starts its camera at ?t= too, so a time shows one view.
@@ -711,6 +718,9 @@ function frame(now) {
   const images = crystal && S.walls >= 1 ? 9 : 1;
   const passes = crystal && S.mirror > 0 ? [0, S.mirror] : [0];
   gl.bindVertexArray(pointVao);
+  // In the crystal room every LED adds its light, near or far: the strands are
+  // fine threads, and nothing near the eye stands dark in front of a form.
+  if (crystal) gl.disable(gl.DEPTH_TEST);
   for (const mirror of passes) {
     for (const prog of progs) {
       gl.useProgram(prog.p);
@@ -718,8 +728,13 @@ function frame(now) {
     }
     gl.useProgram(pointProg.p);
     gl.depthFunc(gl.LESS);
+    if (crystal) {
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.ONE, gl.ONE);
+    }
     if (images > 1) gl.drawArraysInstanced(gl.POINTS, 0, count, images);
     else gl.drawArrays(gl.POINTS, 0, count);
+    gl.disable(gl.BLEND);
     if (wiresOn) {
       // Wires after the LEDs: hidden behind near LEDs, added up, never hiding anything.
       gl.useProgram(wireProg.p);
@@ -757,6 +772,7 @@ function frame(now) {
     gl.bindTexture(gl.TEXTURE_2D, scene.tex);
     gl.uniform1i(downProg.u.uTex, 0);
     gl.uniform2f(downProg.u.uTexel, 1 / W, 1 / H);
+    gl.uniform1f(downProg.u.uKnee, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     // Blur once in each direction: a faint glow that keeps the LEDs crisp.
     gl.useProgram(blurProg.p);
@@ -776,7 +792,9 @@ function frame(now) {
       gl.useProgram(downProg.p);
       gl.bindTexture(gl.TEXTURE_2D, bloomA.tex);
       gl.uniform2f(downProg.u.uTexel, 1 / bloomA.w, 1 / bloomA.h);
+      gl.uniform1f(downProg.u.uKnee, HAZE_KNEE);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
+      gl.uniform1f(downProg.u.uKnee, 0);
       gl.useProgram(blurProg.p);
       for (let i = 0; i < 2; i++) {
         gl.bindFramebuffer(gl.FRAMEBUFFER, hazeB.fb);
@@ -786,6 +804,24 @@ function frame(now) {
         gl.bindFramebuffer(gl.FRAMEBUFFER, hazeA.fb);
         gl.bindTexture(gl.TEXTURE_2D, hazeB.tex);
         gl.uniform2f(blurProg.u.uDir, 0, 1 / hazeA.h);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+      }
+      // The wide haze: a quarter of that again, blurred twice the same way.
+      gl.bindFramebuffer(gl.FRAMEBUFFER, wideA.fb);
+      gl.viewport(0, 0, wideA.w, wideA.h);
+      gl.useProgram(downProg.p);
+      gl.bindTexture(gl.TEXTURE_2D, hazeA.tex);
+      gl.uniform2f(downProg.u.uTexel, 1 / hazeA.w, 1 / hazeA.h);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      gl.useProgram(blurProg.p);
+      for (let i = 0; i < 2; i++) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, wideB.fb);
+        gl.bindTexture(gl.TEXTURE_2D, wideA.tex);
+        gl.uniform2f(blurProg.u.uDir, 1 / wideA.w, 0);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, wideA.fb);
+        gl.bindTexture(gl.TEXTURE_2D, wideB.tex);
+        gl.uniform2f(blurProg.u.uDir, 0, 1 / wideA.h);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
       }
     }
@@ -799,10 +835,15 @@ function frame(now) {
     gl.bindTexture(gl.TEXTURE_2D, bloomA.tex);
     gl.activeTexture(gl.TEXTURE2);
     gl.bindTexture(gl.TEXTURE_2D, hazeA.tex);
+    gl.activeTexture(gl.TEXTURE3);
+    gl.bindTexture(gl.TEXTURE_2D, wideA.tex);
+    gl.activeTexture(gl.TEXTURE0);
     gl.uniform1i(compProg.u.uScene, 0);
     gl.uniform1i(compProg.u.uBloom, 1);
     gl.uniform1i(compProg.u.uHaze, 2);
+    gl.uniform1i(compProg.u.uHazeWide, 3);
     gl.uniform1f(compProg.u.uHazeK, S.haze);
+    gl.uniform1f(compProg.u.uBurn, S.burn);
     gl.uniform1f(compProg.u.uBloomK, S.bloom);
     gl.uniform1f(compProg.u.uExposure, S.exposure * glow);
     gl.uniform1f(compProg.u.uFloor, S.blackFloor / 255);

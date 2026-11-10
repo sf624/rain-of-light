@@ -212,9 +212,9 @@ const vec3 WHITE_HOT = vec3(1.0, 0.96, 0.9);
 vec3 orbLight(vec3 p, vec4 a, vec4 b) {
   float d = length(p - b.xyz) / a.z;
   float body = exp(-d * d * 2.2) * (1.0 - smoothstep(0.8, 1.25, d));
-  float core = exp(-d * d * 7.0);
+  float core = exp(-d * d * 4.5);
   float shimmer = 0.75 + 0.5 * noise3(p * 1.1 + vec3(0.0, uTime * 0.3, 0.0));
-  return vec3(body * 3.0 * shimmer + core * 10.0, core, smoothstep(0.15, 0.9, d));
+  return vec3(body * 3.0 * shimmer + core * 30.0, core, smoothstep(0.15, 0.9, d));
 }
 
 // A spiral disc: tilted, two arms, a bright bulge at the centre, slowly turning.
@@ -227,12 +227,12 @@ vec3 spiralLight(vec3 p, vec4 a, vec4 b, float yaw) {
   float R = a.z;
   float r = length(q.xz) / R;
   float th = atan(q.z, q.x);
-  float thick = R * (0.12 + 0.14 * exp(-r * r * 8.0));
+  float thick = R * (0.06 + 0.12 * exp(-r * r * 8.0));
   float disc = exp(-q.y * q.y / (thick * thick)) * (1.0 - smoothstep(0.75, 1.0, r));
-  float arm = pow(0.5 + 0.5 * cos(2.0 * (th - a.w) + 4.0 * log(r + 0.03)), 3.0);
+  float arm = pow(0.5 + 0.5 * cos(2.0 * (th - a.w) + 4.0 * log(r + 0.03)), 4.0);
   float dust = 0.7 + 0.6 * noise3(p * 0.7);
-  float bulge = exp(-dot(q, q) / (R * R * 0.012));
-  return vec3(disc * (0.1 + 14.0 * arm * dust) * exp(-r * 0.6) + bulge * 8.0, bulge, smoothstep(0.1, 0.8, r));
+  float bulge = exp(-dot(q, q) / (R * R * 0.015));
+  return vec3(disc * (0.15 + 22.0 * arm * dust) * exp(-r * 0.6) + bulge * 40.0, bulge, smoothstep(0.1, 0.8, r));
 }
 
 // A layer: a sea of light near the floor, its surface in slow waves.
@@ -246,19 +246,25 @@ vec3 layerLight(vec3 p, vec4 a, vec4 b) {
   return vec3(top * 2.5 * glint + below * 0.6, top * top * 0.2, clamp(-dy, 0.0, 1.0));
 }
 
-// A cloud: a few soft lobes, frayed by noise, with wisps inside; drifting.
+// A cloud, like a nebula: a body of 3-D noise inside a warped, uneven
+// envelope, with bright knots, dark rifts and frayed wisps; it drifts and
+// slowly changes shape.
 vec3 cloudLight(vec3 p, vec4 a, vec4 b) {
-  vec3 q = (p - b.xyz) / (a.z * vec3(1.0, 0.7, 0.8));
-  float t = uTime * 0.05;
-  float lobes = max(1.0 - length(q),
-                max(0.8 - length(q - vec3(0.55 * cos(t), 0.25, 0.3 * sin(t))) * 1.4,
-                    0.8 - length(q + vec3(0.5, 0.15 * sin(t * 1.3), -0.35)) * 1.5));
-  vec3 drift = vec3(uTime * 0.06, uTime * 0.02, -uTime * 0.04);
-  float n = noise3(p * 0.28 + drift) * 0.6 + noise3(p * 0.7 - drift * 1.5) * 0.4;
-  float dens = smoothstep(0.0, 0.55, lobes + (n - 0.5) * 1.4);
-  float wisp = 0.35 + 1.3 * smoothstep(0.3, 0.75, noise3(p * 0.55 + drift * 2.0));
-  float dense = dens * dens * dens * dens;
-  return vec3(dens * 2.2 * wisp + dense * 2.0, dense * 0.25, smoothstep(0.35, 0.65, n));
+  float t = uTime * 0.04;
+  vec3 q = (p - b.xyz) / (a.z * vec3(1.0, 0.6, 0.9));
+  vec3 s = p * 0.18 + vec3(t, t * 0.3, -t * 0.7);
+  vec3 warp = vec3(noise3(s), noise3(s + 7.3), noise3(s + 13.1)) - 0.5;
+  float env = 1.0 - length(q + warp * 1.4);          // the lobes: > 0 inside the warped shape
+  vec3 r = p * 0.42 + warp * 2.0 + vec3(-t * 1.5, t * 0.5, t);
+  float n = noise3(r) * 0.55 + noise3(r * 2.1 + 3.7) * 0.3 + noise3(r * 4.3 + 9.1) * 0.15;
+  float dens = smoothstep(-0.1, 0.6, env + (n - 0.5) * 1.2);
+  // Where it is thin, only some LEDs light, at random: the edge frays into sparks.
+  float h = hash3(p * 7.31);
+  float lit = smoothstep(h - 0.1, h + 0.1, dens * 1.15);
+  float lanes = smoothstep(0.38, 0.62, n);           // dark rifts between brighter lanes
+  float knot = dens * dens * dens * smoothstep(0.5, 0.75, n);
+  float light = lit * (0.12 + 2.6 * lanes * lanes) * (0.4 + dens) + knot * 6.0;
+  return vec3(light, knot * 0.5, smoothstep(0.3, 0.7, warp.x + 0.5));
 }
 
 // The light of the forms at p. Each comes and goes LED by LED, in a random order.
@@ -359,6 +365,7 @@ void main() {
          + mix(tipCol, vec3(1.0), white) * tip * uTipGain
          + mix(restCol, vec3(1.0), 0.35) * ring * 1.6;
   vec3 glint = tipCol * tip * uTipGain;  // the head's light in its own colour: the light rays
+  vec3 wireCol = c;                      // the wire glows with the LED's own light
 
   if (uScene > 0.5) {
     // Crystal: the forms' light, a faint lattice in the room's colour with a
@@ -372,17 +379,23 @@ void main() {
       + pale * (rain * uRainGain * 0.5 + tip * uTipGain)
       + (form * 1.5 + pale * 0.8) * ring;
     glint = pale * tip * uTipGain;
+    // The strands catch the light of the forms they run through, and a faint
+    // sheen of the room's: thin lit threads, never dark bars.
+    wireCol = form * (1.0 + ring) + pale * (rain * uRainGain * 0.2 + ring * 0.4)
+            + uTint * uRest * 1.5 * (1.0 - smoothstep(3.0, 12.0, dist));
   }
 
   float fog = 1.0 - smoothstep(uFogFar * 0.3, uFogFar, dist);
   c *= fog;
   glint *= fog;
+  wireCol *= fog;
   if (uScene > 0.5) {
     // Each mirror dims its image a little; the floor's image fades with the height above it.
     float g = uCopyGain[gl_InstanceID];
     if (uMirror.y > 0.0) g *= uMirror.y * exp(-(pos.y - uMirror.x) / uMirror.z);
     c *= g;
     glint *= g;
+    wireCol *= g;
   }
 
   // Thinning: LEDs past the shown share fade out, in an order that leaves the
@@ -399,6 +412,11 @@ void main() {
     vSize = 1.0;
     vEnd = float(gl_VertexID % 2);   // neighbours on a strand alternate, so each segment runs 0 .. 1
     vColor = c * on.x * uWire * smoothstep(2.5, 8.0, dist);
+    // Crystal: a whole thread of light, as bright between the LEDs as at them, near or far.
+    if (uScene > 0.5) {
+      vEnd = 0.0;
+      vColor = wireCol * on.x * uWire;
+    }
     return;
   }
   vEnd = 0.0;
@@ -510,13 +528,16 @@ precision mediump float;
 in vec2 vUv;
 uniform sampler2D uTex;
 uniform vec2 uTexel;
+uniform float uKnee; // > 0: light fainter than this is let through less (the haze: only bright light spreads wide)
 out vec4 outColor;
 void main() {
   vec3 c = texture(uTex, vUv + uTexel * vec2(-1.0, -1.0)).rgb
          + texture(uTex, vUv + uTexel * vec2( 1.0, -1.0)).rgb
          + texture(uTex, vUv + uTexel * vec2(-1.0,  1.0)).rgb
          + texture(uTex, vUv + uTexel * vec2( 1.0,  1.0)).rgb;
-  outColor = vec4(c * 0.25, 1.0);
+  c *= 0.25;
+  if (uKnee > 0.0) c *= smoothstep(0.0, uKnee, max(c.r, max(c.g, c.b)));
+  outColor = vec4(c, 1.0);
 }`;
 
 export const BLUR_FS = `#version 300 es
@@ -544,10 +565,26 @@ uniform sampler2D uBloom;
 uniform float uBloomK;
 uniform float uExposure;
 uniform float uFloor;  // black floor: glow fainter than about this (on screen, 0..1) is dropped
-uniform sampler2D uHaze; // a much wider glow, that fills the room (crystal)
+uniform sampler2D uHaze;     // a much wider glow, that fills the room (crystal)
+uniform sampler2D uHazeWide; // and a wider one still, a quarter of its size
 uniform float uHazeK;
+uniform float uBurn;         // > 0: bright light burns out to white (crystal)
 out vec4 outColor;
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+// A smooth (cubic B-spline) read of a small texture, from four bilinear reads:
+// a plain bilinear read of a texture this coarse shows its texels as soft boxes.
+vec3 smoothRead(sampler2D t, vec2 uv) {
+  vec2 size = vec2(textureSize(t, 0));
+  vec2 p = uv * size - 0.5, i = floor(p), f = p - i;
+  vec2 w0 = (1.0 - f) * (1.0 - f) * (1.0 - f) / 6.0;
+  vec2 w1 = (4.0 - 6.0 * f * f + 3.0 * f * f * f) / 6.0;
+  vec2 w3 = f * f * f / 6.0;
+  vec2 w2 = 1.0 - w0 - w1 - w3;
+  vec2 s0 = w0 + w1, s1 = w2 + w3;
+  vec2 c0 = (i - 0.5 + w1 / s0) / size, c1 = (i + 1.5 + w3 / s1) / size;
+  return (texture(t, vec2(c0.x, c0.y)).rgb * s0.x + texture(t, vec2(c1.x, c0.y)).rgb * s1.x) * s0.y
+       + (texture(t, vec2(c0.x, c1.y)).rgb * s0.x + texture(t, vec2(c1.x, c1.y)).rgb * s1.x) * s1.y;
+}
 void main() {
   // Black floor: the haze between the points is all glow (the blurred light
   // of countless dim LEDs). Glow fainter than the floor fades to nothing, so
@@ -555,8 +592,13 @@ void main() {
   vec3 b = texture(uBloom, vUv).rgb * uBloomK;
   float tb = uFloor / max(uExposure, 1e-3);             // the floor before tone mapping
   if (uFloor > 0.0) b *= smoothstep(tb, 3.0 * tb, max(b.r, max(b.g, b.b)));
-  if (uHazeK > 0.0) b += texture(uHaze, vUv).rgb * uHazeK;
+  if (uHazeK > 0.0) b += (smoothRead(uHaze, vUv) * 0.6 + smoothRead(uHazeWide, vUv)) * uHazeK;
   vec3 c = texture(uScene, vUv).rgb + b;
+  if (uBurn > 0.0) {
+    // Light far past white loses its colour, as on film: the cores burn out.
+    float m = max(c.r, max(c.g, c.b));
+    c = mix(c, vec3(m), smoothstep(0.8, 4.0, m * uExposure) * uBurn);
+  }
   c = vec3(1.0) - exp(-c * uExposure);                       // tone map
   float v = smoothstep(1.25, 0.35, length(vUv - 0.5) * 1.5);
   c *= mix(0.55, 1.0, v);                               // vignette

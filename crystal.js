@@ -62,14 +62,14 @@ export function createForms(S, { floor, seed = Math.random() * 1000 }) {
       centre = [3.5 * Math.sin(0.05 * age + ph), -2 + 1.2 * Math.sin(0.03 * age + ph), 3.5 * Math.cos(0.04 * age + ph)];
       size = 3.8 + 0.3 * Math.sin(0.2 * age);
     } else if (form.name === 'spiral') {
-      centre = [1.5 * Math.sin(0.03 * age + ph), -1.5, 1.5 * Math.cos(0.025 * age + ph)];
-      size = 6.5;
-      tilt = 0.9 + 0.2 * Math.sin(0.04 * age + ph);
+      centre = [1.5 * Math.sin(0.03 * age + ph), -2, 1.5 * Math.cos(0.025 * age + ph)];
+      size = 7.5;
+      tilt = 1.1 + 0.15 * Math.sin(0.04 * age + ph);
       lean = 0.04 * age + ph;
       turn = 0.12 * age + ph;
     } else if (form.name === 'cloud') {
       centre = [4 * Math.sin(0.035 * age + ph), -1.5 + Math.sin(0.05 * age), 3 * Math.cos(0.03 * age + ph)];
-      size = 5.5;
+      size = 6;
     } else {                                  // the layer: its surface height, its thickness
       centre = [0, floor + 1.3, 0];
       size = 0.35;
