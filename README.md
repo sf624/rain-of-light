@@ -36,6 +36,11 @@ your first click. The settings panel keeps what you change in this browser
 (Reset brings back the defaults). Any setting can also be given in the URL,
 such as `?color=cloud&weather=drizzle`; `#tune` opens the panel.
 
+Quality is automatic: if frames are slow, the canvas is drawn at a lower
+resolution (down to half), and raised again when the device keeps up. Set
+`Quality` to `full` in the panel (or `?quality=full`) to always draw at the
+screen's full sharpness; `?dpr=` still sets the upper limit.
+
 ## Install and offline
 
 On a phone or in Chrome / Edge you can install it ("Add to Home Screen" /

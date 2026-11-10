@@ -82,19 +82,117 @@ const emptyVao = gl.createVertexArray();
 // ---------- render targets ----------
 let W = 0, H = 0, scene = null, bloomA = null, bloomB = null;
 
+// Render scale, on top of the device pixel ratio. In 'auto' quality it steps
+// down when frames are persistently slow and back up when a probe holds.
+const SCALES = [1, 0.85, 0.7, 0.6, 0.5];
+const MIN_RATIO = 0.5;   // never fewer than half a pixel per CSS pixel
+let scaleIdx = 0;
+let renderScale = 1;
+const baseRatio = () => Math.min(devicePixelRatio || 1, MAX_DPR);
+// The lowest step that keeps MIN_RATIO (a 1x screen has little to give up).
+const lastIdx = () => {
+  let i = 0;
+  while (i + 1 < SCALES.length && baseRatio() * SCALES[i + 1] >= MIN_RATIO) i++;
+  return i;
+};
+
 function resize() {
-  const dpr = Math.min(devicePixelRatio || 1, MAX_DPR);
+  const dpr = baseRatio() * SCALES[scaleIdx];
+  renderScale = SCALES[scaleIdx];
   const w = Math.max(1, Math.round(canvas.clientWidth * dpr));
   const h = Math.max(1, Math.round(canvas.clientHeight * dpr));
   if (w === W && h === H) return;
   W = canvas.width = w;
   H = canvas.height = h;
+  settleUntil = performance.now() + SETTLE_MS; // frame times right after a change say little
   if (hasFloat) {
     freeTarget(scene); freeTarget(bloomA); freeTarget(bloomB);
     scene = target(W, H, true);
     const bw = Math.max(1, W >> 2), bh = Math.max(1, H >> 2);
     bloomA = target(bw, bh);
     bloomB = target(bw, bh);
+  }
+}
+
+// ---------- adaptive render scale ----------
+// Frame time is the only signal, and rAF is capped at the display's rate, so
+// "fast" can never show spare capacity. So:
+//  - Down: the smoothed frame time stays above SLOW_MS (under about 45 fps,
+//    judged in absolute terms, so a 120 Hz screen at 60 fps is fine) for
+//    DOWN_AFTER s. If that step did not make frames at least 8% quicker (judged
+//    only with 20+ frames to go on), the
+//    limit is something resolution cannot fix (a 30 fps cap, the CPU): undo
+//    it and stop lowering for good.
+//  - Up: after UP_WAIT s at a lower step with frames never slow, try one step
+//    up as a probe. If it turns slow within PROBE_S s, go back down and double
+//    UP_WAIT (up to UP_MAX), so a device that cannot afford it is disturbed
+//    rarely. A probe that holds resets UP_WAIT.
+//  - Changes are at least MIN_GAP s apart. Hidden-tab and long-gap frames,
+//    and the first SETTLE_MS after load or a resize, are ignored.
+const SETTLE_MS = 2000;
+const SLOW_MS = 22, FAST_MS = 18.5;
+const DOWN_AFTER = 2.5, MIN_GAP = 6, UP_BASE = 20, UP_MAX = 300, PROBE_S = 5;
+let settleUntil = performance.now() + SETTLE_MS;
+let frameMs = 0;            // smoothed frame time
+let slowFor = 0;            // s the smoothed time has been slow
+let calmFor = 0;            // s the smoothed time has been fast, at this step
+let sinceChange = 0;        // s since the last step change
+let framesSince = 0;        // frames counted since then
+let upWait = UP_BASE;
+let probing = false;        // the current step is a trial up
+let beforeMs = 0;           // smoothed time before the last step down
+let judgeDown = false;      // the last step down is still to be judged
+let giveUp = false;         // lowering did not help: stay put
+document.addEventListener('visibilitychange', () => { settleUntil = performance.now() + SETTLE_MS; });
+
+function setStep(i) {
+  scaleIdx = i;
+  slowFor = calmFor = sinceChange = framesSince = 0;
+  frameMs = 0;
+}
+
+function adapt(rawDt, now) {
+  if (S.quality === 'full') {
+    if (scaleIdx !== 0) setStep(0);
+    probing = judgeDown = false;
+    return;
+  }
+  // Skip hidden-tab or stalled frames, and the settling time.
+  if (rawDt <= 0 || rawDt > 3 || now < settleUntil || document.hidden) return;
+  const ms = rawDt * 1000;
+  frameMs = frameMs ? frameMs + (ms - frameMs) * (1 - Math.exp(-rawDt / 0.5)) : ms;
+  sinceChange += rawDt;
+  framesSince++;
+  slowFor = frameMs > SLOW_MS ? slowFor + rawDt : 0;
+  calmFor = frameMs < FAST_MS ? calmFor + rawDt : 0;
+  const idx = scaleIdx;
+  if (probing && slowFor > 1.5) {          // the probe failed: back down, wait longer
+    upWait = Math.min(UP_MAX, upWait * 2);
+    probing = false;
+    setStep(idx + 1);
+    return;
+  }
+  if (probing && sinceChange > PROBE_S) {  // the probe held
+    probing = false;
+    upWait = UP_BASE;
+  }
+  if (sinceChange < MIN_GAP) return;
+  if (judgeDown) {
+    judgeDown = false;
+    // With few frames (a very slow device) the average says too little to judge.
+    if (framesSince >= 20 && frameMs > SLOW_MS && frameMs > beforeMs * 0.92) { // no relief
+      giveUp = true;
+      setStep(idx - 1);
+      return;
+    }
+  }
+  if (slowFor > DOWN_AFTER && idx < lastIdx() && !giveUp) {
+    beforeMs = frameMs;
+    judgeDown = true;
+    setStep(idx + 1);
+  } else if (!probing && idx > 0 && calmFor > upWait && slowFor === 0) {
+    probing = true;
+    setStep(idx - 1);
   }
 }
 
@@ -407,8 +505,10 @@ let last = performance.now();
 let checked = false;
 
 function frame(now) {
-  const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)); // rAF time may precede `last`
+  const rawDt = (now - last) / 1000;
+  const dt = Math.min(0.05, Math.max(0, rawDt)); // rAF time may precede `last`
   last = now;
+  adapt(rawDt, now);
   time += dt;
   resize();
 
@@ -496,7 +596,7 @@ function frame(now) {
   gl.uniform1f(u.uGain, hasFloat ? 1 : S.exposure * glow); // without float buffers the points go to the screen
   gl.uniform1f(u.uFocal, (H / 2) / Math.tan(fovRad() / 2));
   gl.uniform1f(u.uSize, S.size);
-  gl.uniform1f(u.uMaxPx, S.maxPx);
+  gl.uniform1f(u.uMaxPx, S.maxPx * renderScale); // pixels shrink with the scale
   gl.uniform1f(u.uRest, S.rest);
   gl.uniform1f(u.uRainGain, S.rainGain);
   gl.uniform1f(u.uTipGain, S.tipGain);

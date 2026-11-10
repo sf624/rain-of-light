@@ -84,6 +84,7 @@ export const DEFAULTS = {
   flow: 'auto',
   camera: 'orbit', orbit: 0.025, radius: 7.5, fov: 60,
   ripples: 12,
+  quality: 'auto',
   breath: 'on', breathRate: 6, breathDepth: 0.3,
   volume: 0.8, music: 0.6, chimes: 0.6, rainSound: 0.3,
 };
@@ -91,6 +92,10 @@ export const DEFAULTS = {
 export const STORAGE_KEY = 'rain-of-light:settings';
 
 export const SCHEMA = [
+  { title: 'Display', items: [
+    { key: 'quality', label: 'Quality', options: ['auto', 'full'],
+      hint: 'auto: lowers the sharpness if frames are slow, and raises it again when they are not / full: always as sharp as the screen allows' },
+  ] },
   { title: 'Density', items: [
     { key: 'grid', label: 'Strands per side (max)', min: 8, max: 160, step: 1 },
     { key: 'rows', label: 'LEDs per strand (max)', min: 8, max: 256, step: 1 },
