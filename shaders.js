@@ -373,15 +373,19 @@ void main() {
     float id = seed * 0.37 + u * 91.7;
     vec3 form = formsAt(pos, id);
     vec3 pale = mix(uTint, vec3(1.0), 0.55);
+    // A wave lifts a form's light at most to white: past that the LED looks
+    // the same, and the extra light would only swell the haze around it.
+    float fm = max(form.r, max(form.g, form.b));
+    vec3 flare = form * min(1.0, 1.0 / max(fm, 1e-3));
     float tw = hash(id + 3.0) < 0.2
       ? pow(0.5 + 0.5 * sin(uTime * (0.3 + 1.2 * hash(id + 1.0)) + hash(id + 2.0) * 6.2832), 30.0) * uTwinkle : 0.0;
     c = uTint * uRest + pale * tw + form
       + pale * (rain * uRainGain * 0.5 + tip * uTipGain)
-      + (form * 1.5 + pale * 0.8) * ring;
+      + (flare * 1.5 + pale * 0.8) * ring;
     glint = pale * tip * uTipGain;
     // The strands catch the light of the forms they run through, and a faint
     // sheen of the room's: thin lit threads, never dark bars.
-    wireCol = form * (1.0 + ring) + pale * (rain * uRainGain * 0.2 + ring * 0.4)
+    wireCol = form + flare * ring + pale * (rain * uRainGain * 0.2 + ring * 0.4)
             + uTint * uRest * 1.5 * (1.0 - smoothstep(3.0, 12.0, dist));
   }
 
@@ -442,6 +446,8 @@ void main() {
   gl_PointSize = shown;
   vSize = shown;
   vColor = c;
+  // Crystal: a pixel wider each side, so the LED's light is spread by area (see POINT_FS).
+  if (uScene > 0.5) gl_PointSize = shown + 2.0;
   // Light rays: only LEDs whose head light passes the threshold, drawn as a
   // larger sprite of thin rays around the LED, in the LED's own colour.
   if (uRayLen > 0.0) {
@@ -477,8 +483,24 @@ precision mediump float;
 in vec3 vColor;
 in float vSize;
 uniform float uGain; // 1 with float buffers (the composite pass applies exposure); else exposure and breath
+uniform float uSoft; // 1: each pixel takes the share of the LED that covers it (crystal)
 out vec4 outColor;
 void main() {
+  if (uSoft > 0.5) {
+    // Added light: each pixel gets the part of the LED's square that falls
+    // on it, so an LED gives the same light wherever it sits between pixels
+    // (a plain sprite of 1.5 px covers 1 to 4 whole pixels, and its light
+    // jumps as the view moves). Large LEDs are rounded.
+    vec2 o = (gl_PointCoord - 0.5) * (vSize + 2.0); // from the LED's centre, in pixels
+    vec2 h = vec2(vSize * 0.5);
+    vec2 cov = clamp(min(o + 0.5, h) - max(o - 0.5, -h), 0.0, 1.0);
+    float r = length(o) / h.x;
+    float a = cov.x * cov.y * (0.85 + 0.15 * (1.0 - min(r * r, 1.0)));
+    if (vSize >= 3.5) a *= 1.0 - smoothstep(1.0 - 2.0 / vSize, 1.0, r);
+    if (a <= 0.0) discard;
+    outColor = vec4(vColor * a * uGain, 1.0);
+    return;
+  }
   // An opaque round LED. Its rim pixel is darkened rather than blended,
   // so the depth test can still let near LEDs hide far ones.
   // LEDs of a few pixels are drawn whole: a disc that small is only a dot.
@@ -597,7 +619,7 @@ void main() {
   if (uBurn > 0.0) {
     // Light far past white loses its colour, as on film: the cores burn out.
     float m = max(c.r, max(c.g, c.b));
-    c = mix(c, vec3(m), smoothstep(0.8, 4.0, m * uExposure) * uBurn);
+    c = mix(c, vec3(m), smoothstep(1.5, 8.0, m * uExposure) * uBurn);
   }
   c = vec3(1.0) - exp(-c * uExposure);                       // tone map
   float v = smoothstep(1.25, 0.35, length(vUv - 0.5) * 1.5);
