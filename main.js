@@ -254,8 +254,9 @@ addEventListener('pointermove', (e) => {
   if (!e.isPrimary) return; // with two fingers the view follows the first
   if (e.pointerType === 'mouse') {
     if (!mouseDrag) return;
-    pointer.x = half(pointer.x + (e.clientX - mouseDrag.x) / innerWidth);
-    pointer.y = half(pointer.y + (e.clientY - mouseDrag.y) / innerHeight);
+    // The drag pulls the picture along: the view turns the other way.
+    pointer.x = half(pointer.x - (e.clientX - mouseDrag.x) / innerWidth);
+    pointer.y = half(pointer.y - (e.clientY - mouseDrag.y) / innerHeight);
     mouseDrag = { x: e.clientX, y: e.clientY };
     return;
   }
