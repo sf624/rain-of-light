@@ -243,12 +243,22 @@ function wake() {
 }
 wake();
 
-// The view follows the pointer, except over the settings panel and the
-// buttons: there the view holds still while you tune.
+// The view follows a drag: a finger's place on the screen, or how far the
+// mouse moved with its button down. A mouse that only moves leaves the view
+// alone. Over the settings panel and the buttons the view holds still.
 const STILL = '.tuner, .tuner-toggle, .sound-toggle, .full-toggle, .volume-bar';
+let mouseDrag = null; // the last mouse position of a drag begun on the canvas
+const half = (v) => Math.max(-0.5, Math.min(0.5, v));
 addEventListener('pointermove', (e) => {
   wake();
   if (!e.isPrimary) return; // with two fingers the view follows the first
+  if (e.pointerType === 'mouse') {
+    if (!mouseDrag) return;
+    pointer.x = half(pointer.x + (e.clientX - mouseDrag.x) / innerWidth);
+    pointer.y = half(pointer.y + (e.clientY - mouseDrag.y) / innerHeight);
+    mouseDrag = { x: e.clientX, y: e.clientY };
+    return;
+  }
   if (e.target instanceof Element && e.target.closest(STILL)) return;
   pointer.x = e.clientX / innerWidth - 0.5;
   pointer.y = e.clientY / innerHeight - 0.5;
@@ -293,19 +303,25 @@ const TAP_TIME = 350; // ms
 const touches = new Map(); // pointerId -> { x, y, t, drag }
 canvas.addEventListener('pointerdown', (e) => {
   hideOverlay();
-  if (e.pointerType === 'mouse') rippleAt(e.clientX, e.clientY);
-  else touches.set(e.pointerId, { x: e.clientX, y: e.clientY, t: e.timeStamp, drag: false });
+  if (e.pointerType === 'mouse') {
+    rippleAt(e.clientX, e.clientY);
+    if (e.button === 0) {
+      mouseDrag = { x: e.clientX, y: e.clientY };
+      try { canvas.setPointerCapture(e.pointerId); } catch { /* the drag then ends at the window's edge */ }
+    }
+  } else touches.set(e.pointerId, { x: e.clientX, y: e.clientY, t: e.timeStamp, drag: false });
 });
 addEventListener('pointermove', (e) => {
   const d = touches.get(e.pointerId);
   if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > TAP_MOVE) d.drag = true;
 });
 addEventListener('pointerup', (e) => {
+  if (e.pointerType === 'mouse') mouseDrag = null;
   const d = touches.get(e.pointerId);
   touches.delete(e.pointerId);
   if (d && !d.drag && e.timeStamp - d.t < TAP_TIME) rippleAt(d.x, d.y);
 });
-addEventListener('pointercancel', (e) => touches.delete(e.pointerId));
+addEventListener('pointercancel', (e) => { touches.delete(e.pointerId); if (e.pointerType === 'mouse') mouseDrag = null; });
 
 addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return; // browser shortcuts, and a held key
