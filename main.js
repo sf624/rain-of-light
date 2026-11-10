@@ -67,7 +67,22 @@ for (const item of SCHEMA.flatMap((g) => g.items)) {
     S[item.key] = v;
   }
 }
-const fovRad = () => S.fov * Math.PI / 180;
+// A view narrower than 16:9 (a window made narrow, a phone held upright) sees
+// too little of the room's width at the set field of view: everything looks
+// too big. So the view zooms out, smoothly with the shape of the view: the
+// field of view opens (up to FOV_MAX, past which the picture distorts), and
+// the eye steps back from the centre (while it stays inside the room), the
+// visible distance with it. At 16:9 and wider nothing changes: there the Field
+// of view and Distance settings are what is seen.
+const WIDE = 16 / 9, FOV_MAX = 104, FOV_SHARE = 0.32, BACK_SHARE = 0.35;
+function viewFit() {
+  const need = W > 0 && H > 0 ? Math.max(1, WIDE * H / W) : 1;   // how many times too narrow the view is
+  const tan = Math.min(Math.tan(S.fov * Math.PI / 360) * need ** FOV_SHARE,
+    Math.tan(Math.max(S.fov, FOV_MAX) * Math.PI / 360));
+  const radius = Math.min(S.radius * need ** BACK_SHARE, Math.max(S.radius, SPAN / 2 - 1.5));
+  return { fov: 2 * Math.atan(tan), radius, back: S.radius > 0 ? radius / S.radius : 1 };
+}
+const fovRad = () => viewFit().fov;
 
 const { program, target, freeTarget } = createGL(gl);
 
@@ -627,7 +642,7 @@ function frame(now) {
   CAMERAS.forEach((cam, i) => {
     camW[i] = camFrom[i] + ((cam === camMode ? 1 : 0) - camFrom[i]) * kb;
     if (camW[i] < 1e-4) return;
-    const pose = cameraPose(cam.name, camClock, S.radius, bob, ground);
+    const pose = cameraPose(cam.name, camClock, viewFit().radius, bob, ground);
     for (let k = 0; k < 3; k++) {
       eye[k] += pose.eye[k] * camW[i];
       dir[k] += pose.dir[k] * camW[i];
@@ -667,7 +682,7 @@ function frame(now) {
   if (time > densityUntil) nextDensity(time);
   if (time > camUntil) nextCamera(time);
   ease(dt);
-  const shown = show.update(time, dt, camera.eye);
+  const shown = show.update(time, dt, camera);
   const rk = shown.rain;                 // how much rain falls now: 0 a still room .. 1 a rain passage
   placeImages();
   sound.rain(look.rain, sway, rk);
@@ -743,14 +758,17 @@ function frame(now) {
   gl.uniform1f(u.uFlowRate, look.flowRate);
   gl.uniform3fv(u.uGrad0, look.g0);
   gl.uniform3fv(u.uGrad1, look.g1);
-  gl.uniform1f(u.uFogFar, S.fog * (1 - RAIN_MIST * rk)); // rain brings a mist: the far strands fade
+  // Rain brings a mist: the far strands fade. An eye that stepped back sees as far into the room as before.
+  gl.uniform1f(u.uFogFar, S.fog * viewFit().back * (1 - RAIN_MIST * rk));
   gl.uniform3fv(u.uColA, look.a);
   gl.uniform3fv(u.uColB, look.b);
   gl.uniform4fv(u.uRipples, ripples);
   // Rain spreads strand by strand as a rain passage comes, from the few
   // strands that carry pale drops in a still room.
-  gl.uniform1f(u.uRainShare, sparseShare() + (S.rainShare - sparseShare()) * rk);
+  // Through a form it thins, so the form shows between the drops.
+  gl.uniform1f(u.uRainShare, sparseShare() + (S.rainShare * (1 - 0.35 * shown.storm) - sparseShare()) * rk);
   gl.uniform1f(u.uRainMix, rk);
+  gl.uniform1f(u.uStorm, shown.storm);
   gl.uniform4fv(u.uFormA, shown.A);
   gl.uniform4fv(u.uFormB, shown.B);
   gl.uniform4fv(u.uFormE, shown.E);

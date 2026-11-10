@@ -81,7 +81,7 @@ export const FORMS = [
   { name: 'ring',   type: 4, palettes: ['amber', 'aurora', 'sakura', 'deep sea'] },
   { name: 'veil',   type: 5, palettes: ['aurora', 'sakura', 'deep sea', 'amber'] },
 ];
-export const LAYER = { name: 'layer', type: 2, palettes: ['deep sea', 'ice', 'aurora'] };
+export const LAYER = { name: 'layer', type: 2, palettes: ['deep sea', 'ice', 'aurora', 'sakura', 'amber'] };
 
 // The room: strands of LEDs over a mirror floor, the same for the whole show.
 export const ROOM = {
@@ -108,7 +108,7 @@ export const SCENES = ['mix', 'rain', 'crystal'];
 export const DEFAULTS = {
   scene: 'mix', form: 'auto', layer: 'auto', mirror: 0.6, walls: 0, haze: 1.5, burn: 0.7, twinkle: 0.4, rainShare: 1,
   grid: small ? 44 : 72,  rows: small ? 72 : 96,
-  layout: 'strands', density: 'auto', strandShare: 1.0, rowShare: 1.0, strandMin: 0.3, rowMin: 0.35,
+  layout: 'strands', density: 'auto', strandShare: 1.0, rowShare: 1.0, strandMin: 0.5, rowMin: 0.55,
   size: 0.018, maxPx: 4.5, rest: 0.03, wire: 0.2,
   rainGain: 4.0, tipGain: 5.0, exposure: 1.8, bloom: 0.8, fog: 34, blackFloor: 3,
   rays: '2', rayGain: 0.3, rayLength: 20, rayThreshold: 0.7,
@@ -209,8 +209,10 @@ export const SCHEMA = [
     { key: 'camera', label: 'Move', options: ['auto', ...CAMERAS.map((c) => c.name)],
       hint: 'orbit: circle the field / walk: wander through it / spin: look around from the centre / gaze: look up and down / rise: drift up and down' },
     { key: 'orbit', label: 'Move speed', min: 0, max: 0.2, step: 0.005 },
-    { key: 'radius', label: 'Distance from the centre', min: 0, max: 16, step: 0.1 },
-    { key: 'fov', label: 'Field of view (deg)', min: 30, max: 110, step: 1 },
+    { key: 'radius', label: 'Distance from the centre', min: 0, max: 16, step: 0.1,
+      hint: 'As set in a view of 16:9 or wider; in a narrower one (a phone held upright) the eye steps back' },
+    { key: 'fov', label: 'Field of view (deg)', min: 30, max: 110, step: 1,
+      hint: 'As set in a view of 16:9 or wider; a narrower one opens further, so the room keeps its size' },
   ] },
   { title: 'Ripples', items: [
     { key: 'ripples', label: 'Auto interval, about (s, 0: none)', min: 0, max: 30, step: 0.5 },
