@@ -54,7 +54,7 @@ function createTimeline(seed, pool, name) {
       const prev = list[k - 1];
       const kind = prev ? pickKind(prev.kind, hash(r * 91 + 1)) : pool[0];
       const T = next;
-      // The form: a passage of another kind may keep the form that shows.
+      // The form: a storm may keep the form that shows, and rain gathers on it.
       let sky = null;
       if (kind.sky) {
         if (prev?.sky && prev.kind !== kind && hash(r * 37 + 5) < 0.6) sky = prev.sky;
