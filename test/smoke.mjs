@@ -11,7 +11,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const TIMEOUT_MS = 180_000;
+const TIMEOUT_MS = 420_000;
 const MIN_FRAMES = 4; // software GL is slow: a few frames per second
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
   '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.json': 'application/json' };
@@ -193,6 +193,22 @@ async function visit(cdp, base, query, interact) {
     }
     await sleep(1000);
     check('after click and keys');
+    // The scene changes in place (no reload), and Reset brings back the mix.
+    await evalJs(`(() => { window.__stay = 1; const s = [...document.querySelectorAll('.tuner select')]
+      .find((x) => [...x.options].some((o) => o.value === 'crystal')); s.value = 'crystal';
+      s.dispatchEvent(new Event('change')); })()`);
+    await sleep(1500);
+    const f = await evalJs('window.__frames');
+    await sleep(1000);
+    if (await evalJs('window.__stay') !== 1) fail(`[${label}] changing the scene reloaded the page`);
+    if (await evalJs('window.__frames') <= f) fail(`[${label}] frame loop stopped after changing the scene`);
+    const scene = await evalJs(`(() => { [...document.querySelectorAll('.tuner-buttons button')]
+      .find((b) => b.textContent === 'Reset').click(); return [...document.querySelectorAll('.tuner select')]
+      .find((x) => [...x.options].some((o) => o.value === 'crystal')).value; })()`);
+    if (scene !== 'mix') fail(`[${label}] Reset left the scene at ${scene}, not mix`);
+    await sleep(500);
+    if (await evalJs('window.__stay') !== 1) fail(`[${label}] Reset reloaded the page`);
+    check('after changing the scene and Reset');
   }
   await evalJs(`(() => { const o = document.getElementById('overlay'); if (o) o.style.display = 'none'; })()`);
   await sleep(300);
@@ -225,7 +241,10 @@ await cdp.send('Target.closeTarget', { targetId });
 await visit(cdp, base, '', true);
 for (const m of modes) await visit(cdp, base, `?color=${encodeURIComponent(m)}`, false);
 await visit(cdp, base, '#tune', false);
+// The pinned scenes, and the mix part-way through (a form, rain going or coming).
+await visit(cdp, base, '?scene=rain', true);
 await visit(cdp, base, '?scene=crystal', true);
+await visit(cdp, base, '?seed=7&t=100', false);
 
 clearTimeout(overall);
 cleanup();

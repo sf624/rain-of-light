@@ -51,21 +51,22 @@ uniform float uSat;
 uniform vec2 uDensity;  // share of strands, share of LEDs per strand, that are on
 uniform float uBowStyle; // rainbow: 0 bands, 1 a random hue per drop, 2 per LED
 uniform float uRainShare; // share of strands (or lanes across the flow) that carry rain
-// The crystal scene: forms of light in a mirrored room.
-uniform float uScene;     // 0 rain, 1 crystal
-uniform vec4 uFormA[2];   // per form: type (0 orb, 1 spiral, 2 layer, 3 cloud), weight 0..1, size, turn
-uniform vec4 uFormB[2];   // centre (the layer: its height in y), tilt
-uniform float uFormYaw[2]; // the way the tilt leans
-uniform vec3 uFormC[2];   // the form's colour
-uniform vec3 uFormD[2];   // its second colour
+// The show: how much of the rain's look there is, forms of light, and the mirrors.
+uniform float uRainMix;   // 0: the still room's look (pale drops, the room's tint) .. 1: the rain's colours
+uniform vec4 uFormA[3];   // per form: type (0 orb, 1 spiral, 2 layer, 3 cloud), weight 0..1, size, turn
+uniform vec4 uFormB[3];   // centre (the layer: its height in y), tilt
+uniform vec2 uFormE[3];   // how much it comes and goes from the top down (0: LED by LED), and 1 coming / -1 going
+uniform float uFormYaw[3]; // the way the tilt leans
+uniform vec3 uFormC[3];   // the form's colour
+uniform vec3 uFormD[3];   // its second colour
 uniform vec3 uTint;       // the colour of the room: of the forms shown now
 uniform float uTwinkle;
 uniform vec3 uMirror;     // floor height, reflection gain (> 0: drawing the reflection), its fade length
 uniform vec4 uCopy[9];    // wall mirrors, per instance: x sign, x offset, z sign, z offset
 uniform float uCopyGain[9];
+uniform vec2 uCull;       // a point this far out of the view (in clip units, 1: the edge) is not lit
 out vec3 vColor;
 out float vSize;
-out float vEnd;  // wires: 0 at one LED, 1 at the next, alternating along a strand
 
 float hash(float n) { return fract(sin(n * 127.1 + 311.7) * 43758.5453); }
 float hash3(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
@@ -204,7 +205,7 @@ float tiltedRain(inout Lit L, vec3 pos, float theta, float trailK, float w) {
   return along;
 }
 
-// ---------- forms of light (crystal scene) ----------
+// ---------- forms of light ----------
 // Each returns (light, white-hot share, mix from the first colour to the second).
 const vec3 WHITE_HOT = vec3(1.0, 0.96, 0.9);
 
@@ -267,10 +268,11 @@ vec3 cloudLight(vec3 p, vec4 a, vec4 b) {
   return vec3(light, knot * 0.5, smoothstep(0.3, 0.7, warp.x + 0.5));
 }
 
-// The light of the forms at p. Each comes and goes LED by LED, in a random order.
-vec3 formsAt(vec3 p, float id) {
+// The light of the forms at p (v: 0 at the top .. 1 at the floor). Each comes
+// and goes LED by LED in a random order, or, while rain falls, from the top down.
+vec3 formsAt(vec3 p, float id, float v) {
   vec3 c = vec3(0.0);
-  for (int k = 0; k < 2; k++) {
+  for (int k = 0; k < 3; k++) {
     vec4 a = uFormA[k];
     if (a.y < 0.001) continue;
     vec4 b = uFormB[k];
@@ -280,7 +282,9 @@ vec3 formsAt(vec3 p, float id) {
     else if (type == 1) f = spiralLight(p, a, b, uFormYaw[k]);
     else if (type == 2) f = layerLight(p, a, b);
     else f = cloudLight(p, a, b);
-    float on = clamp((a.y * 1.25 - hash(id + float(k) * 7.7)) / 0.25, 0.0, 1.0) * smoothstep(0.0, 0.4, a.y);
+    vec2 e = uFormE[k];
+    float order = mix(hash(id + float(k) * 7.7), e.y > 0.0 ? v : 1.0 - v, e.x * 0.8);
+    float on = clamp((a.y * 1.25 - order) / 0.25, 0.0, 1.0) * smoothstep(0.0, 0.4, a.y);
     c += mix(mix(uFormC[k], uFormD[k], f.z), WHITE_HOT, clamp(f.y, 0.0, 1.0)) * f.x * on;
   }
   return c;
@@ -292,23 +296,23 @@ void main() {
   vec3 pos = vec3(aData.x, (0.5 - u) * uHeight, aData.z);
   float h = hash(seed + 5.0);
   float spatial = (pos.x + pos.z) * 0.012;           // bands lean a little across the field
-  vec4 mv = uView * vec4(pos, 1.0);
+  // Mirror images: the LED's light, seen where its image is (in the walls, the
+  // floor). Everything below is worked out at the LED itself (pos), so each
+  // image is a true reflection of it.
+  vec4 cp = uCopy[gl_InstanceID];
+  vec3 seen = vec3(cp.x * pos.x + cp.y, pos.y, cp.z * pos.z + cp.w);
+  if (uMirror.y > 0.0) seen.y = 2.0 * uMirror.x - pos.y;
+  vec4 mv = uView * vec4(seen, 1.0);
   float dist = -mv.z;
-  if (uScene > 0.5) {
-    // Mirror images: the LED's light, seen where its image is (in the walls, the floor).
-    vec4 cp = uCopy[gl_InstanceID];
-    vec3 seen = vec3(cp.x * pos.x + cp.y, pos.y, cp.z * pos.z + cp.w);
-    if (uMirror.y > 0.0) seen.y = 2.0 * uMirror.x - pos.y;
-    mv = uView * vec4(seen, 1.0);
-    dist = -mv.z;
-    if (dist > uFogFar && uWire == 0.0) {            // lost in the fog: skip the work (wires never skip)
-      gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
-      gl_PointSize = 0.0;
-      vColor = vec3(0.0);
-      vSize = 1.0;
-      vEnd = 0.0;
-      return;
-    }
+  vec4 clip = uProj * mv;
+  // Out of the view, or lost in the fog: skip the work. A wire keeps its place
+  // (unlit), so its line never runs off to where a skipped point goes.
+  if (dist > uFogFar || clip.w < 0.05 || abs(clip.x) > clip.w * uCull.x || abs(clip.y) > clip.w * uCull.y) {
+    gl_Position = uWire > 0.0 ? clip : vec4(2.0, 2.0, 2.0, 1.0);
+    gl_PointSize = uWire > 0.0 ? 1.0 : 0.0;
+    vColor = vec3(0.0);
+    vSize = 1.0;
+    return;
   }
   Lit L = Lit(0.0, 0.0, vec3(0.0), vec3(0.0));
 
@@ -333,17 +337,14 @@ void main() {
   }
   float rain = L.rain;
   float tip = L.tip;
-  if (uScene < 0.5) col += placeColor(pos, u, dist);
-
-  // Colours that travel with each drop. An LED at rest shows one of its own.
-  vec3 restDrop = dropColor(seed * 0.37 + u * 91.7, 0.0) + uColA * 1.2 * uW[5];
-  vec3 rainCol = col + (rain > 1e-4 ? L.rainCol / rain : restDrop);
-  vec3 tipCol = col + (tip > 1e-4 ? L.tipCol / tip : restDrop);
-  vec3 restCol = col + restDrop;
-  // The rainbow per LED: each LED has its own hue, shown as the light passes.
-  if (uBowStyle > 1.5) {
-    vec3 led = bowAt(hash(seed * 0.37 + u * 91.7)) * uW[2];
-    rainCol += led; tipCol += led; restCol += led;
+  // Rays come only from a drop's head, and few LEDs are near one: the rest
+  // stop here (no colour of a head comes to 4 times its light).
+  if (uRayLen > 0.0 && tip * uTipGain * uRainMix * 4.0 < uRayThreshold) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    gl_PointSize = 0.0;
+    vColor = vec3(0.0);
+    vSize = 1.0;
+    return;
   }
 
   // Spherical waves of light.
@@ -357,77 +358,81 @@ void main() {
     ring += exp(-x * x * 1.8) * fade * fade;
   }
 
-  // Heads turn white in most modes; in the colourful ones they keep their colour.
-  const float WHITE[11] = float[11](0.75, 0.75, 0.15, 0.2, 0.3, 0.0, 0.3, 0.35, 0.5, 0.3, 0.5);
-  float white = 0.0;
-  for (int i = 0; i < 11; i++) white += WHITE[i] * uW[i];
-  vec3 c = restCol * uRest + rainCol * rain * uRainGain
-         + mix(tipCol, vec3(1.0), white) * tip * uTipGain
-         + mix(restCol, vec3(1.0), 0.35) * ring * 1.6;
-  vec3 glint = tipCol * tip * uTipGain;  // the head's light in its own colour: the light rays
-  vec3 wireCol = c;                      // the wire glows with the LED's own light
+  // The forms' light. A wave lifts it at most to white: past that the LED
+  // looks the same, and the extra light would only swell the glow around it.
+  float id = seed * 0.37 + u * 91.7;
+  vec3 form = formsAt(pos, id, u);
+  float fm = max(form.r, max(form.g, form.b));
+  vec3 flare = form * min(1.0, 1.0 / max(fm, 1e-3));
+  float inForm = clamp(fm, 0.0, 1.0);                // drops in a form take its colour
 
-  if (uScene > 0.5) {
-    // Crystal: the forms' light, a faint lattice in the room's colour with a
-    // sparse twinkle, a few pale drops, and waves that flare through the forms.
-    float id = seed * 0.37 + u * 91.7;
-    vec3 form = formsAt(pos, id);
+  vec3 c = form + flare * 1.5 * ring;
+  vec3 glint = vec3(0.0);
+  vec3 wireCol = form + flare * ring;
+  float near = 1.0 - smoothstep(3.0, 12.0, dist);
+  float rk = uRainMix;
+  if (rk > 0.001) {
+    // The rain's look: its colour modes. Colours travel with each drop; an
+    // LED at rest shows one of its own.
+    col += placeColor(pos, u, dist);
+    vec3 restDrop = dropColor(id, 0.0) + uColA * 1.2 * uW[5];
+    vec3 rainCol = col + (rain > 1e-4 ? L.rainCol / rain : restDrop);
+    vec3 tipCol = col + (tip > 1e-4 ? L.tipCol / tip : restDrop);
+    vec3 restCol = col + restDrop;
+    // The rainbow per LED: each LED has its own hue, shown as the light passes.
+    if (uBowStyle > 1.5) {
+      vec3 led = bowAt(hash(id)) * uW[2];
+      rainCol += led; tipCol += led; restCol += led;
+    }
+    rainCol = mix(rainCol, flare * 1.3, inForm * 0.8);
+    tipCol = mix(tipCol, mix(flare, vec3(1.0), 0.4) * 1.3, inForm * 0.8);
+    // Heads turn white in most modes; in the colourful ones they keep their colour.
+    const float WHITE[11] = float[11](0.75, 0.75, 0.15, 0.2, 0.3, 0.0, 0.3, 0.35, 0.5, 0.3, 0.5);
+    float white = 0.0;
+    for (int i = 0; i < 11; i++) white += WHITE[i] * uW[i];
+    c += (restCol * uRest + rainCol * rain * uRainGain + mix(tipCol, vec3(1.0), white) * tip * uTipGain
+        + mix(restCol, vec3(1.0), 0.35) * ring * 1.6) * rk;
+    glint = tipCol * tip * uTipGain * rk;            // the head's light in its own colour: the light rays
+    wireCol += (rainCol * rain * uRainGain * 0.2 + restCol * uRest * 1.5 * near + restCol * ring * 0.4) * rk;
+  }
+  if (rk < 0.999) {
+    // The still room's look: a faint lattice in the room's colour with a
+    // sparse twinkle, a few pale drops, and waves.
     vec3 pale = mix(uTint, vec3(1.0), 0.55);
-    // A wave lifts a form's light at most to white: past that the LED looks
-    // the same, and the extra light would only swell the haze around it.
-    float fm = max(form.r, max(form.g, form.b));
-    vec3 flare = form * min(1.0, 1.0 / max(fm, 1e-3));
+    vec3 drop = mix(pale, flare, inForm * 0.8);
     float tw = hash(id + 3.0) < 0.2
       ? pow(0.5 + 0.5 * sin(uTime * (0.3 + 1.2 * hash(id + 1.0)) + hash(id + 2.0) * 6.2832), 30.0) * uTwinkle : 0.0;
-    c = uTint * uRest + pale * tw + form
-      + pale * (rain * uRainGain * 0.5 + tip * uTipGain)
-      + (flare * 1.5 + pale * 0.8) * ring;
-    glint = pale * tip * uTipGain;
+    c += (uTint * uRest + pale * tw + drop * (rain * uRainGain * 0.5 + tip * uTipGain) + pale * 0.8 * ring) * (1.0 - rk);
     // The strands catch the light of the forms they run through, and a faint
     // sheen of the room's: thin lit threads, never dark bars.
-    wireCol = form + flare * ring + pale * (rain * uRainGain * 0.2 + ring * 0.4)
-            + uTint * uRest * 1.5 * (1.0 - smoothstep(3.0, 12.0, dist));
+    wireCol += (drop * rain * uRainGain * 0.2 + pale * ring * 0.4 + uTint * uRest * 1.5 * near) * (1.0 - rk);
   }
 
   float fog = 1.0 - smoothstep(uFogFar * 0.3, uFogFar, dist);
-  c *= fog;
-  glint *= fog;
-  wireCol *= fog;
-  if (uScene > 0.5) {
-    // Each mirror dims its image a little; the floor's image fades with the height above it.
-    float g = uCopyGain[gl_InstanceID];
-    if (uMirror.y > 0.0) g *= uMirror.y * exp(-(pos.y - uMirror.x) / uMirror.z);
-    c *= g;
-    glint *= g;
-    wireCol *= g;
-  }
+  // Each mirror dims its image a little; the floor's image fades with the height above it.
+  float g = uCopyGain[gl_InstanceID] * fog;
+  if (uMirror.y > 0.0) g *= uMirror.y * exp(-(pos.y - uMirror.x) / uMirror.z);
+  c *= g;
+  glint *= g;
+  wireCol *= g;
 
   // Thinning: LEDs past the shown share fade out, in an order that leaves the
   // rest evenly spread, so density can change smoothly.
   vec2 on = clamp((uDensity * 1.04 - aRank) / 0.04, 0.0, 1.0);
 
-  // The wires: a strand's wire glows with the light of the LEDs along it, and
-  // runs on past LEDs that are thinned out. Never skipped, so no line breaks.
-  // Near the eye a wire reads as a hard line, so wires fade in with distance:
-  // what remains is a glow in the middle distance, where they blur together.
+  // The wires: a whole thread of light along each strand, as bright between
+  // the LEDs as at them, running on past LEDs that are thinned out.
   if (uWire > 0.0) {
-    gl_Position = uProj * mv;
+    gl_Position = clip;
     gl_PointSize = 1.0;
     vSize = 1.0;
-    vEnd = float(gl_VertexID % 2);   // neighbours on a strand alternate, so each segment runs 0 .. 1
-    vColor = c * on.x * uWire * smoothstep(2.5, 8.0, dist);
-    // Crystal: a whole thread of light, as bright between the LEDs as at them, near or far.
-    if (uScene > 0.5) {
-      vEnd = 0.0;
-      vColor = wireCol * on.x * uWire;
-    }
+    vColor = wireCol * on.x * uWire;
     return;
   }
-  vEnd = 0.0;
   c *= on.x * on.y;
   glint *= on.x * on.y;
 
-  // LEDs right at the eye are skipped: as opaque squares they would block the view.
+  // LEDs right at the eye are skipped: they would only be a blur over the view.
   if (dist <= 1.2 || max(c.r, max(c.g, c.b)) < 0.002) {
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0); // outside the clip volume: skipped
     gl_PointSize = 0.0;
@@ -442,40 +447,35 @@ void main() {
   float shown = clamp(px, 1.5, max(1.5, uMaxPx));
   c *= min(1.0, px / shown);
   glint *= min(1.0, px / shown);
-  gl_Position = uProj * mv;
-  gl_PointSize = shown;
+  gl_Position = clip;
   vSize = shown;
   vColor = c;
-  // Crystal: a pixel wider each side, so the LED's light is spread by area (see POINT_FS).
-  if (uScene > 0.5) gl_PointSize = shown + 2.0;
+  // A pixel wider each side, so the LED's light is spread by area (see POINT_FS).
+  gl_PointSize = shown + 2.0;
   // Light rays: only LEDs whose head light passes the threshold, drawn as a
   // larger sprite of thin rays around the LED, in the LED's own colour.
   if (uRayLen > 0.0) {
-    float g = max(glint.r, max(glint.g, glint.b));
-    if (g < uRayThreshold) {
+    float bright = max(glint.r, max(glint.g, glint.b));
+    if (bright < uRayThreshold) {
       gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
       gl_PointSize = 0.0;
       return;
     }
     gl_PointSize = 2.0 * uRayLen + 1.0;
     vSize = gl_PointSize;
-    vColor = glint * smoothstep(uRayThreshold, uRayThreshold * 2.0, g);
+    vColor = glint * smoothstep(uRayThreshold, uRayThreshold * 2.0, bright);
   }
 }`;
 
-// The wires between the LEDs: each LED lights its wire a little way up and
-// down, fading towards the middle, so the wires never show as joined lines;
-// added up, they make the air between the LEDs glow.
+// The wires between the LEDs: a thread of light, as bright between the LEDs
+// as at them, in the light of the LEDs along it.
 export const WIRE_FS = `#version 300 es
 precision mediump float;
 in vec3 vColor;
-in float vSize;
-in float vEnd;
 uniform float uGain;
 out vec4 outColor;
 void main() {
-  float d = min(vEnd, 1.0 - vEnd) * 2.0;    // 0 at an LED, 1 halfway to the next
-  outColor = vec4(vColor * uGain * exp(-d * 4.0), 1.0);
+  outColor = vec4(vColor * uGain, 1.0);
 }`;
 
 export const POINT_FS = `#version 300 es
@@ -483,31 +483,19 @@ precision mediump float;
 in vec3 vColor;
 in float vSize;
 uniform float uGain; // 1 with float buffers (the composite pass applies exposure); else exposure and breath
-uniform float uSoft; // 1: each pixel takes the share of the LED that covers it (crystal)
 out vec4 outColor;
 void main() {
-  if (uSoft > 0.5) {
-    // Added light: each pixel gets the part of the LED's square that falls
-    // on it, so an LED gives the same light wherever it sits between pixels
-    // (a plain sprite of 1.5 px covers 1 to 4 whole pixels, and its light
-    // jumps as the view moves). Large LEDs are rounded.
-    vec2 o = (gl_PointCoord - 0.5) * (vSize + 2.0); // from the LED's centre, in pixels
-    vec2 h = vec2(vSize * 0.5);
-    vec2 cov = clamp(min(o + 0.5, h) - max(o - 0.5, -h), 0.0, 1.0);
-    float r = length(o) / h.x;
-    float a = cov.x * cov.y * (0.85 + 0.15 * (1.0 - min(r * r, 1.0)));
-    if (vSize >= 3.5) a *= 1.0 - smoothstep(1.0 - 2.0 / vSize, 1.0, r);
-    if (a <= 0.0) discard;
-    outColor = vec4(vColor * a * uGain, 1.0);
-    return;
-  }
-  // An opaque round LED. Its rim pixel is darkened rather than blended,
-  // so the depth test can still let near LEDs hide far ones.
-  // LEDs of a few pixels are drawn whole: a disc that small is only a dot.
-  float r = length(gl_PointCoord * 2.0 - 1.0);
-  float edge = vSize < 3.5 ? 1.0 : 1.0 - smoothstep(1.0 - 2.0 / vSize, 1.0, r);
-  if (edge <= 0.15) discard;
-  float a = edge * (0.85 + 0.15 * (1.0 - r * r));   // slightly brighter centre
+  // Added light: each pixel gets the part of the LED's square that falls
+  // on it, so an LED gives the same light wherever it sits between pixels
+  // (a plain sprite of 1.5 px covers 1 to 4 whole pixels, and its light
+  // jumps as the view moves). Large LEDs are rounded.
+  vec2 o = (gl_PointCoord - 0.5) * (vSize + 2.0); // from the LED's centre, in pixels
+  vec2 h = vec2(vSize * 0.5);
+  vec2 cov = clamp(min(o + 0.5, h) - max(o - 0.5, -h), 0.0, 1.0);
+  float r = length(o) / h.x;
+  float a = cov.x * cov.y * (0.85 + 0.15 * (1.0 - min(r * r, 1.0)));
+  if (vSize >= 3.5) a *= 1.0 - smoothstep(1.0 - 2.0 / vSize, 1.0, r);
+  if (a <= 0.0) discard;
   outColor = vec4(vColor * a * uGain, 1.0);
 }`;
 
@@ -550,7 +538,7 @@ precision mediump float;
 in vec2 vUv;
 uniform sampler2D uTex;
 uniform vec2 uTexel;
-uniform float uKnee; // > 0: light fainter than this is let through less (the haze: only bright light spreads wide)
+uniform float uKnee; // > 0: only light brighter than this passes, less the knee (only bright cores glow)
 out vec4 outColor;
 void main() {
   vec3 c = texture(uTex, vUv + uTexel * vec2(-1.0, -1.0)).rgb
@@ -558,7 +546,10 @@ void main() {
          + texture(uTex, vUv + uTexel * vec2(-1.0,  1.0)).rgb
          + texture(uTex, vUv + uTexel * vec2( 1.0,  1.0)).rgb;
   c *= 0.25;
-  if (uKnee > 0.0) c *= smoothstep(0.0, uKnee, max(c.r, max(c.g, c.b)));
+  // The knee is taken off the brightest channel and the colour kept: dim light
+  // (most LEDs, the threads) gives no glow at all, so the dark between stays black.
+  float m = max(c.r, max(c.g, c.b));
+  if (uKnee > 0.0) c *= max(m - uKnee, 0.0) / max(m, 1e-4);
   outColor = vec4(c, 1.0);
 }`;
 
@@ -587,10 +578,10 @@ uniform sampler2D uBloom;
 uniform float uBloomK;
 uniform float uExposure;
 uniform float uFloor;  // black floor: glow fainter than about this (on screen, 0..1) is dropped
-uniform sampler2D uHaze;     // a much wider glow, that fills the room (crystal)
+uniform sampler2D uHaze;     // a much wider glow, around the brightest light
 uniform sampler2D uHazeWide; // and a wider one still, a quarter of its size
 uniform float uHazeK;
-uniform float uBurn;         // > 0: bright light burns out to white (crystal)
+uniform float uBurn;         // > 0: bright light burns out to white
 out vec4 outColor;
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 // A smooth (cubic B-spline) read of a small texture, from four bilinear reads:

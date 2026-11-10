@@ -1,15 +1,17 @@
-// Rain of Light: a lattice of light points with drops of light falling through it.
-// Plain WebGL2, no dependencies. Points are drawn as opaque discs (with a depth
-// test) into a half-float buffer, then blurred for bloom and tone-mapped onto the screen.
+// Rain of Light: a lattice of light points over a mirror floor, with rain of
+// light falling through it and forms of light that come and go (see show.js).
+// Plain WebGL2, no dependencies. Points add their light into a half-float
+// buffer (once as they are, once as their image in the floor), which is then
+// blurred for the glow and tone-mapped onto the screen.
 
 import { createTuner, loadSettings } from './tuner.js';
 import { createAudio } from './audio.js';
 import { createSway } from './sway.js';
 import {
   PALETTES, WEATHER, FLOWS, COLOR_MODES, MODE, SETS, ACCENTS, DEPTHS, SKY, CAMERAS,
-  DEFAULTS, STORAGE_KEY, SCHEMA, SCENES,
+  DEFAULTS, STORAGE_KEY, SCHEMA, ROOM,
 } from './config.js';
-import { createForms } from './crystal.js';
+import { createShow } from './show.js';
 import { FLOW_WRAP, POINT_VS, POINT_FS, WIRE_FS, RAY_FS, QUAD_VS, DOWN_FS, BLUR_FS, COMPOSITE_FS } from './shaders.js';
 import { createGL, sub, cross, dot, norm, perspective, lookAt } from './gl.js';
 import { createLattice, fillLattice } from './lattice.js';
@@ -24,7 +26,7 @@ const overlay = document.getElementById('overlay');
 const gl = canvas.getContext('webgl2', {
   antialias: false,
   alpha: false,
-  depth: true, // used when float buffers are missing
+  depth: false, // the light is added up: nothing hides anything
   powerPreference: 'high-performance',
 });
 
@@ -40,17 +42,16 @@ const hasFloat = !!(gl.getExtension('EXT_color_buffer_float') || gl.getExtension
 const params = new URLSearchParams(location.search);
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const MAX_DPR = Number(params.get('dpr')) || 2;
+const SEED = params.has('seed') && Number.isFinite(Number(params.get('seed'))) ? Number(params.get('seed')) : Math.random() * 1000;
 const SPEED = reducedMotion ? 0.4 : 1.0;
 
-// The scene sets its own defaults; what was saved or linked still wins.
-const asked = loadSettings(DEFAULTS, STORAGE_KEY, params).scene;
-const SCENE = Object.hasOwn(SCENES, asked) ? asked : DEFAULTS.scene;
-const SC = SCENES[SCENE];
-const crystal = SCENE === 'crystal';
-const SPAN = SC.span ?? 22; // width and depth of the lattice
-const HEIGHT = 15;  // height of the lattice
-const FLOOR = -HEIGHT / 2; // the floor under it (a mirror, in the crystal scene)
-const DEF = { ...DEFAULTS, ...SC.settings, scene: SCENE };
+// One room for the whole show: the rain and the forms share it.
+const SPAN = ROOM.span;     // width and depth of the lattice
+const HEIGHT = ROOM.height; // height of the lattice
+// The mirror floor, a little below the strands' feet: each strand and its
+// image are parted by a thin dark seam, so the floor line can be seen.
+const FLOOR = -HEIGHT / 2 - ROOM.foot;
+const DEF = DEFAULTS;
 const S = loadSettings(DEF, STORAGE_KEY, params);
 
 // A saved or linked choice that no longer exists falls back to its default.
@@ -116,7 +117,7 @@ function resize() {
   if (hasFloat) {
     freeTarget(scene); freeTarget(bloomA); freeTarget(bloomB); freeTarget(hazeA); freeTarget(hazeB);
     freeTarget(wideA); freeTarget(wideB);
-    scene = target(W, H, true);
+    scene = target(W, H);
     const bw = Math.max(1, W >> 2), bh = Math.max(1, H >> 2);
     bloomA = target(bw, bh);
     bloomB = target(bw, bh);
@@ -280,7 +281,9 @@ function rippleAt(x, y) {
     f[2] + r[2] * nx * th * aspect + u[2] * ny * th,
   ]);
   const D = 7;
-  addRipple(eye[0] + dir[0] * D, eye[1] + dir[1] * D, eye[2] + dir[2] * D, time);
+  // A tap on the floor's image rings the light whose image it is.
+  const hy = eye[1] + dir[1] * D;
+  addRipple(eye[0] + dir[0] * D, hy < FLOOR ? 2 * FLOOR - hy : hy, eye[2] + dir[2] * D, time);
 }
 
 // A mouse rings at once. A finger or pen only looks around while it drags;
@@ -309,7 +312,7 @@ addEventListener('keydown', (e) => {
   if (e.key === 'p') tuner.toggle();             // settings panel
   if (e.key === 'f') controls.toggleFullscreen(); // full screen
   if (e.key === 'w') step('weather', WEATHER);   // next weather
-  if (e.key === 'c') step('color', COLOR_MODES); // next colour
+  if (e.key === 'c') { step('color', COLOR_MODES); show.recolor(); } // next colour, of the rain and the forms
   if (e.key === 'd') step('flow', FLOWS);        // switch direction
   if (e.key === 'v') step('camera', CAMERAS);    // next camera move
   if (e.key === 'm') controls.toggleSound();     // sound on and off
@@ -388,12 +391,19 @@ function nextFlow(now) {
     turnP = 0;
   }
 }
-// The haze spreads bright light wide; dimmer light, less (so the room keeps its contrast).
+// Only light past a knee glows (scene light, before exposure): the glow stays
+// tight around bright heads and cores, and the dark between the points black.
+// The haze, wider, takes only what is brighter still.
+const BLOOM_KNEE = 0.5;
+// While rain falls the room closes in: the visible distance shrinks by this share.
+const RAIN_MIST = 0.35;
 const HAZE_KNEE = 1.5;
+// The floor's image fades over this height above the floor, as on dark glass.
+const MIRROR_FADE = 14;
 const CAMERA_BLEND = 8; // seconds to turn one move into the next
 const smooth = (x) => x * x * (3 - 2 * x);
-// The crystal scene starts its camera at ?t= too, so a time shows one view.
-let camMode = CAMERAS[0], camUntil = 0, camClock = crystal ? time : 0, camBlend = 1;
+// The camera starts at ?t= too, so a time shows one view.
+let camMode = CAMERAS[0], camUntil = 0, camClock = time, camBlend = 1;
 const camW = CAMERAS.map((c) => (c === camMode ? 1 : 0));
 let camFrom = [...camW];
 let lastDir = [0, 0, -1];
@@ -483,10 +493,10 @@ else {
   Object.assign(goal, { mode: colorMode.mode });
 }
 
-// What a change in the panel does at once.
+// What a change in the panel does at once. The scene, form and layer need
+// nothing here: the show reads them every frame and blends into the change.
 let rebuildTimer = 0;
 function apply(key) {
-  if (key === 'scene') { location.reload(); return; } // a scene has its own defaults: start afresh
   if (key === 'grid' || key === 'rows' || key === 'layout') {
     clearTimeout(rebuildTimer);
     rebuildTimer = setTimeout(buildLattice, 250); // wait for the slider to settle
@@ -544,8 +554,11 @@ function ease(dt) {
   bandShift = (bandShift + advance * S.bandSpeed) % (10 / S.bandScale);
 }
 
-// ---------- crystal: forms of light, and the mirrors ----------
-const forms = crystal ? createForms(S, { floor: FLOOR }) : null;
+// ---------- the show: rain and forms of light, and the mirrors ----------
+// ?seed= gives the show's timeline; else each visit has its own.
+const show = createShow(S, { feet: -HEIGHT / 2, seed: SEED }); // the layer lies just above the strands' feet
+// While no rain passage shows, a few pale drops still fall: more in heavier weather.
+const sparseShare = () => 0.03 + 0.05 * look.rain;
 // The images of the lattice in the wall mirrors: per image, x sign and offset,
 // z sign and offset, and how much light is left after its reflections. The
 // walls stand half a strand spacing beyond the outer strands.
@@ -581,9 +594,9 @@ function frame(now) {
   camBlend = Math.min(1, camBlend + dt / CAMERA_BLEND);
   const kb = smooth(camBlend);
   let eye = [0, 0, 0], dir = [0, 0, 0];
-  // In the crystal room the eye stands on the floor, with a little sway.
-  const ground = crystal ? FLOOR + SC.eye : undefined;
-  const bob = crystal ? ground + Math.sin(time * 0.05) * 0.2 : Math.sin(time * 0.05) * 0.8;
+  // The eye stands on the floor, with a little sway.
+  const ground = FLOOR + ROOM.eye;
+  const bob = ground + Math.sin(time * 0.05) * 0.2;
   CAMERAS.forEach((cam, i) => {
     camW[i] = camFrom[i] + ((cam === camMode ? 1 : 0) - camFrom[i]) * kb;
     if (camW[i] < 1e-4) return;
@@ -601,10 +614,8 @@ function frame(now) {
   eye = turn(eye);
   eye[1] -= pointer.sy * 2.0;
   dir = turn(dir);
-  if (crystal) {                                   // above the floor, looking a little up
-    eye[1] = Math.max(FLOOR + 0.4, eye[1]);
-    dir = norm([dir[0], dir[1] + SC.pitch, dir[2]]);
-  }
+  eye[1] = Math.max(FLOOR + 0.4, eye[1]);          // above the floor, looking a little up
+  dir = norm([dir[0], dir[1] + ROOM.pitch, dir[2]]);
   const at = [eye[0] + dir[0], eye[1] + dir[1], eye[2] + dir[2]];
   const aspect = W / H;
   const view = lookAt(eye, at, [0, 1, 0]);
@@ -629,9 +640,10 @@ function frame(now) {
   if (time > densityUntil) nextDensity(time);
   if (time > camUntil) nextCamera(time);
   ease(dt);
-  const shown = forms ? forms.update(time) : null;
-  if (crystal) placeImages();
-  sound.rain(look.rain, sway);
+  const shown = show.update(time, dt);
+  const rk = shown.rain;                 // how much rain falls now: 0 a still room .. 1 a rain passage
+  placeImages();
+  sound.rain(look.rain, sway, rk);
   // Breath: light and pad swell as you breathe in and ease as you breathe out.
   const breath = S.breath === 'on' ? breathAt(dt) : 1;
   const glow = 1 - S.breathDepth * (1 - breath);
@@ -641,21 +653,26 @@ function frame(now) {
   gl.bindFramebuffer(gl.FRAMEBUFFER, hasFloat ? scene.fb : null);
   gl.viewport(0, 0, W, H);
   gl.clearColor(0, 0, 0, 1);
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-  gl.enable(gl.DEPTH_TEST);
-  gl.depthFunc(gl.LESS);
+  gl.clear(gl.COLOR_BUFFER_BIT);
   // The LEDs and their wires share one vertex shader, so both get the same uniforms.
   const wiresOn = S.wire > 0 && wireCount > 0;
-  const rays = S.rays === 'off' ? 0 : Number(S.rays);
+  // Rays belong to the rain's heads: drawn only while rain falls.
+  const rays = S.rays === 'off' || rk < 0.01 ? 0 : Number(S.rays);
   const progs = [pointProg];
   if (wiresOn) progs.push(wireProg);
   if (rays) progs.push(rayProg);
   const rayScale = H / 1080;   // rays scale with the view like the lattice: their length is set for a 1080 px tall view
+  const rayLen = Math.min(S.rayLength * rayScale, (MAX_POINT - 1) / 2);
   for (const prog of progs) {
   gl.useProgram(prog.p);
   const u = prog.u;
   gl.uniform1f(u.uWire, prog === wireProg ? S.wire : 0);
-  gl.uniform1f(u.uRayLen, prog === rayProg ? Math.min(S.rayLength * rayScale, (MAX_POINT - 1) / 2) : 0);
+  gl.uniform1f(u.uRayLen, prog === rayProg ? rayLen : 0);
+  // Points this far past the edge are not lit (clip units): their sprite's half
+  // size and a little more. A wire's segment is short, so a wide margin is safe.
+  const margin = prog === rayProg ? rayLen + 2 : S.maxPx + 4;
+  if (prog === wireProg) gl.uniform2f(u.uCull, 1.5, 1.5);
+  else gl.uniform2f(u.uCull, 1 + 2 * margin / W, 1 + 2 * margin / H);
   gl.uniform1f(u.uRayThreshold, S.rayThreshold);
   gl.uniform1f(u.uRays, rays);
   gl.uniform1f(u.uRayGain, S.rayGain);
@@ -674,7 +691,8 @@ function frame(now) {
   gl.uniform1f(u.uBandShift, bandShift);
   gl.uniform1f(u.uBandScale, S.bandScale);
   gl.uniform1f(u.uSat, S.saturation);
-  gl.uniform2fv(u.uDensity, look.density);
+  // The forms want the whole lattice: thinning belongs to the rain passages.
+  gl.uniform2f(u.uDensity, 1 + (look.density[0] - 1) * rk, 1 + (look.density[1] - 1) * rk);
   gl.uniform1f(u.uBowStyle, { bands: 0, drop: 1, led: 2 }[S.rainbow] ?? 1);
   gl.uniform1f(u.uFlow, look.flow);
   gl.uniform1f(u.uRain, look.rain);
@@ -695,73 +713,46 @@ function frame(now) {
   gl.uniform1f(u.uFlowRate, look.flowRate);
   gl.uniform3fv(u.uGrad0, look.g0);
   gl.uniform3fv(u.uGrad1, look.g1);
-  gl.uniform1f(u.uFogFar, S.fog);
+  gl.uniform1f(u.uFogFar, S.fog * (1 - RAIN_MIST * rk)); // rain brings a mist: the far strands fade
   gl.uniform3fv(u.uColA, look.a);
   gl.uniform3fv(u.uColB, look.b);
   gl.uniform4fv(u.uRipples, ripples);
-  gl.uniform1f(u.uRainShare, S.rainShare);
-  gl.uniform1f(u.uScene, crystal ? 1 : 0);
-  gl.uniform1f(u.uSoft, crystal ? 1 : 0);
-  if (crystal) {
-    gl.uniform4fv(u.uFormA, shown.A);
-    gl.uniform4fv(u.uFormB, shown.B);
-    gl.uniform1fv(u.uFormYaw, shown.yaw);
-    gl.uniform3fv(u.uFormC, shown.C);
-    gl.uniform3fv(u.uFormD, shown.D);
-    gl.uniform3fv(u.uTint, shown.tint);
-    gl.uniform1f(u.uTwinkle, S.twinkle);
-    gl.uniform4fv(u.uCopy, copies);
-    gl.uniform1fv(u.uCopyGain, copyGain);
+  // Rain spreads strand by strand as a rain passage comes, from the few
+  // strands that carry pale drops in a still room.
+  gl.uniform1f(u.uRainShare, sparseShare() + (S.rainShare - sparseShare()) * rk);
+  gl.uniform1f(u.uRainMix, rk);
+  gl.uniform4fv(u.uFormA, shown.A);
+  gl.uniform4fv(u.uFormB, shown.B);
+  gl.uniform2fv(u.uFormE, shown.E);
+  gl.uniform1fv(u.uFormYaw, shown.yaw);
+  gl.uniform3fv(u.uFormC, shown.C);
+  gl.uniform3fv(u.uFormD, shown.D);
+  gl.uniform3fv(u.uTint, shown.tint);
+  gl.uniform1f(u.uTwinkle, S.twinkle);
+  gl.uniform4fv(u.uCopy, copies);
+  gl.uniform1fv(u.uCopyGain, copyGain);
   }
-  }
-  // The light itself, then (crystal) its image in the floor mirror. Wall
-  // mirrors draw the lattice again per image, as instances.
-  const images = crystal && S.walls >= 1 ? 9 : 1;
-  const passes = crystal && S.mirror > 0 ? [0, S.mirror] : [0];
+  // The light itself, then its image in the floor mirror. Wall mirrors draw
+  // the lattice again per image, as instances. Every LED, wire and ray adds
+  // its light, near or far: the strands are fine threads, and nothing near
+  // the eye stands dark in front of a form.
+  const images = S.walls >= 1 ? 9 : 1;
+  const passes = S.mirror > 0 ? [0, S.mirror] : [0];
   gl.bindVertexArray(pointVao);
-  // In the crystal room every LED adds its light, near or far: the strands are
-  // fine threads, and nothing near the eye stands dark in front of a form.
-  if (crystal) gl.disable(gl.DEPTH_TEST);
+  gl.disable(gl.DEPTH_TEST);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.ONE, gl.ONE);
   for (const mirror of passes) {
     for (const prog of progs) {
       gl.useProgram(prog.p);
-      gl.uniform3f(prog.u.uMirror, FLOOR, mirror, HEIGHT * 2);
-    }
-    gl.useProgram(pointProg.p);
-    gl.depthFunc(gl.LESS);
-    if (crystal) {
-      gl.enable(gl.BLEND);
-      gl.blendFunc(gl.ONE, gl.ONE);
-    }
-    if (images > 1) gl.drawArraysInstanced(gl.POINTS, 0, count, images);
-    else gl.drawArrays(gl.POINTS, 0, count);
-    gl.disable(gl.BLEND);
-    if (wiresOn) {
-      // Wires after the LEDs: hidden behind near LEDs, added up, never hiding anything.
-      gl.useProgram(wireProg.p);
-      gl.depthFunc(gl.LEQUAL);
-      gl.depthMask(false);
-      gl.enable(gl.BLEND);
-      gl.blendFunc(gl.ONE, gl.ONE);
-      if (images > 1) gl.drawElementsInstanced(gl.LINES, wireCount, gl.UNSIGNED_INT, 0, images);
-      else gl.drawElements(gl.LINES, wireCount, gl.UNSIGNED_INT, 0);
-      gl.disable(gl.BLEND);
-      gl.depthMask(true);
-    }
-    if (rays) {
-      // Rays after everything: hidden behind near LEDs, added up, never hiding anything.
-      gl.useProgram(rayProg.p);
-      gl.depthFunc(gl.LEQUAL);
-      gl.depthMask(false);
-      gl.enable(gl.BLEND);
-      gl.blendFunc(gl.ONE, gl.ONE);
-      if (images > 1) gl.drawArraysInstanced(gl.POINTS, 0, count, images);
-      else gl.drawArrays(gl.POINTS, 0, count);
-      gl.disable(gl.BLEND);
-      gl.depthMask(true);
+      gl.uniform3f(prog.u.uMirror, FLOOR, mirror, MIRROR_FADE);
+      if (images > 1 && prog !== wireProg) gl.drawArraysInstanced(gl.POINTS, 0, count, images);
+      else if (prog !== wireProg) gl.drawArrays(gl.POINTS, 0, count);
+      else if (images > 1) gl.drawElementsInstanced(gl.LINE_STRIP, wireCount, gl.UNSIGNED_INT, 0, images);
+      else gl.drawElements(gl.LINE_STRIP, wireCount, gl.UNSIGNED_INT, 0);
     }
   }
-  gl.disable(gl.DEPTH_TEST);
+  gl.disable(gl.BLEND);
 
   if (hasFloat) {
     gl.bindVertexArray(emptyVao);
@@ -773,7 +764,7 @@ function frame(now) {
     gl.bindTexture(gl.TEXTURE_2D, scene.tex);
     gl.uniform1i(downProg.u.uTex, 0);
     gl.uniform2f(downProg.u.uTexel, 1 / W, 1 / H);
-    gl.uniform1f(downProg.u.uKnee, 0);
+    gl.uniform1f(downProg.u.uKnee, BLOOM_KNEE);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     // Blur once in each direction: a faint glow that keeps the LEDs crisp.
     gl.useProgram(blurProg.p);
