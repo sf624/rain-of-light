@@ -18,7 +18,7 @@ Inspired by teamLab's *Light Sculpture - Point*.
 
 ## Use
 
-- **Click or tap**: a ripple of light (and a bell). **Drag** to look around.
+- **Click or tap**: a ripple of light (and a bell). **Drag** to look around: the picture follows the mouse or the finger.
 - **Buttons, bottom right**: settings ⚙, full screen, sound ♪, volume.
 - **Keys**:
 
