@@ -230,6 +230,7 @@ wake();
 const STILL = '.tuner, .tuner-toggle, .sound-toggle, .full-toggle, .volume-bar';
 addEventListener('pointermove', (e) => {
   wake();
+  if (!e.isPrimary) return; // with two fingers the view follows the first
   if (e.target instanceof Element && e.target.closest(STILL)) return;
   pointer.x = e.clientX / innerWidth - 0.5;
   pointer.y = e.clientY / innerHeight - 0.5;
@@ -249,11 +250,11 @@ function breathAt(dt) {
 }
 
 
-canvas.addEventListener('pointerdown', (e) => {
-  hideOverlay();
+// A ripple goes where the view is hit at screen point (x, y).
+function rippleAt(x, y) {
   if (!camera) return;
-  const nx = (e.clientX / innerWidth) * 2 - 1;
-  const ny = 1 - (e.clientY / innerHeight) * 2;
+  const nx = (x / innerWidth) * 2 - 1;
+  const ny = 1 - (y / innerHeight) * 2;
   const th = Math.tan(fovRad() / 2);
   const { eye, f, r, u, aspect } = camera;
   const dir = norm([
@@ -263,7 +264,28 @@ canvas.addEventListener('pointerdown', (e) => {
   ]);
   const D = 7;
   addRipple(eye[0] + dir[0] * D, eye[1] + dir[1] * D, eye[2] + dir[2] * D, time);
+}
+
+// A mouse rings at once. A finger or pen only looks around while it drags;
+// it rings on lift if it was a tap: short, and moved less than TAP_MOVE.
+const TAP_MOVE = 10;  // CSS px
+const TAP_TIME = 350; // ms
+const touches = new Map(); // pointerId -> { x, y, t, drag }
+canvas.addEventListener('pointerdown', (e) => {
+  hideOverlay();
+  if (e.pointerType === 'mouse') rippleAt(e.clientX, e.clientY);
+  else touches.set(e.pointerId, { x: e.clientX, y: e.clientY, t: e.timeStamp, drag: false });
 });
+addEventListener('pointermove', (e) => {
+  const d = touches.get(e.pointerId);
+  if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > TAP_MOVE) d.drag = true;
+});
+addEventListener('pointerup', (e) => {
+  const d = touches.get(e.pointerId);
+  touches.delete(e.pointerId);
+  if (d && !d.drag && e.timeStamp - d.t < TAP_TIME) rippleAt(d.x, d.y);
+});
+addEventListener('pointercancel', (e) => touches.delete(e.pointerId));
 
 addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return; // browser shortcuts, and a held key
