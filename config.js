@@ -105,11 +105,11 @@ export const SCENES = ['mix', 'rain', 'crystal'];
 
 // ---------- tunable settings (panel: p key or the gear button; also ?key=value) ----------
 export const DEFAULTS = {
-  scene: 'mix', form: 'auto', layer: 'auto', mirror: 0.6, walls: 0, haze: 0.5, burn: 0.7, twinkle: 0.4, rainShare: 1,
+  scene: 'mix', form: 'auto', layer: 'auto', mirror: 0.6, walls: 0, haze: 1.5, burn: 0.7, twinkle: 0.4, rainShare: 1,
   grid: small ? 44 : 72,  rows: small ? 72 : 96,
   layout: 'strands', density: 'auto', strandShare: 1.0, rowShare: 1.0, strandMin: 0.3, rowMin: 0.35,
   size: 0.018, maxPx: 4.5, rest: 0.03, wire: 0.2,
-  rainGain: 4.0, tipGain: 5.0, exposure: 1.8, bloom: 0.5, fog: 34, blackFloor: 3,
+  rainGain: 4.0, tipGain: 5.0, exposure: 1.8, bloom: 0.8, fog: 34, blackFloor: 3,
   rays: '2', rayGain: 0.3, rayLength: 20, rayThreshold: 0.7,
   speed: 1.0, trail: 1.0, weather: 'auto', turnTime: 8, turnSteps: 9,
   color: 'auto', palette: 'auto', rainbow: 'drop', bandSpeed: 0.17, bandScale: 1.0, saturation: 1.0,
