@@ -71,8 +71,35 @@ export const CAMERAS = [
   { name: 'rise',  hold: [25, 40], weight: 1.5 },
 ];
 
+// Forms of light in the crystal scene. Sky forms come one at a time; the
+// layer (a sea of light near the floor) comes and goes beside them. Each
+// form picks its colours from a few of the palettes.
+export const FORMS = [
+  { name: 'orb',    type: 0, palettes: ['amber', 'candle', 'sakura', 'ice'] },
+  { name: 'spiral', type: 1, palettes: ['deep sea', 'sakura', 'ice', 'aurora'] },
+  { name: 'cloud',  type: 3, palettes: ['sakura', 'aurora', 'ice', 'deep sea'] },
+];
+export const LAYER = { name: 'layer', type: 2, palettes: ['deep sea', 'ice', 'aurora'] };
+
+// Scenes: the rain, or a mirrored room where forms of light appear in a
+// regular lattice. A scene changes the defaults below; what you set wins.
+export const SCENES = {
+  rain: { settings: {} },
+  crystal: {
+    span: 36,      // a larger room than the rain's, so the forms are seen from afar
+    eye: 2.5,      // the eye's height above the floor
+    pitch: 0.06,   // and how far it looks up
+    settings: {
+      grid: small ? 44 : 72, layout: 'grid', density: 'manual', size: 0.02, rest: 0.035, wire: 0.18,
+      radius: 13, rainShare: 0.04, ripples: 16, fov: 76, fog: 34, bloom: 0.8, blackFloor: 0,
+      exposure: 2.0, mirror: 0.6, walls: 0, haze: 1.5, twinkle: 0.4, rays: 'off',
+    },
+  },
+};
+
 // ---------- tunable settings (panel: p key or the gear button; also ?key=value) ----------
 export const DEFAULTS = {
+  scene: 'rain', form: 'auto', layer: 'auto', mirror: 0, walls: 0, haze: 0, twinkle: 0, rainShare: 1,
   grid: small ? 36 : 60,  rows: small ? 72 : 96,
   layout: 'strands', density: 'auto', strandShare: 1.0, rowShare: 1.0, strandMin: 0.3, rowMin: 0.35,
   size: 0.013, maxPx: 4.5, rest: 0.025, wire: 0.1,
@@ -92,6 +119,19 @@ export const DEFAULTS = {
 export const STORAGE_KEY = 'rain-of-light:settings';
 
 export const SCHEMA = [
+  { title: 'Scene', items: [
+    { key: 'scene', label: 'Scene', options: Object.keys(SCENES),
+      hint: 'rain: rain of light / crystal: a mirrored room where forms of light appear (reloads the page)' },
+    { key: 'form', label: 'Form (crystal)', options: ['auto', ...FORMS.map((f) => f.name), 'none'] },
+    { key: 'layer', label: 'Layer of light (crystal)', options: ['auto', 'on', 'off'] },
+    { key: 'mirror', label: 'Floor mirror (0: off)', min: 0, max: 1, step: 0.05 },
+    { key: 'walls', label: 'Wall mirrors (copies per side)', min: 0, max: 1, step: 1,
+      hint: 'Each copy draws the lattice again: costly' },
+    { key: 'haze', label: 'Haze (0: off)', min: 0, max: 2, step: 0.05,
+      hint: 'A wide, soft glow of the light that fills the room' },
+    { key: 'twinkle', label: 'Twinkle', min: 0, max: 2, step: 0.05 },
+    { key: 'rainShare', label: 'Share of strands with rain', min: 0, max: 1, step: 0.01 },
+  ] },
   { title: 'Display', items: [
     { key: 'quality', label: 'Quality', options: ['auto', 'full'],
       hint: 'auto: lowers the sharpness if frames are slow, and raises it again when they are not / full: always as sharp as the screen allows' },
@@ -99,8 +139,8 @@ export const SCHEMA = [
   { title: 'Density', items: [
     { key: 'grid', label: 'Strands per side (max)', min: 8, max: 160, step: 1 },
     { key: 'rows', label: 'LEDs per strand (max)', min: 8, max: 256, step: 1 },
-    { key: 'layout', label: 'Layout', options: ['strands', 'scatter'],
-      hint: 'strands: in lines along each strand / scatter: at random within one strand\'s width' },
+    { key: 'layout', label: 'Layout', options: ['strands', 'scatter', 'grid'],
+      hint: 'strands: in lines along each strand / scatter: at random within one strand\'s width / grid: a regular lattice' },
     { key: 'density', label: 'Density change', options: ['auto', 'manual'],
       hint: 'auto: drifts slowly between the lower limits and full / manual: held at the shares below' },
     { key: 'strandShare', label: 'Share of strands (manual)', min: 0.02, max: 1, step: 0.01 },

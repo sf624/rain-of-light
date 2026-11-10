@@ -7,7 +7,7 @@ const CACHE = 'rain-of-light';
 // Add new modules and assets here.
 const CORE = [
   './', 'index.html', 'style.css', 'manifest.webmanifest', 'favicon.svg',
-  'main.js', 'config.js', 'shaders.js', 'lattice.js', 'gl.js',
+  'main.js', 'config.js', 'shaders.js', 'lattice.js', 'gl.js', 'crystal.js',
   'controls.js', 'audio.js', 'sway.js', 'tuner.js', 'wakelock.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png',
   'icons/apple-touch-icon.png',

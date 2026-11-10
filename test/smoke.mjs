@@ -225,6 +225,7 @@ await cdp.send('Target.closeTarget', { targetId });
 await visit(cdp, base, '', true);
 for (const m of modes) await visit(cdp, base, `?color=${encodeURIComponent(m)}`, false);
 await visit(cdp, base, '#tune', false);
+await visit(cdp, base, '?scene=crystal', true);
 
 clearTimeout(overall);
 cleanup();

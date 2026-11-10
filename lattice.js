@@ -47,14 +47,17 @@ export function fillLattice(gl, { pointVao, pointBuf, rankBuf, wireBuf }, S, SPA
   rowOrder.sort((a, b) => a[0] - b[0]);
   const rowRank = new Float32Array(ROWS);
   rowOrder.forEach(([, r], n) => { rowRank[r] = (n + 0.5) / ROWS; });
+  // A grid is regular: no jitter, all rows at one height, so the lattice
+  // lines up in perspective (the crystal scene wants those patterns).
+  const grid = S.layout === 'grid';
   let k = 0, q = 0;
   for (let i = 0; i < GRID; i++) {
     for (let j = 0; j < GRID; j++) {
       // Jitter each strand, and shift its LEDs by up to one row, so that rows
       // and columns never line up into dark lines across the view.
-      const x = -SPAN / 2 + i * step + (Math.random() - 0.5) * step;
-      const z = -SPAN / 2 + j * step + (Math.random() - 0.5) * step;
-      const shift = Math.random();
+      const x = -SPAN / 2 + i * step + (grid ? 0 : (Math.random() - 0.5) * step);
+      const z = -SPAN / 2 + j * step + (grid ? 0 : (Math.random() - 0.5) * step);
+      const shift = grid ? 0.5 : Math.random();
       const seed = Math.random() * 1000;
       const strandRank = Math.random();
       const rowStart = Math.floor(Math.random() * ROWS);

@@ -7,8 +7,9 @@ import { createAudio } from './audio.js';
 import { createSway } from './sway.js';
 import {
   PALETTES, WEATHER, FLOWS, COLOR_MODES, MODE, SETS, ACCENTS, DEPTHS, SKY, CAMERAS,
-  DEFAULTS, STORAGE_KEY, SCHEMA,
+  DEFAULTS, STORAGE_KEY, SCHEMA, SCENES,
 } from './config.js';
+import { createForms } from './crystal.js';
 import { FLOW_WRAP, POINT_VS, POINT_FS, WIRE_FS, RAY_FS, QUAD_VS, DOWN_FS, BLUR_FS, COMPOSITE_FS } from './shaders.js';
 import { createGL, sub, cross, dot, norm, perspective, lookAt } from './gl.js';
 import { createLattice, fillLattice } from './lattice.js';
@@ -39,19 +40,26 @@ const hasFloat = !!(gl.getExtension('EXT_color_buffer_float') || gl.getExtension
 const params = new URLSearchParams(location.search);
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const MAX_DPR = Number(params.get('dpr')) || 2;
-const SPAN = 22;    // width and depth of the lattice
-const HEIGHT = 15;  // height of the lattice
 const SPEED = reducedMotion ? 0.4 : 1.0;
 
-const S = loadSettings(DEFAULTS, STORAGE_KEY, params);
+// The scene sets its own defaults; what was saved or linked still wins.
+const asked = loadSettings(DEFAULTS, STORAGE_KEY, params).scene;
+const SCENE = Object.hasOwn(SCENES, asked) ? asked : DEFAULTS.scene;
+const SC = SCENES[SCENE];
+const crystal = SCENE === 'crystal';
+const SPAN = SC.span ?? 22; // width and depth of the lattice
+const HEIGHT = 15;  // height of the lattice
+const FLOOR = -HEIGHT / 2; // the floor under it (a mirror, in the crystal scene)
+const DEF = { ...DEFAULTS, ...SC.settings, scene: SCENE };
+const S = loadSettings(DEF, STORAGE_KEY, params);
 
 // A saved or linked choice that no longer exists falls back to its default.
 for (const item of SCHEMA.flatMap((g) => g.items)) {
-  if (item.options && !item.options.includes(S[item.key])) S[item.key] = DEFAULTS[item.key];
+  if (item.options && !item.options.includes(S[item.key])) S[item.key] = DEF[item.key];
   // A number out of range (or none) falls back to its default and is clamped.
   if (item.options === undefined) {
     let v = Number(S[item.key]);
-    if (!Number.isFinite(v)) v = DEFAULTS[item.key];
+    if (!Number.isFinite(v)) v = DEF[item.key];
     v = Math.min(item.max, Math.max(item.min, v));
     if (item.key === 'ripples' && v > 0) v = Math.max(1, v); // 0 is none; else at least 1 s
     S[item.key] = v;
@@ -80,7 +88,7 @@ const pointVao = lattice.pointVao;
 const emptyVao = gl.createVertexArray();
 
 // ---------- render targets ----------
-let W = 0, H = 0, scene = null, bloomA = null, bloomB = null;
+let W = 0, H = 0, scene = null, bloomA = null, bloomB = null, hazeA = null, hazeB = null;
 
 // Render scale, on top of the device pixel ratio. In 'auto' quality it steps
 // down when frames are persistently slow and back up when a probe holds.
@@ -106,11 +114,15 @@ function resize() {
   H = canvas.height = h;
   settleUntil = performance.now() + SETTLE_MS; // frame times right after a change say little
   if (hasFloat) {
-    freeTarget(scene); freeTarget(bloomA); freeTarget(bloomB);
+    freeTarget(scene); freeTarget(bloomA); freeTarget(bloomB); freeTarget(hazeA); freeTarget(hazeB);
     scene = target(W, H, true);
     const bw = Math.max(1, W >> 2), bh = Math.max(1, H >> 2);
     bloomA = target(bw, bh);
     bloomB = target(bw, bh);
+    // The haze: a sixteenth of the size, blurred wide.
+    const hw = Math.max(1, W >> 4), hh = Math.max(1, H >> 4);
+    hazeA = target(hw, hh);
+    hazeB = target(hw, hh);
   }
 }
 
@@ -373,7 +385,8 @@ function nextFlow(now) {
 }
 const CAMERA_BLEND = 8; // seconds to turn one move into the next
 const smooth = (x) => x * x * (3 - 2 * x);
-let camMode = CAMERAS[0], camUntil = 0, camClock = 0, camBlend = 1;
+// The crystal scene starts its camera at ?t= too, so a time shows one view.
+let camMode = CAMERAS[0], camUntil = 0, camClock = crystal ? time : 0, camBlend = 1;
 const camW = CAMERAS.map((c) => (c === camMode ? 1 : 0));
 let camFrom = [...camW];
 let lastDir = [0, 0, -1];
@@ -385,8 +398,9 @@ function nextCamera(now) {
   camBlend = 0;
 }
 
-// Where one move puts the eye at clock t, and which way it looks.
-function cameraPose(name, t, R, bob) {
+// Where one move puts the eye at clock t, and which way it looks. On a floor
+// (ground: the eye's height there) the rise goes up from it and back.
+function cameraPose(name, t, R, bob, ground) {
   const a = t * 0.025;                                   // orbit angle
   const inward = [-Math.sin(a), 0, -Math.cos(a)];        // towards the centre
   const onOrbit = (y) => [Math.sin(a) * R, y, Math.cos(a) * R];
@@ -405,7 +419,8 @@ function cameraPose(name, t, R, bob) {
       return { eye: onOrbit(bob), dir: [inward[0] * Math.cos(p), Math.sin(p), inward[2] * Math.cos(p)] };
     }
     case 'rise':                                         // drift up and down through the lattice
-      return { eye: onOrbit(Math.sin(t * 0.035) * 5.5), dir: inward };
+      return { eye: onOrbit(ground === undefined ? Math.sin(t * 0.035) * 5.5 : ground + (1 - Math.cos(t * 0.035)) * 3.5),
+        dir: inward };
     default:                                             // orbit
       return { eye: onOrbit(bob), dir: inward };
   }
@@ -464,6 +479,7 @@ else {
 // What a change in the panel does at once.
 let rebuildTimer = 0;
 function apply(key) {
+  if (key === 'scene') { location.reload(); return; } // a scene has its own defaults: start afresh
   if (key === 'grid' || key === 'rows' || key === 'layout') {
     clearTimeout(rebuildTimer);
     rebuildTimer = setTimeout(buildLattice, 250); // wait for the slider to settle
@@ -482,7 +498,7 @@ if (forced('camera')) {
 } else camUntil = rand(...CAMERAS[0].hold);
 
 const tuner = createTuner({
-  schema: SCHEMA, settings: S, defaults: DEFAULTS, storageKey: STORAGE_KEY,
+  schema: SCHEMA, settings: S, defaults: DEF, storageKey: STORAGE_KEY,
   onChange: (key) => apply(key),
 });
 look = {
@@ -521,6 +537,23 @@ function ease(dt) {
   bandShift = (bandShift + advance * S.bandSpeed) % (10 / S.bandScale);
 }
 
+// ---------- crystal: forms of light, and the mirrors ----------
+const forms = crystal ? createForms(S, { floor: FLOOR }) : null;
+// The images of the lattice in the wall mirrors: per image, x sign and offset,
+// z sign and offset, and how much light is left after its reflections. The
+// walls stand half a strand spacing beyond the outer strands.
+const copies = new Float32Array(9 * 4), copyGain = new Float32Array(9);
+function placeImages() {
+  const room = SPAN + SPAN / (GRID - 1);
+  let i = 0;
+  for (const nx of [0, -1, 1]) {
+    for (const nz of [0, -1, 1]) {
+      copies.set([nx ? -1 : 1, nx * room, nz ? -1 : 1, nz * room], i * 4);
+      copyGain[i++] = 0.7 ** (Math.abs(nx) + Math.abs(nz));
+    }
+  }
+}
+
 // ---------- frame ----------
 let last = performance.now();
 
@@ -541,11 +574,13 @@ function frame(now) {
   camBlend = Math.min(1, camBlend + dt / CAMERA_BLEND);
   const kb = smooth(camBlend);
   let eye = [0, 0, 0], dir = [0, 0, 0];
-  const bob = Math.sin(time * 0.05) * 0.8;
+  // In the crystal room the eye stands on the floor, with a little sway.
+  const ground = crystal ? FLOOR + SC.eye : undefined;
+  const bob = crystal ? ground + Math.sin(time * 0.05) * 0.2 : Math.sin(time * 0.05) * 0.8;
   CAMERAS.forEach((cam, i) => {
     camW[i] = camFrom[i] + ((cam === camMode ? 1 : 0) - camFrom[i]) * kb;
     if (camW[i] < 1e-4) return;
-    const pose = cameraPose(cam.name, camClock, S.radius, bob);
+    const pose = cameraPose(cam.name, camClock, S.radius, bob, ground);
     for (let k = 0; k < 3; k++) {
       eye[k] += pose.eye[k] * camW[i];
       dir[k] += pose.dir[k] * camW[i];
@@ -559,6 +594,10 @@ function frame(now) {
   eye = turn(eye);
   eye[1] -= pointer.sy * 2.0;
   dir = turn(dir);
+  if (crystal) {                                   // above the floor, looking a little up
+    eye[1] = Math.max(FLOOR + 0.4, eye[1]);
+    dir = norm([dir[0], dir[1] + SC.pitch, dir[2]]);
+  }
   const at = [eye[0] + dir[0], eye[1] + dir[1], eye[2] + dir[2]];
   const aspect = W / H;
   const view = lookAt(eye, at, [0, 1, 0]);
@@ -583,6 +622,8 @@ function frame(now) {
   if (time > densityUntil) nextDensity(time);
   if (time > camUntil) nextCamera(time);
   ease(dt);
+  const shown = forms ? forms.update(time) : null;
+  if (crystal) placeImages();
   sound.rain(look.rain, sway);
   // Breath: light and pad swell as you breathe in and ease as you breathe out.
   const breath = S.breath === 'on' ? breathAt(dt) : 1;
@@ -651,31 +692,58 @@ function frame(now) {
   gl.uniform3fv(u.uColA, look.a);
   gl.uniform3fv(u.uColB, look.b);
   gl.uniform4fv(u.uRipples, ripples);
+  gl.uniform1f(u.uRainShare, S.rainShare);
+  gl.uniform1f(u.uScene, crystal ? 1 : 0);
+  if (crystal) {
+    gl.uniform4fv(u.uFormA, shown.A);
+    gl.uniform4fv(u.uFormB, shown.B);
+    gl.uniform1fv(u.uFormYaw, shown.yaw);
+    gl.uniform3fv(u.uFormC, shown.C);
+    gl.uniform3fv(u.uFormD, shown.D);
+    gl.uniform3fv(u.uTint, shown.tint);
+    gl.uniform1f(u.uTwinkle, S.twinkle);
+    gl.uniform4fv(u.uCopy, copies);
+    gl.uniform1fv(u.uCopyGain, copyGain);
   }
-  gl.useProgram(pointProg.p);
+  }
+  // The light itself, then (crystal) its image in the floor mirror. Wall
+  // mirrors draw the lattice again per image, as instances.
+  const images = crystal && S.walls >= 1 ? 9 : 1;
+  const passes = crystal && S.mirror > 0 ? [0, S.mirror] : [0];
   gl.bindVertexArray(pointVao);
-  gl.drawArrays(gl.POINTS, 0, count);
-  if (wiresOn) {
-    // Wires after the LEDs: hidden behind near LEDs, added up, never hiding anything.
-    gl.useProgram(wireProg.p);
-    gl.depthFunc(gl.LEQUAL);
-    gl.depthMask(false);
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.ONE, gl.ONE);
-    gl.drawElements(gl.LINES, wireCount, gl.UNSIGNED_INT, 0);
-    gl.disable(gl.BLEND);
-    gl.depthMask(true);
-  }
-  if (rays) {
-    // Rays after everything: hidden behind near LEDs, added up, never hiding anything.
-    gl.useProgram(rayProg.p);
-    gl.depthFunc(gl.LEQUAL);
-    gl.depthMask(false);
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.ONE, gl.ONE);
-    gl.drawArrays(gl.POINTS, 0, count);
-    gl.disable(gl.BLEND);
-    gl.depthMask(true);
+  for (const mirror of passes) {
+    for (const prog of progs) {
+      gl.useProgram(prog.p);
+      gl.uniform3f(prog.u.uMirror, FLOOR, mirror, HEIGHT * 2);
+    }
+    gl.useProgram(pointProg.p);
+    gl.depthFunc(gl.LESS);
+    if (images > 1) gl.drawArraysInstanced(gl.POINTS, 0, count, images);
+    else gl.drawArrays(gl.POINTS, 0, count);
+    if (wiresOn) {
+      // Wires after the LEDs: hidden behind near LEDs, added up, never hiding anything.
+      gl.useProgram(wireProg.p);
+      gl.depthFunc(gl.LEQUAL);
+      gl.depthMask(false);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.ONE, gl.ONE);
+      if (images > 1) gl.drawElementsInstanced(gl.LINES, wireCount, gl.UNSIGNED_INT, 0, images);
+      else gl.drawElements(gl.LINES, wireCount, gl.UNSIGNED_INT, 0);
+      gl.disable(gl.BLEND);
+      gl.depthMask(true);
+    }
+    if (rays) {
+      // Rays after everything: hidden behind near LEDs, added up, never hiding anything.
+      gl.useProgram(rayProg.p);
+      gl.depthFunc(gl.LEQUAL);
+      gl.depthMask(false);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.ONE, gl.ONE);
+      if (images > 1) gl.drawArraysInstanced(gl.POINTS, 0, count, images);
+      else gl.drawArrays(gl.POINTS, 0, count);
+      gl.disable(gl.BLEND);
+      gl.depthMask(true);
+    }
   }
   gl.disable(gl.DEPTH_TEST);
 
@@ -701,6 +769,26 @@ function frame(now) {
     gl.bindTexture(gl.TEXTURE_2D, bloomB.tex);
     gl.uniform2f(blurProg.u.uDir, 0, 1 / bloomA.h);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+    if (S.haze > 0) {
+      // The haze: the glow, made smaller again and blurred twice more, wide.
+      gl.bindFramebuffer(gl.FRAMEBUFFER, hazeA.fb);
+      gl.viewport(0, 0, hazeA.w, hazeA.h);
+      gl.useProgram(downProg.p);
+      gl.bindTexture(gl.TEXTURE_2D, bloomA.tex);
+      gl.uniform2f(downProg.u.uTexel, 1 / bloomA.w, 1 / bloomA.h);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      gl.useProgram(blurProg.p);
+      for (let i = 0; i < 2; i++) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, hazeB.fb);
+        gl.bindTexture(gl.TEXTURE_2D, hazeA.tex);
+        gl.uniform2f(blurProg.u.uDir, 1 / hazeA.w, 0);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, hazeA.fb);
+        gl.bindTexture(gl.TEXTURE_2D, hazeB.tex);
+        gl.uniform2f(blurProg.u.uDir, 0, 1 / hazeA.h);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+      }
+    }
     // Composite to the screen.
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, W, H);
@@ -709,8 +797,12 @@ function frame(now) {
     gl.bindTexture(gl.TEXTURE_2D, scene.tex);
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, bloomA.tex);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, hazeA.tex);
     gl.uniform1i(compProg.u.uScene, 0);
     gl.uniform1i(compProg.u.uBloom, 1);
+    gl.uniform1i(compProg.u.uHaze, 2);
+    gl.uniform1f(compProg.u.uHazeK, S.haze);
     gl.uniform1f(compProg.u.uBloomK, S.bloom);
     gl.uniform1f(compProg.u.uExposure, S.exposure * glow);
     gl.uniform1f(compProg.u.uFloor, S.blackFloor / 255);

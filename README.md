@@ -36,6 +36,12 @@ your first click. The settings panel keeps what you change in this browser
 (Reset brings back the defaults). Any setting can also be given in the URL,
 such as `?color=cloud&weather=drizzle`; `#tune` opens the panel.
 
+A second scene, still a prototype: `?scene=crystal` (or Scene in the panel).
+A regular lattice stands in a room with a mirror floor; large forms of light
+appear in it one after another (an orb, a spiral, a cloud), with now and then
+a layer of light near the floor. `?form=orb` (spiral, cloud, none) and
+`?layer=on` (off) hold one.
+
 Quality is automatic: if frames are slow, the canvas is drawn at a lower
 resolution (down to half), and raised again when the device keeps up. Set
 `Quality` to `full` in the panel (or `?quality=full`) to always draw at the
@@ -64,7 +70,8 @@ work, because the scripts are ES modules.
 | --- | --- |
 | `index.html`, `style.css` | the page |
 | `main.js` | the director that changes weather, colour, flow and camera, and the frame loop |
-| `config.js` | palettes, colour modes, weathers, camera moves, default settings and the panel's layout |
+| `config.js` | palettes, colour modes, weathers, camera moves, forms, scenes, default settings and the panel's layout |
+| `crystal.js` | the crystal scene's director: which forms of light show, where, and how bright |
 | `shaders.js` | the GLSL shaders: the points of light, bloom and tone mapping |
 | `lattice.js` | the strands and LEDs, and the order in which they thin out |
 | `gl.js` | WebGL helpers and vector maths |
