@@ -74,7 +74,7 @@ async function startChrome() {
   chrome.stderr.on('data', (d) => { err += d; });
   chrome.on('exit', (code) => { if (chrome) fail(`Chrome exited early (code ${code}).\n${err.slice(-1500)}`); });
   const portFile = path.join(userDir, 'DevToolsActivePort');
-  for (let i = 0; i < 100 && !fs.existsSync(portFile); i++) await sleep(100);
+  for (let i = 0; i < 400 && !fs.existsSync(portFile); i++) await sleep(100); // a cold CI runner can take over 10 s
   if (!fs.existsSync(portFile)) fail(`Chrome gave no debugging port.\n${err.slice(-1500)}`);
   const [port, wsPath] = fs.readFileSync(portFile, 'utf8').trim().split('\n');
   return `ws://127.0.0.1:${port}${wsPath}`;
