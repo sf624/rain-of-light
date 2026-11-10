@@ -61,6 +61,7 @@ export function createTuner({ schema, settings, defaults, storageKey, onChange }
         input.step = item.step;
         out = document.createElement('output');
         input.addEventListener('input', () => set(item.key, Number(input.value)));
+        touchSlider(row, input);
       }
       row.append(name, input);
       if (out) row.append(out);
@@ -75,6 +76,44 @@ export function createTuner({ schema, settings, defaults, storageKey, onChange }
   document.body.append(toggle, root);
   refresh();
   let versionAsked = false;
+
+  // On a touch screen a slider moves only when a finger drags sideways: the
+  // CSS lets the slider itself ignore touches (pointer-events: none), so the
+  // row gets them; a vertical drag then scrolls the panel (touch-action: pan-y)
+  // and a tap does nothing, where the native slider jumps its thumb to the
+  // touch. The drag is relative: the value moves by as much as the finger,
+  // wherever it began. A mouse, a keyboard and assistive tools use the native
+  // slider (the CSS applies only to a coarse, hover-less main pointer).
+  const touchOnly = window.matchMedia('(hover: none) and (pointer: coarse)');
+  function touchSlider(row, input) {
+    const SLOP = 8; // CSS px before a drag counts as sideways
+    let g = null;   // { id, x, y, v, sideways }
+    row.addEventListener('pointerdown', (e) => {
+      if (!touchOnly.matches || e.pointerType === 'mouse') return;
+      g = { id: e.pointerId, x: e.clientX, y: e.clientY, v: Number(input.value), sideways: false };
+    });
+    row.addEventListener('pointermove', (e) => {
+      if (!g || e.pointerId !== g.id) return;
+      const dx = e.clientX - g.x;
+      if (!g.sideways) {
+        if (Math.abs(dx) < SLOP || Math.abs(dx) < Math.abs(e.clientY - g.y)) return;
+        g.sideways = true;
+        g.x += Math.sign(dx) * SLOP; // the value starts moving from here, not with a jump
+        try { row.setPointerCapture(e.pointerId); } catch { /* the drag then ends at the row's edge */ }
+      }
+      const min = Number(input.min), max = Number(input.max), step = Number(input.step) || 1;
+      const room = Math.max(1, input.getBoundingClientRect().width - 28); // the thumb's travel, about
+      let v = g.v + ((e.clientX - g.x) / room) * (max - min);
+      v = Math.min(max, Math.max(min, min + Math.round((v - min) / step) * step));
+      v = Number(v.toFixed(6));
+      if (String(v) === input.value) return;
+      input.value = v;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    const end = (e) => { if (g && e.pointerId === g.id) g = null; };
+    row.addEventListener('pointerup', end);
+    row.addEventListener('pointercancel', end);
+  }
 
   function button(text, title) {
     const b = document.createElement('button');

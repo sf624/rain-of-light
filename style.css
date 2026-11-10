@@ -154,6 +154,8 @@ body.hinting.idle .sound-toggle, body.hinting.idle .volume-bar { opacity: 0.6; }
   backdrop-filter: blur(6px);
   font-size: 12px;
   color: var(--fg);
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 .tuner[hidden] { display: none; }
 
@@ -216,7 +218,7 @@ body.hinting.idle .sound-toggle, body.hinting.idle .volume-bar { opacity: 0.6; }
   color: var(--dim);
 }
 .tuner-row input[type="range"], .tuner-row select { grid-area: input; width: 100%; margin: 3px 0 0; }
-.tuner-row input[type="range"] { accent-color: #9cc8ff; }
+.tuner-row input[type="range"] { accent-color: #9cc8ff; touch-action: pan-y; }
 .tuner-row select {
   padding: 3px 4px;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -224,4 +226,27 @@ body.hinting.idle .sound-toggle, body.hinting.idle .volume-bar { opacity: 0.6; }
   background: #11151c;
   color: var(--fg);
   font: inherit;
+}
+
+/* ---------- the panel on a touch screen ---------- */
+@media (hover: none) and (pointer: coarse) {
+  /* A finger scrolls the panel anywhere, also over a slider: the slider does
+     not take touches itself; tuner.js moves it on a sideways drag. */
+  .tuner { touch-action: pan-y; padding-left: 22px; padding-right: 22px; }
+  .tuner-head { margin-left: -22px; margin-right: -22px; padding-left: 22px; padding-right: 22px; }
+  .tuner-row input[type="range"] { pointer-events: none; height: 26px; }
+  .tuner-row { margin: 2px 0; padding: 4px 0; }
+  .tuner-row select { min-height: 34px; font-size: 13px; }
+  .tuner button:not(.tuner-toggle) { min-width: 40px; min-height: 34px; padding: 4px 12px; font-size: 13px; }
+}
+/* Held upright, the panel is a sheet over the lower part: the picture stays
+   in view above it while a value is tuned. */
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+  .tuner {
+    top: auto;
+    left: max(10px, env(safe-area-inset-left));
+    right: max(10px, env(safe-area-inset-right));
+    width: auto;
+    height: min(58dvh, 560px);
+  }
 }
