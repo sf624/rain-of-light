@@ -8,7 +8,19 @@ weather, the colours, the direction of the rain and the camera change on
 their own too. Calm generative music plays along and follows the show, and
 every ripple of light rings a bell.
 
-![A short clip of the piece: strands of amber light points, with drops of light falling through them as the camera walks among the strands](demo.gif)
+<table>
+  <tr>
+    <td align="center"><img src="docs/rain.gif" alt="Rain of light: teal drops fall in long strands of light points, and the camera circles slowly" width="100%"><br><sub>rain of light</sub></td>
+    <td align="center"><img src="docs/orb.gif" alt="An orb of warm white light glows in the still room above a mirror floor, with a blue layer of light along the floor" width="100%"><br><sub>an orb in the still room, with the layer</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/spiral.gif" alt="A spiral of pale blue light gathers above the mirror floor and is mirrored in it" width="100%"><br><sub>a spiral</sub></td>
+    <td align="center"><img src="docs/cloud.gif" alt="A cloud of pink light floats above the blue layer of light on the mirror floor" width="100%"><br><sub>a cloud</sub></td>
+  </tr>
+  <tr>
+    <td align="center" colspan="2"><img src="docs/storm.gif" alt="Rain of light falls through an orb of warm white light, and the drops take its amber colour" width="50%"><br><sub>rain falling through a form</sub></td>
+  </tr>
+</table>
 
 Plain WebGL2 and Web Audio: no build step, no dependencies, no media files.
 
@@ -35,7 +47,10 @@ Inspired by teamLab's *Light Sculpture - Point*.
 The screen stays awake while the page is showing (where the browser allows it).
 
 Browsers start sound only after a click or a key, so the music begins with
-your first click. The settings panel keeps what you change in this browser
+your first click or key press (unless you turned the sound off: that is
+remembered). A ripple also rings by itself now and then (Ripples in the
+panel), and a breathing guide swells the light and the pad slowly (Meditation
+in the panel; off with `?breath=off`). The settings panel keeps what you change in this browser
 (Reset brings back the defaults). Any setting can also be given in the URL,
 such as `?color=cloud&weather=drizzle`; `#tune` opens the panel.
 
@@ -55,6 +70,11 @@ A form that comes or goes while rain falls does so from the top down, as if
 rain gathered into it or it ran off as rain. Each passage lasts from about
 20 seconds to over a minute, and each visit has its own order. `?seed=` (any
 number) gives one order, and `?t=` (seconds) starts at that time in it.
+
+The weather of the rain (drizzle, rain) changes on its own too; the heavy
+ones, `shower` and `downpour`, never come by themselves: choose them with `w`
+or the Weather setting. When the rain turns between falling and sideways, the
+two cross-fade (Turn steps in the panel makes it turn in steps instead).
 
 Scene in the panel (or `?scene=`) pins the content: `mix` (the default, the
 whole show), `rain` (only the rain) or `crystal` (only the forms). It changes
@@ -123,6 +143,8 @@ work, because the scripts are ES modules.
 | `tuner.js` | the settings panel |
 | `manifest.webmanifest`, `icons/` | the install information and the app icons |
 | `sw.js` | the service worker: network first, cached files when offline (add new files to its list) |
+| `docs/` | the GIFs shown above |
+| `tools/` | makes those GIFs (see below) |
 | `test/smoke.mjs` | the smoke test (see Test) |
 | `test/render-audio.mjs` | renders the page's sound to a WAV file, for listening and measuring (see Test) |
 
@@ -159,6 +181,19 @@ writes `/tmp/sound.wav` (and the samples as floats, and the show's state over
 time as JSON). It runs the real page in headless Chrome on a fake clock, with
 an OfflineAudioContext in place of the AudioContext, so the show drives the
 sound exactly as it does live; see the top of the file for its limits.
+
+## The GIFs
+
+`docs/*.gif` are captured from the page itself, on a fake clock so that a run
+is repeatable: `tools/scenes.json` lists the scenes (URL parameters, size,
+length), `tools/capture-frames.mjs` saves their frames with Chrome, and
+`tools/make-gifs.py` (Pillow, numpy) scales them to 480x270, cross-fades the
+loop and writes the GIFs. They are not precached by the service worker.
+
+```sh
+node tools/capture-frames.mjs /tmp/frames   # needs Chrome; opens a window on the GPU
+python3 -I tools/make-gifs.py /tmp/frames docs
+```
 
 ## Licence
 
