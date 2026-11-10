@@ -4,8 +4,9 @@ A room of small points of light over a mirror floor. Rain of light falls
 through it; now and then the rain eases off and a large form of light gathers
 in the room (an orb, a spiral, a cloud), or glows while the rain falls through
 it. The show moves between these on its own, with slow cross-fades. The
-weather, the colours and the camera change on their own too. Calm generative
-music plays along, and every ripple of light rings a bell.
+weather, the colours, the direction of the rain and the camera change on
+their own too. Calm generative music plays along, and every ripple of light
+rings a bell.
 
 ![A short clip of the piece: strands of amber light points, with drops of light falling through them as the camera walks among the strands](demo.gif)
 
