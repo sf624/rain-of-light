@@ -1,0 +1,43 @@
+# Deploys the site to GitHub Pages and stamps version.json with the commit.
+# (Repository settings: Pages > Source = GitHub Actions.)
+name: pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never cancel a deploy that is running; a newer one waits its turn.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/configure-pages@v6
+      - name: Build the site directory
+        run: |
+          mkdir _site
+          # Only what the page, the manifest and the service worker load.
+          cp index.html style.css manifest.webmanifest favicon.svg og-image.jpg sw.js ./*.js _site/
+          cp -r icons _site/icons
+          printf '{"sha":"%s","date":"%s"}\n' "$GITHUB_SHA" \
+            "$(git log -1 --format=%cI "$GITHUB_SHA")" > _site/version.json
+          cat _site/version.json
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v5

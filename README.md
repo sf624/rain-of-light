@@ -126,6 +126,13 @@ work, because the scripts are ES modules.
 | `test/smoke.mjs` | the smoke test (see Test) |
 | `test/render-audio.mjs` | renders the page's sound to a WAV file, for listening and measuring (see Test) |
 
+## Version
+
+The link to this repository and the short commit hash being served are at the
+bottom of the settings panel. GitHub Pages deploys through
+`.github/workflows/pages.yml`, which writes `version.json` (the commit and its
+date) into the site; the file is not committed, so a local server shows only the link.
+
 ## Test
 
 ```sh
