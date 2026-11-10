@@ -2,8 +2,8 @@
 
 A room of small points of light over a mirror floor. Rain of light falls
 through it; now and then the rain eases off and a large form of light gathers
-in the room (an orb, a spiral, a cloud), or glows while the rain falls through
-it. The show moves between these on its own, with slow cross-fades. The
+in the room (an orb, a spiral, a cloud of points, a ring, a veil like an
+aurora), or glows while the rain falls through it. The show moves between these on its own, with slow cross-fades. The
 weather, the colours, the direction of the rain and the camera change on
 their own too. Calm generative music plays along and follows the show, and
 every ripple of light rings a bell.
@@ -68,7 +68,26 @@ image, towards that line. The show passes through:
 - **a still room**: only a layer of light near the floor, which also comes
   and goes beside the others.
 
-A form that comes or goes while rain falls does so from the top down, as if
+The forms move, slowly, each in its own way, and the mirror floor shows each
+move:
+
+- **orb**: rises out of the floor, meeting its own image there, drifts and
+  breathes; now and then it parts into two that drift apart and flow together
+  again; it goes by sinking back into the floor;
+- **spiral**: unfurls out of its bright core, its arms turning, and winds back
+  into it as it goes; it turns its face to the room, leaning to and fro;
+- **cloud**: a cloud of separate points in two colours that gathers as points
+  fall into place, drifts across the room, now and then parts in two, and
+  goes by rising away as points;
+- **ring**: rises out of the floor lying flat, beside its image, then stands up
+  and turns slowly; now and then it parts into two hoops that cross and come
+  back into one; it goes by lying down and sinking into the floor;
+- **veil**: a curtain of light like an aurora that unrolls from one end, its
+  folds travelling slowly along it, its rays rising from a bright lower edge;
+  it goes by lifting away upward.
+
+The layer near the floor takes a colour that answers the form above it. A
+form that comes or goes while rain falls does so from the top down, as if
 rain gathered into it or it ran off as rain. Each passage lasts from about
 20 seconds to over a minute, and each visit has its own order. `?seed=` (any
 number) gives one order, and `?t=` (seconds) starts at that time in it.
@@ -80,7 +99,7 @@ two cross-fade (Turn steps in the panel makes it turn in steps instead).
 
 Scene in the panel (or `?scene=`) pins the content: `mix` (the default, the
 whole show), `rain` (only the rain) or `crystal` (only the forms). It changes
-without a reload. `?form=orb` (spiral, cloud, none) and `?layer=on` (off)
+without a reload. `?form=orb` (spiral, cloud, ring, veil, none) and `?layer=on` (off)
 hold one form or the layer. `c` turns both the rain's colours and the forms'
 colours; `w` changes the weather, which also sets how many pale drops fall in
 a still room.
@@ -94,9 +113,10 @@ fades:
   pad in D major, a little veiled;
 - **a form**: as it gathers, a chord of its own blooms and the pad opens; each
   form has a voice that swells and fades with it, from the side where it is
-  seen: the orb a warm, low hum, the spiral a slow figure of notes that
-  climbs and turns, the cloud a high, airy shimmer. As it leaves, the
-  harmony comes home to D;
+  seen (it follows the form as it moves): the orb a warm, low hum, the spiral
+  a slow figure of notes that climbs and turns, the cloud a high, airy
+  shimmer, the ring a clear, glassy tone, the veil a soft, open air. As it
+  leaves, the harmony comes home to D;
 - **rain through a form**: both, fuller but not louder;
 - **a still room**: close to silence: the pad thins out, and now and then a
   high, soft note falls, like the room's pale drops;
@@ -134,7 +154,8 @@ work, because the scripts are ES modules.
 | `index.html`, `style.css` | the page |
 | `main.js` | the director that changes weather, colour, flow and camera, and the frame loop |
 | `config.js` | palettes, colour modes, weathers, camera moves, forms, passages, the room, default settings and the panel's layout |
-| `show.js` | the show's director: the timeline of passages, how much rain falls, which forms of light show, where, and how bright |
+| `show.js` | the show's director: the timeline of passages, how much rain falls, which forms of light show, and how bright |
+| `forms.js` | how each form of light moves through its life: where it is, how large and how turned |
 | `shaders.js` | the GLSL shaders: the points of light, bloom and tone mapping |
 | `lattice.js` | the strands and LEDs, and the order in which they thin out |
 | `gl.js` | WebGL helpers and vector maths |
@@ -167,8 +188,8 @@ Needs Node 22 and Chrome (`google-chrome` or `chromium` on PATH, or set
 `CHROME=/path/to/chrome`). It serves the repo, opens it in headless Chrome with
 software GL, and fails on any error, a shown fallback message, a stalled frame
 loop or a black canvas. It also clicks, presses the keys and tries every colour
-mode, the pinned scenes (`rain`, `crystal`) and a time part-way through the
-show, changes the scene in the panel (it must not reload) and checks that
+mode, the pinned scenes (`rain`, `crystal`), the newer forms (`ring`, `veil`)
+and a time part-way through the show, changes the scene in the panel (it must not reload) and checks that
 Reset brings back the mix. It also renders a few seconds of sound offline and
 checks that a held orb sounds, a still room is much quieter, and nothing
 clips. GitHub Actions runs it on every pull request and push to main.

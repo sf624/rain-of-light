@@ -279,6 +279,8 @@ await visit(cdp, base, '#tune', false);
 await visit(cdp, base, '?scene=rain', true);
 await visit(cdp, base, '?scene=crystal', true);
 await visit(cdp, base, '?seed=7&t=100', false);
+// The forms added later, each held part-way through its life (it has risen and turned).
+for (const f of ['ring', 'veil']) await visit(cdp, base, `?scene=crystal&form=${f}&seed=2&t=40`, false);
 
 // The sound follows the show: rendered offline on the page's own clock (see
 // render-audio.mjs), a held orb sounds (its voice, the pad) and a still room
