@@ -1,4 +1,9 @@
 :root {
+  /* The screen's safe areas, named for the picture's edges; body.turned swaps them. */
+  --sa-top: env(safe-area-inset-top);
+  --sa-right: env(safe-area-inset-right);
+  --sa-bottom: env(safe-area-inset-bottom);
+  --sa-left: env(safe-area-inset-left);
   color-scheme: dark;
   --bg: #000;
   --fg: rgba(255, 255, 255, 0.82);
@@ -6,6 +11,25 @@
 }
 
 * { box-sizing: border-box; }
+
+/* The rotate button turned the picture a quarter clockwise (rotate.js): the
+   body is as wide as the screen is tall, laid on its side. What is fixed in it
+   is fixed to the body, not to the screen. */
+body.turned {
+  --sa-top: env(safe-area-inset-right);
+  --sa-right: env(safe-area-inset-bottom);
+  --sa-bottom: env(safe-area-inset-left);
+  --sa-left: env(safe-area-inset-top);
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vh;
+  width: 100dvh;
+  height: 100vw;
+  transform-origin: 0 0;
+  transform: translateX(100vw) rotate(90deg);
+}
+body.turned #stage { width: 100%; height: 100%; }
 
 html, body {
   margin: 0;
@@ -29,8 +53,8 @@ html, body {
 
 .overlay {
   position: fixed;
-  left: max(16px, env(safe-area-inset-left));
-  bottom: max(20px, env(safe-area-inset-bottom));
+  left: max(16px, var(--sa-left));
+  bottom: max(20px, var(--sa-bottom));
   pointer-events: none;
   transition: opacity 2.5s ease;
 }
@@ -38,7 +62,7 @@ html, body {
 .overlay.hidden { opacity: 0; }
 /* On narrow screens the title sits above the buttons, the volume bar and its note. */
 @media (max-width: 520px) {
-  .overlay { bottom: calc(max(16px, env(safe-area-inset-bottom)) + 80px); }
+  .overlay { bottom: calc(max(16px, var(--sa-bottom)) + 80px); }
 }
 
 .overlay h1 {
@@ -70,10 +94,10 @@ html, body {
 body.idle, body.idle #stage { cursor: none; }
 
 /* ---------- settings panel ---------- */
-.tuner-toggle, .sound-toggle, .full-toggle {
+.tuner-toggle, .sound-toggle, .full-toggle, .rotate-toggle {
   position: fixed;
-  right: max(16px, env(safe-area-inset-right));
-  bottom: max(16px, env(safe-area-inset-bottom));
+  right: max(16px, var(--sa-right));
+  bottom: max(16px, var(--sa-bottom));
   width: 36px;
   height: 36px;
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -87,23 +111,31 @@ body.idle, body.idle #stage { cursor: none; }
   transition: opacity 0.6s ease;
 }
 /* From the right: settings, full screen (where the browser has it), sound, volume. */
-:root { --controls-right: max(16px, env(safe-area-inset-right)); --full-slot: 46px; }
+:root { --controls-right: max(16px, var(--sa-right)); --full-slot: 46px; --rot-slot: 0px; }
 body.no-fullscreen { --full-slot: 0px; }
+/* The rotate button, left of full screen: on touch screens only. */
+.rotate-toggle { display: none; }
+@media (hover: none) and (pointer: coarse) {
+  :root { --rot-slot: 46px; }
+  .rotate-toggle { display: grid; place-items: center; padding: 0; right: calc(var(--controls-right) + var(--full-slot) + 46px); }
+  .rotate-toggle svg { width: 17px; height: 17px; }
+  .rotate-toggle.active { opacity: 0.9; border-color: rgba(156, 200, 255, 0.6); color: #cfe4ff; }
+}
 .full-toggle { right: calc(var(--controls-right) + 46px); display: grid; place-items: center; padding: 0; }
 .full-toggle svg { width: 16px; height: 16px; }
 body.no-fullscreen .full-toggle { display: none; }
-.sound-toggle { right: calc(var(--controls-right) + var(--full-slot) + 46px); display: grid; place-items: center; padding: 0; }
+.sound-toggle { right: calc(var(--controls-right) + var(--full-slot) + var(--rot-slot) + 46px); display: grid; place-items: center; padding: 0; }
 .sound-toggle svg { width: 17px; height: 17px; }
 .sound-toggle.active .mute { display: none; }  /* struck through only while off */
-.tuner-toggle:hover, .tuner-toggle.active, .sound-toggle:hover, .full-toggle:hover { opacity: 1; }
+.tuner-toggle:hover, .tuner-toggle.active, .sound-toggle:hover, .full-toggle:hover, .rotate-toggle:hover { opacity: 1; }
 .sound-toggle.active { opacity: 0.9; border-color: rgba(156, 200, 255, 0.6); color: #cfe4ff; }
 body.idle .tuner-toggle:not(.active), body.idle .sound-toggle, body.idle .volume-bar,
-body.idle .full-toggle { opacity: 0; }
+body.idle .full-toggle, body.idle .rotate-toggle { opacity: 0; }
 /* A control with the keyboard focus stays visible, idle or not. */
-.tuner-toggle:focus-visible, .sound-toggle:focus-visible, .full-toggle:focus-visible,
+.tuner-toggle:focus-visible, .sound-toggle:focus-visible, .full-toggle:focus-visible, .rotate-toggle:focus-visible,
 .volume-bar:focus-visible,
 body.idle .tuner-toggle:focus-visible, body.idle .sound-toggle:focus-visible,
-body.idle .full-toggle:focus-visible, body.idle .volume-bar:focus-visible {
+body.idle .full-toggle:focus-visible, body.idle .rotate-toggle:focus-visible, body.idle .volume-bar:focus-visible {
   opacity: 1;
   outline: 2px solid #9cc8ff;
   outline-offset: 2px;
@@ -112,9 +144,9 @@ body.idle .full-toggle:focus-visible, body.idle .volume-bar:focus-visible {
 /* ---------- volume bar, left of the note button ---------- */
 .volume-bar {
   position: fixed;
-  right: calc(var(--controls-right) + var(--full-slot) + 92px);
-  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 11px);
-  width: min(120px, calc(100vw - 186px));
+  right: calc(var(--controls-right) + var(--full-slot) + var(--rot-slot) + 92px);
+  bottom: calc(max(16px, var(--sa-bottom)) + 11px);
+  width: min(120px, calc(100% - 186px - var(--full-slot) - var(--rot-slot)));
   height: 14px;
   margin: 0;
   accent-color: #9cc8ff;
@@ -127,8 +159,8 @@ body.idle .full-toggle:focus-visible, body.idle .volume-bar:focus-visible {
 /* ---------- a note on the sound controls, shown for a while at the start ---------- */
 .sound-hint {
   position: fixed;
-  right: max(16px, env(safe-area-inset-right));
-  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 46px);
+  right: max(16px, var(--sa-right));
+  bottom: calc(max(16px, var(--sa-bottom)) + 46px);
   margin: 0;
   font-size: 12px;
   letter-spacing: 0.12em;
@@ -143,9 +175,9 @@ body.hinting.idle .sound-toggle, body.hinting.idle .volume-bar { opacity: 0.6; }
 .tuner {
   position: fixed;
   top: 16px;
-  right: max(16px, env(safe-area-inset-right));
+  right: max(16px, var(--sa-right));
   bottom: 64px;
-  width: min(300px, calc(100vw - 32px));
+  width: min(300px, calc(100% - 32px));
   overflow-y: auto;
   padding: 10px 14px 14px;
   border: 1px solid rgba(255, 255, 255, 0.14);
@@ -241,12 +273,17 @@ body.hinting.idle .sound-toggle, body.hinting.idle .volume-bar { opacity: 0.6; }
 }
 /* Held upright, the panel is a sheet over the lower part: the picture stays
    in view above it while a value is tuned. */
-@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
-  .tuner {
+@media (hover: none) and (pointer: coarse) {
+  body.portrait .tuner {
     top: auto;
-    left: max(10px, env(safe-area-inset-left));
-    right: max(10px, env(safe-area-inset-right));
+    left: max(10px, var(--sa-left));
+    right: max(10px, var(--sa-right));
     width: auto;
-    height: min(58dvh, 560px);
+    height: min(58%, 560px);
   }
+}
+
+/* touch-action does not follow the rotation: a turned panel scrolls along the screen's x. */
+@media (hover: none) and (pointer: coarse) {
+  body.turned .tuner, body.turned .tuner-row input[type="range"] { touch-action: pan-x; }
 }

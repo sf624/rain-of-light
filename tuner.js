@@ -1,6 +1,8 @@
 // A small panel of sliders and selects bound to a settings object.
 // Settings are saved in this browser, so tuning survives a reload.
 
+import { view } from './rotate.js';
+
 export function createTuner({ schema, settings, defaults, storageKey, onChange }) {
   const toggle = document.createElement('button');
   toggle.className = 'tuner-toggle';
@@ -86,24 +88,26 @@ export function createTuner({ schema, settings, defaults, storageKey, onChange }
   // slider (the CSS applies only to a coarse, hover-less main pointer).
   const touchOnly = window.matchMedia('(hover: none) and (pointer: coarse)');
   function touchSlider(row, input) {
+    const at = (e) => view.point(e.clientX, e.clientY); // the panel may be turned with the picture
     const SLOP = 8; // CSS px before a drag counts as sideways
     let g = null;   // { id, x, y, v, sideways }
     row.addEventListener('pointerdown', (e) => {
       if (!touchOnly.matches || e.pointerType === 'mouse') return;
-      g = { id: e.pointerId, x: e.clientX, y: e.clientY, v: Number(input.value), sideways: false };
+      g = { id: e.pointerId, ...at(e), v: Number(input.value), sideways: false };
     });
     row.addEventListener('pointermove', (e) => {
       if (!g || e.pointerId !== g.id) return;
-      const dx = e.clientX - g.x;
+      const p = at(e);
+      const dx = p.x - g.x;
       if (!g.sideways) {
-        if (Math.abs(dx) < SLOP || Math.abs(dx) < Math.abs(e.clientY - g.y)) return;
+        if (Math.abs(dx) < SLOP || Math.abs(dx) < Math.abs(p.y - g.y)) return;
         g.sideways = true;
         g.x += Math.sign(dx) * SLOP; // the value starts moving from here, not with a jump
         try { row.setPointerCapture(e.pointerId); } catch { /* the drag then ends at the row's edge */ }
       }
       const min = Number(input.min), max = Number(input.max), step = Number(input.step) || 1;
-      const room = Math.max(1, input.getBoundingClientRect().width - 28); // the thumb's travel, about
-      let v = g.v + ((e.clientX - g.x) / room) * (max - min);
+      const room = Math.max(1, input.offsetWidth - 28); // the thumb's travel, about
+      let v = g.v + ((p.x - g.x) / room) * (max - min);
       v = Math.min(max, Math.max(min, min + Math.round((v - min) / step) * step));
       v = Number(v.toFixed(6));
       if (String(v) === input.value) return;
