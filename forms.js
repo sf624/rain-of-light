@@ -9,8 +9,9 @@
 // (f[0..2], see each); dissolve (0 .. 1) lifts the form away as rising points
 // (or, falling back, gathers it out of them); bound is how far from the
 // centre any of its light reaches, so LEDs farther away skip it.
-// `face` is the way from the form towards the eye (an angle about the
-// vertical, eased in show.js), for the forms that turn a face to the room.
+// `face` is the way from the eye towards the form (an angle about the
+// vertical, eased in show.js): some forms turn a face to the room, and some
+// keep beyond their path as the eye sees it (see BACK).
 
 import { ROOM } from './config.js';
 
@@ -29,16 +30,16 @@ const swell = (age, first, every, len) => {
 // into it as it goes. Between, it drifts, breathes, and now and then parts
 // into two that drift apart and flow together again.
 // f: how far each half has moved from the centre (x, z), and how far it has
-// risen (its core burns white only once it is clear of the floor).
-function orb(age, leave, ph) {
-  const size = 3.6 + 0.35 * Math.sin(0.11 * age + ph);
-  const hover = -2.2 + 1.0 * Math.sin(0.03 * age + ph);
+// risen (its heart glows only once it is clear of the floor).
+function orb(age, leave, ph, face) {
+  const size = 3.3 + 0.3 * Math.sin(0.11 * age + ph);
+  const hover = -2.4 + 0.9 * Math.sin(0.03 * age + ph);
   const deep = FLOOR - size * 1.1;                  // below the floor, out of sight
   const y = mix(mix(deep, hover, smooth(age / 22)), deep, smooth(leave * 1.1) * 0.75);
-  const apart = 2.4 * swell(age, 30, 110, 46);
-  const way = 0.02 * age + ph;
+  const apart = 2.3 * swell(age, 30, 110, 46);
+  const way = 0.02 * age + ph, drift = 2.6;
   return {
-    centre: [3.2 * Math.sin(0.035 * age + ph), y, 3.2 * Math.cos(0.028 * age + ph)],
+    centre: [drift * Math.sin(0.035 * age + ph), y, drift * Math.cos(0.028 * age + ph)],
     size, f: [apart * Math.cos(way), apart * Math.sin(way), smooth((y - FLOOR) / size)],
     bound: size * 1.3 + apart,
   };
@@ -49,9 +50,9 @@ function orb(age, leave, ph) {
 // it would read as a plain column), leaning a little to and fro.
 // f[0]: how far it has unfurled (0.15 .. 1).
 function spiral(age, leave, ph, face) {
-  const size = 7.2;
+  const size = 7.2, drift = 2.0;
   return {
-    centre: [2.0 * Math.sin(0.025 * age + ph), -1.6 + 0.7 * Math.sin(0.02 * age + ph), 2.0 * Math.cos(0.02 * age + ph)],
+    centre: [drift * Math.sin(0.025 * age + ph), -1.6 + 0.7 * Math.sin(0.02 * age + ph), drift * Math.cos(0.02 * age + ph)],
     size, turn: 0.1 * age + ph,
     yaw: face + 0.75 * Math.sin(0.031 * age + ph),
     tilt: 1.4 + 0.3 * Math.sin(0.023 * age + 2 * ph),
@@ -60,19 +61,19 @@ function spiral(age, leave, ph, face) {
   };
 }
 
-// A cloud of points: gathers as points fall into place, drifts across the
-// room, and now and then parts into two drifts that come together again; it
-// goes by rising away as points.
+// A cloud of points: a few puffs over a flat base. It gathers as points fall
+// into place, drifts across the room, and now and then parts into two drifts
+// that come together again; it goes by rising away as points.
 // f: how far each drift has moved from the centre (x, z).
-function cloud(age, leave, ph) {
-  const size = 6.2;
-  const apart = 4.2 * swell(age, 20, 90, 50);
+function cloud(age, leave, ph, face) {
+  const size = 3.0;           // about one puff's radius
+  const apart = 2.6 * swell(age, 24, 90, 50);
   const way = -0.015 * age + ph;
   return {
-    centre: [5.0 * Math.sin(0.022 * age + ph), -2.2 + 0.7 * Math.sin(0.03 * age), 4.0 * Math.sin(0.017 * age + 2 * ph + 1)],
+    centre: [3.2 * Math.sin(0.022 * age + ph), -3.3 + 0.5 * Math.sin(0.03 * age), 2.8 * Math.sin(0.017 * age + 2 * ph + 1)],
     size, f: [apart * Math.cos(way), apart * Math.sin(way), 0],
     dissolve: Math.max(0.85 * (1 - smooth(age / 14)), smooth(leave * 1.1)),
-    bound: size * 1.5 + apart,
+    bound: size * 2.6 + apart,
   };
 }
 
@@ -82,12 +83,12 @@ function cloud(age, leave, ph) {
 // and sinking into the floor.
 // f[0]: how far the two hoops lean apart (radians).
 function ring(age, leave, ph, face) {
-  const size = 3.7;
+  const size = 3.7, drift = 1.8;
   const up = smooth((age - 6) / 22) * (1 - smooth(leave * 1.2));   // 0 lying .. 1 standing
   const rise = smooth(age / 16) * (1 - smooth(leave * 1.1 - 0.2));
-  const y = mix(FLOOR - 0.9, -2.0 + 0.6 * Math.sin(0.025 * age + ph), rise);
+  const y = mix(FLOOR - 0.9, -2.5 + 0.5 * Math.sin(0.025 * age + ph), rise);
   return {
-    centre: [1.8 * Math.sin(0.02 * age + ph), y, 1.8 * Math.cos(0.017 * age + ph)],
+    centre: [drift * Math.sin(0.02 * age + ph), y, drift * Math.cos(0.017 * age + ph)],
     size, turn: 0.12 * age + ph,
     yaw: face + 0.4 * Math.sin(0.027 * age + ph),
     tilt: mix(0, 1.9 + 0.2 * Math.sin(0.021 * age + ph), up),   // standing, it leans a little towards the eye below
@@ -96,28 +97,35 @@ function ring(age, leave, ph, face) {
   };
 }
 
-// A veil, like an aurora: a curtain of light that unrolls from one end, its
-// folds slowly travelling along it, its rays rising from a bright lower edge;
-// it sways slowly about the way it faces the room, and goes by lifting away upward.
-// f[0]: how much of it has unrolled (0 .. 1); f[1]: how far it has lifted.
+// A veil, like an aurora: a curtain of light across the room, hanging in
+// folds that slowly travel along it, its rays rising from a bright lower
+// hem; it unrolls from one end, sways slowly about the way it faces the
+// room, and goes by lifting away upward.
+// f[0]: how much of it has unrolled (0 .. 1); f[1]: how far it has lifted;
+// f[2]: half its length.
 function veil(age, leave, ph, face) {
-  const size = 5.5;
+  const size = 5.2;                                 // the height of its longest rays
+  const half = 9.5, drift = 1.5;
   return {
-    centre: [2.0 * Math.sin(0.015 * age + ph), -3.6 + 0.4 * Math.sin(0.03 * age + ph), 2.0 * Math.cos(0.012 * age + ph)],
-    size, turn: 0.06 * age + ph * 3,
-    yaw: face + 0.6 * Math.sin(0.017 * age + ph * 2),
-    f: [smooth(age / 20), 6 * smooth(leave), 0],
+    centre: [drift * Math.sin(0.015 * age + ph), -3.2 + 0.35 * Math.sin(0.03 * age + ph), drift * Math.cos(0.012 * age + ph)],
+    size, turn: 0.05 * age + ph * 3,
+    yaw: face + 0.16 * Math.sin(0.017 * age + ph * 2),
+    f: [smooth(age / 20), 6 * smooth(leave), half],
     dissolve: 0.5 * smooth(leave),
-    bound: 11 + 6 * smooth(leave),
+    bound: half + size + 3 + 6 * smooth(leave),
   };
 }
 
 export const MOTIONS = { orb, spiral, cloud, ring, veil };
-// The forms that turn a face to the room (show.js eases `face` for them).
-export const FACING = new Set(['spiral', 'ring', 'veil']);
+// How far beyond its own path each form keeps, as the eye sees it: the loose
+// and the wide ones read from a distance, and none flares right at the eye.
+const BACK = { orb: 1.5, ring: 1.5, cloud: 3.5, veil: 3 };
 
-// The form's place at its age: the defaults filled in.
+// The form's place at its age: the defaults filled in. anchor is the place
+// on its own path (the eye's way to it gives `face`); centre is where it shows.
 export function motion(name, age, leave, r, face) {
   const m = MOTIONS[name](age, leave, r * TAU, face);
-  return { turn: 0, tilt: 0, yaw: 0, f: [0, 0, 0], dissolve: 0, ...m };
+  const [x, y, z] = m.centre, back = BACK[name] || 0;
+  return { turn: 0, tilt: 0, yaw: 0, f: [0, 0, 0], dissolve: 0, ...m,
+    anchor: m.centre, centre: [x + back * Math.sin(face), y, z + back * Math.cos(face)] };
 }
