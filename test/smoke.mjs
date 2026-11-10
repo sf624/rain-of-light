@@ -11,8 +11,8 @@ import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const TIMEOUT_MS = 420_000;
-const MIN_FRAMES = 4; // software GL is slow: a few frames per second
+const TIMEOUT_MS = 780_000;
+const MIN_FRAMES = 4; // software GL is slow: a few frames per second, so the page is small (480x300)
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
   '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.json': 'application/json' };
 
@@ -67,7 +67,7 @@ async function startChrome() {
     '--headless=new', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--use-gl=angle',
     '--ignore-gpu-blocklist', '--no-sandbox', '--disable-dev-shm-usage', '--no-first-run',
     '--disable-background-timer-throttling', '--disable-renderer-backgrounding',
-    '--autoplay-policy=no-user-gesture-required', '--window-size=800,500',
+    '--autoplay-policy=no-user-gesture-required', '--window-size=480,300',
     '--remote-debugging-port=0', `--user-data-dir=${userDir}`, 'about:blank',
   ], { detached: true, stdio: ['ignore', 'ignore', 'pipe'] }); // own process group, killed as a whole
   let err = '';
@@ -163,7 +163,7 @@ async function visit(cdp, base, query, interact) {
     }
   });
   for (const d of ['Runtime', 'Log', 'Network', 'Page']) await s(`${d}.enable`);
-  await s('Emulation.setDeviceMetricsOverride', { width: 800, height: 500, deviceScaleFactor: 1, mobile: false });
+  await s('Emulation.setDeviceMetricsOverride', { width: 480, height: 300, deviceScaleFactor: 1, mobile: false });
   await s('Page.addScriptToEvaluateOnNewDocument', { source: COUNT_RAF });
   await s('Page.navigate', { url: `${base}${query}` });
   const evalJs = async (expression) => {
@@ -182,9 +182,9 @@ async function visit(cdp, base, query, interact) {
   for (let i = 0; i < 30 && (f2 < MIN_FRAMES || f2 - state.f < 3); i++) { await sleep(500); f2 = await evalJs('window.__frames'); }
   if (f2 < MIN_FRAMES || f2 - state.f < 3) fail(`[${label}] frame loop not advancing (${state.f} -> ${f2} frames in 15 s)`);
   if (interact) {
-    await s('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 400, y: 250 });
-    await s('Input.dispatchMouseEvent', { type: 'mousePressed', x: 400, y: 250, button: 'left', clickCount: 1 });
-    await s('Input.dispatchMouseEvent', { type: 'mouseReleased', x: 400, y: 250, button: 'left', clickCount: 1 });
+    await s('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 200, y: 120 });
+    await s('Input.dispatchMouseEvent', { type: 'mousePressed', x: 200, y: 120, button: 'left', clickCount: 1 });
+    await s('Input.dispatchMouseEvent', { type: 'mouseReleased', x: 200, y: 120, button: 'left', clickCount: 1 });
     await sleep(500);
     for (const k of 'cwdvpmpm') { // p and m twice: panel and sound go back
       await s('Input.dispatchKeyEvent', { type: 'keyDown', key: k, text: k, code: `Key${k.toUpperCase()}` });
