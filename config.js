@@ -10,18 +10,20 @@ export const PALETTES = [
   { name: 'deep sea', a: [0.10, 0.35, 1.00], b: [0.30, 0.95, 1.00] },
   { name: 'candle',   a: [1.00, 0.85, 0.55], b: [1.00, 1.00, 0.95] },
 ];
+// The pale ones: light of these has little colour of its own.
+export const PALE = ['ice', 'candle'];
 
 // Weather: how fast the drops fall (flow) and how many extra drops join (rain).
 export const WEATHER = [
-  { name: 'drizzle',  flow: 0.6, rain: 0.0,  hold: [10, 18], weight: 2 },
+  { name: 'drizzle',  flow: 0.6, rain: 0.08, hold: [10, 18], weight: 2 },
   { name: 'rain',     flow: 1.0, rain: 0.25, hold: [12, 22], weight: 3 },
   { name: 'shower',   flow: 1.9, rain: 0.6,  hold: [8, 14],  weight: 0 },   // the two heavy ones never come on their own:
   { name: 'downpour', flow: 3.6, rain: 1.0,  hold: [6, 12],  weight: 0 },   // only by the w key or the Weather setting
 ];
-// Direction: rain falls from above, or now and then flows sideways, each time a new way.
+// Direction: rain falls from above, or now and then flows sideways for a while, each time a new way.
 export const FLOWS = [
-  { name: 'down',   toward: 0, hold: [20, 40], weight: 3 },
-  { name: 'across', toward: 1, hold: [20, 40], weight: 1 },
+  { name: 'down',   toward: 0, hold: [26, 44], weight: 3 },
+  { name: 'across', toward: 1, hold: [14, 24], weight: 1 },
 ];
 // Colour modes. Their order is the order of the weights uW in the shader.
 export const COLOR_MODES = [
@@ -29,7 +31,7 @@ export const COLOR_MODES = [
   { name: 'gradient', hold: [14, 24], weight: 2 },   // two palettes, flowing
   { name: 'rainbow',  hold: [10, 18], weight: 1.5 }, // a random hue per drop
   { name: 'palette',  hold: [14, 24], weight: 2 },   // each drop picks from a set of colours
-  { name: 'accent',   hold: [14, 24], weight: 1.5 }, // white rain, now and then a coloured drop
+  { name: 'accent',   hold: [12, 20], weight: 1 },   // pale rain, now and then a coloured drop
   { name: 'comet',    hold: [12, 20], weight: 1.5 }, // white heads, coloured trails
   { name: 'speed',    hold: [12, 20], weight: 1 },   // slow drops warm, fast ones blue-white
   { name: 'cloud',    hold: [16, 28], weight: 2 },   // drifting clouds of colour
@@ -42,7 +44,7 @@ export const MODE = Object.fromEntries(COLOR_MODES.map((m, i) => [m.name, i]));
 
 // Sets of colours for the palette rain.
 export const SETS = [
-  { name: 'pastel', c: [[1.0, 0.62, 0.75], [0.62, 0.85, 1.0], [0.72, 1.0, 0.72], [1.0, 0.92, 0.6]] },
+  { name: 'pastel', c: [[1.0, 0.45, 0.65], [0.42, 0.72, 1.0], [0.5, 1.0, 0.6], [1.0, 0.82, 0.38]] },
   { name: 'neon',   c: [[1.0, 0.1, 0.6], [0.1, 0.9, 1.0], [0.7, 1.0, 0.1], [0.6, 0.2, 1.0]] },
   { name: 'wa',     c: [[0.93, 0.25, 0.15], [0.15, 0.3, 0.85], [1.0, 0.72, 0.1], [0.45, 0.8, 0.35]] },
   { name: 'sunset', c: [[1.0, 0.35, 0.1], [1.0, 0.62, 0.2], [0.9, 0.2, 0.45], [0.55, 0.25, 0.9]] },
@@ -58,7 +60,7 @@ export const DEPTHS = [                                       // near, far
 // The sky through one day: colour at the top, colour at the bottom.
 export const SKY = [
   [[0.35, 0.35, 0.95], [1.0, 0.55, 0.45]],  // dawn
-  [[0.45, 0.75, 1.0], [0.92, 0.96, 1.0]],   // day
+  [[0.25, 0.6, 1.0], [0.7, 0.9, 1.0]],      // day
   [[0.6, 0.25, 0.85], [1.0, 0.45, 0.12]],   // dusk
   [[0.08, 0.15, 0.65], [0.35, 0.45, 0.95]], // night
 ];
@@ -75,9 +77,9 @@ export const CAMERAS = [
 // next); the layer (a sea of light near the floor) comes and goes beside
 // them. Each form picks its colours from a few of the palettes.
 export const FORMS = [
-  { name: 'orb',    type: 0, palettes: ['amber', 'candle', 'sakura', 'ice'] },
+  { name: 'orb',    type: 0, palettes: ['amber', 'candle', 'sakura', 'deep sea'] },
   { name: 'spiral', type: 1, palettes: ['deep sea', 'sakura', 'ice', 'aurora'] },
-  { name: 'cloud',  type: 3, palettes: ['sakura', 'aurora', 'ice', 'deep sea'] },
+  { name: 'cloud',  type: 3, palettes: ['sakura', 'aurora', 'amber', 'deep sea'] },
   { name: 'ring',   type: 4, palettes: ['amber', 'aurora', 'sakura', 'deep sea'] },
   { name: 'veil',   type: 5, palettes: ['aurora', 'sakura', 'deep sea', 'amber'] },
 ];
@@ -108,7 +110,7 @@ export const SCENES = ['mix', 'rain', 'crystal'];
 export const DEFAULTS = {
   scene: 'mix', form: 'auto', layer: 'auto', mirror: 0.6, walls: 0, haze: 1.5, burn: 0.7, twinkle: 0.4, rainShare: 1,
   grid: small ? 44 : 72,  rows: small ? 72 : 96,
-  layout: 'strands', density: 'auto', strandShare: 1.0, rowShare: 1.0, strandMin: 0.5, rowMin: 0.55,
+  layout: 'strands', density: 'auto', strandShare: 1.0, rowShare: 1.0, strandMin: 0.66, rowMin: 0.68,
   size: 0.018, maxPx: 4.5, rest: 0.03, wire: 0.2,
   rainGain: 4.0, tipGain: 5.0, exposure: 1.8, bloom: 0.8, fog: 34, blackFloor: 3,
   rays: '2', rayGain: 0.3, rayLength: 20, rayThreshold: 0.7,
@@ -186,14 +188,14 @@ export const SCHEMA = [
     { key: 'speed', label: 'Speed (x)', min: 0, max: 4, step: 0.05 },
     { key: 'trail', label: 'Trail length (x)', min: 0.2, max: 4, step: 0.05 },
     { key: 'flow', label: 'Direction', options: ['auto', 'down', 'across'],
-      hint: 'down: from above / across: sideways (a random way each time)' },
+      hint: 'down: from above / across: sideways (a new way each time)' },
     { key: 'turnTime', label: 'Turn time (s)', min: 1, max: 30, step: 0.5 },
     { key: 'turnSteps', label: 'Turn steps (1: cross-fade)', min: 1, max: 18, step: 1 },
   ] },
   { title: 'Colour', items: [
     { key: 'color', label: 'Colour mode', options: ['auto', ...COLOR_MODES.map((m) => m.name)],
       hint: 'mono: one palette / gradient: flowing gradient / rainbow: a hue per drop / '
-        + 'palette: each drop picks from a set / accent: white rain, now and then a coloured drop / '
+        + 'palette: each drop picks from a set / accent: pale rain, now and then a coloured drop / '
         + 'comet: white heads, coloured trails / speed: colour by speed / cloud: drifting clouds of colour / '
         + 'depth: near and far / repaint: waves repaint the field / sky: a day goes by' },
     { key: 'rainbow', label: 'Rainbow style', options: ['drop', 'led', 'bands'],

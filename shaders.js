@@ -17,25 +17,35 @@ uniform float uSize;
 const float FLOW_WRAP = ${FLOW_WRAP}.0;
 uniform float uFlow;  // falling time: integrated, so speed changes never make drops jump; wrapped at FLOW_WRAP
 uniform float uRain;  // 0 light rain .. 1 downpour
-uniform float uW[11]; // weights of the colour modes, in the order of COLOR_MODES
-uniform vec3 uSet[4];  // palette rain: the colours drops pick from
-uniform vec3 uAccent;  // accent: the colour of the rare drop
-uniform vec3 uNear;    // depth: colour near the eye
-uniform vec3 uFar;     // depth: colour far away
-uniform float uCloudHue; // colour clouds: base hue
+// The rain's colours come as two looks, and each strand shows one of them
+// (uSide: how far the strands have gone over from the first to the second):
+// a new colour takes the rain over strand by strand, never as a blend of
+// two colours, which goes grey. main() copies the strand's look into the
+// globals below.
+uniform float uW[22];    // per look: weights of the colour modes, in the order of COLOR_MODES
+uniform vec3 uSet[8];    // palette rain: the colours drops pick from
+uniform vec3 uAccent[2]; // accent: the colour of the rare drop
+uniform vec3 uNear[2];   // depth: colour near the eye
+uniform vec3 uFar[2];    // depth: colour far away
+uniform float uCloudHue[2]; // colour clouds: base hue
+uniform vec3 uGrad0[2];
+uniform vec3 uGrad1[2];
+uniform vec3 uColA[2];
+uniform vec3 uColB[2];
+uniform float uSide;
+float W[11];
+vec3 Set[4];
+vec3 Accent, Near, Far, Grad0, Grad1, ColA, ColB;
+float CloudHue;
 uniform vec3 uSky0;    // sky: colour at the top
 uniform vec3 uSky1;    // sky: colour at the bottom
 uniform float uFlowRate; // how fast the rain falls now (weather)
-uniform vec3 uGrad0;
-uniform vec3 uGrad1;
 uniform float uTurn;       // 0 rain falls down .. 1 light flows sideways
 uniform float uTurnSteps;  // steps the flow turns through on the way
 uniform vec2 uFlowDir;  // horizontal direction of that flow
 uniform vec2 uLane;     // lane width across the flow, lane height
 uniform float uSpan;
 uniform float uFogFar;
-uniform vec3 uColA;
-uniform vec3 uColB;
 uniform vec4 uRipples[8]; // xyz center, w start time
 uniform float uRest;
 uniform float uRainGain;
@@ -94,32 +104,32 @@ vec3 bowAt(float hue) { return hsv2rgb(vec3(fract(hue), uSat, 1.0)) * 1.4; }
 // The rainbow is added here only as bands; per drop and per LED come later.
 vec3 flowColor(float along, float spatial, float h) {
   float phase = along - uBandShift + spatial;
-  vec3 mono = mix(uColA, uColB, h);
-  vec3 grad = mix(uGrad0, uGrad1, 0.5 + 0.5 * sin(phase * 6.2832 * 0.9 * uBandScale));
+  vec3 mono = mix(ColA, ColB, h * h * 0.85);       // mostly the deep colour, some LEDs paler
+  vec3 grad = mix(Grad0, Grad1, 0.5 + 0.5 * sin(phase * 6.2832 * 0.9 * uBandScale));
   vec3 bow = uBowStyle < 0.5 ? bowAt(phase * 0.7 * uBandScale) : vec3(0.0);
-  return mono * uW[0] + grad * uW[1] + bow * uW[2];
+  return mono * W[0] + grad * W[1] + bow * W[2];
 }
 
 // Colours of the field itself, whatever the flow: drifting clouds of colour,
 // near and far, the colour the last wave painted, and the sky.
 vec3 placeColor(vec3 pos, float u, float dist) {
   vec3 c = vec3(0.0);
-  if (uW[7] > 0.001) {
+  if (W[7] > 0.001) {
     vec3 drift = vec3(uTime * 0.35, uTime * 0.04, uTime * 0.18);
     float n = noise3(pos * 0.14 + drift) * 0.7 + noise3(pos * 0.37 - drift * 0.6) * 0.3;
-    c += hsv2rgb(vec3(fract(uCloudHue + smoothstep(0.3, 0.7, n) * 0.4), 0.85, 1.0)) * 1.3 * uW[7];
+    c += hsv2rgb(vec3(fract(CloudHue + smoothstep(0.3, 0.7, n) * 0.4), 0.85, 1.0)) * 1.3 * W[7];
   }
-  if (uW[8] > 0.001) c += mix(uNear, uFar, smoothstep(2.5, uFogFar * 0.7, dist)) * uW[8];
-  if (uW[9] > 0.001) {
+  if (W[8] > 0.001) c += mix(Near, Far, smoothstep(2.5, uFogFar * 0.7, dist)) * W[8];
+  if (W[9] > 0.001) {
     float last = -1e9;                       // the latest wave that has passed this LED
     for (int i = 0; i < 8; i++) {
       vec4 r = uRipples[i];
       float age = uTime - r.w;
       if (age > 0.0 && r.w > last && length(pos - r.xyz) < age * 3.6) last = r.w;
     }
-    c += hsv2rgb(vec3(hash(last * 0.731), 0.8, 1.0)) * 1.3 * uW[9];
+    c += hsv2rgb(vec3(hash(last * 0.731), 0.8, 1.0)) * 1.3 * W[9];
   }
-  if (uW[10] > 0.001) c += mix(uSky0, uSky1, u) * uW[10];
+  if (W[10] > 0.001) c += mix(uSky0, uSky1, u) * W[10];
   return c;
 }
 
@@ -127,17 +137,17 @@ vec3 placeColor(vec3 pos, float u, float dist) {
 vec3 dropColor(float sd, float cycle) {
   float r = hash(sd + cycle * 13.37);
   vec3 c = vec3(0.0);
-  if (uW[2] > 0.001 && uBowStyle > 0.5 && uBowStyle < 1.5) c += bowAt(r) * uW[2];
-  if (uW[3] > 0.001) c += uSet[int(min(r * 4.0, 3.0))] * 1.2 * uW[3];
-  if (uW[4] > 0.001) {
+  if (W[2] > 0.001 && uBowStyle > 0.5 && uBowStyle < 1.5) c += bowAt(r) * W[2];
+  if (W[3] > 0.001) c += Set[int(min(r * 4.0, 3.0))] * 1.2 * W[3];
+  if (W[4] > 0.001) {
     bool rare = hash(sd + cycle * 7.13 + 3.1) < 0.1;
-    c += (rare ? uAccent * 2.3 : vec3(0.9, 0.93, 1.0)) * uW[4];
+    c += (rare ? Accent * 2.3 : mix(vec3(0.9, 0.93, 1.0), ColA, 0.4)) * W[4];
   }
-  if (uW[6] > 0.001) {
+  if (W[6] > 0.001) {
     // Slow drops glow warm, fast ones blue-white; a downpour turns it all pale.
     float s = clamp(pow(hash(sd + 1.0), 1.5) * 0.8 + (uFlowRate - 1.0) * 0.25, 0.0, 1.0);
     c += (s < 0.5 ? mix(vec3(1.0, 0.32, 0.08), vec3(1.0, 0.88, 0.7), s * 2.0)
-                  : mix(vec3(1.0, 0.88, 0.7), vec3(0.5, 0.78, 1.0), s * 2.0 - 1.0)) * 1.2 * uW[6];
+                  : mix(vec3(1.0, 0.88, 0.7), vec3(0.5, 0.78, 1.0), s * 2.0 - 1.0)) * 1.2 * W[6];
   }
   return c;
 }
@@ -166,11 +176,12 @@ const vec3 HEAD = vec3(1.0, 0.97, 0.92);
 void gather(inout Lit L, vec4 r, float sd, float w) {
   vec3 now = dropColor(sd, r.w);
   vec3 before = dropColor(sd, r.w - 1.0);
-  vec3 tail = uColA * 1.2 * uW[5];
+  vec3 tail = ColA * 1.2 * W[5];
   L.rain += (r.x + r.y) * w;
   L.tip += r.z * w;
-  L.rainCol += ((now + mix(tail, HEAD * uW[5], r.x * r.x)) * r.x + (before + tail) * r.y) * w;
-  L.tipCol += (now + HEAD * uW[5]) * r.z * w;
+  float x2 = r.x * r.x;                              // the white of the head reaches only a little way back
+  L.rainCol += ((now + mix(tail, HEAD * W[5], x2 * x2 * x2)) * r.x + (before + tail) * r.y) * w;
+  L.tipCol += (now + HEAD * W[5]) * r.z * w;
 }
 
 // The rain on one strand: two drops at their own pace; in heavy rain two more
@@ -199,7 +210,7 @@ float tiltedRain(inout Lit L, vec3 pos, float theta, float trailK, float w) {
   float lane = floor(dot(pos, s1) / uLane.x) * 7.31 + floor(dot(pos, s2) / size2) * 131.7 + theta * 57.3;
   float len = abs(D.x) * uSpan + abs(D.y) * uHeight + abs(D.z) * uSpan;
   float along = dot(pos, D) / len + 0.5;
-  float k = trailK * mix(1.0, 1.5, st);
+  float k = trailK * mix(1.0, 2.0, st);
   w *= step(hash(lane + 9.0), uRainShare);
   if (w == 0.0) return along;
   gather(L, drop(lane, along, k), lane, w);
@@ -238,7 +249,7 @@ vec3 orbLight(vec3 p, vec4 a, vec4 b, vec4 f) {
   float rim = exp(-(d - 0.9) * (d - 0.9) * 220.0);
   float core = exp(-d * d * 7.0) * mix(0.15, 1.0, f.z);     // dim while it is still low, by the floor
   float shimmer = 0.6 + 0.8 * noise3(p * 1.3 + vec3(0.0, uTime * 0.3, 0.0));
-  return vec3(body * 1.8 * shimmer + rim * 1.2 + core * 9.0, core * 0.45, smoothstep(0.0, 0.6, d));
+  return vec3(body * 2.0 * shimmer + rim * 1.2 + core * 14.0, core * 0.3, smoothstep(0.0, 0.6, d));
 }
 
 // A spiral disc: tilted, two arms, a bright bulge at the centre, slowly
@@ -257,48 +268,57 @@ vec3 spiralLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
 }
 
 // A layer: a sea of light near the floor, its surface in slow waves, its
-// points glinting; below the surface it soon goes dark. f.x: how bright it is.
+// points glinting; below the surface it soon goes dark. f.x: how bright it
+// is; f.y: how much it has the room to itself (0 .. 1): alone it is the
+// subject, a brighter sea in a longer, higher swell, its crests paler.
 vec3 layerLight(vec3 p, vec4 a, vec4 b, vec4 f) {
-  float s = b.y + 0.35 * sin(p.x * 0.42 + uTime * 0.45) + 0.25 * sin(p.z * 0.57 - uTime * 0.33)
-          + 0.12 * sin((p.x - p.z) * 1.1 + uTime * 0.8);
+  float s = b.y + (0.35 * sin(p.x * 0.42 + uTime * 0.45) + 0.25 * sin(p.z * 0.57 - uTime * 0.33)
+          + 0.12 * sin((p.x - p.z) * 1.1 + uTime * 0.8)) * (1.0 + 0.5 * f.y)
+          + f.y * 0.9 * sin(p.x * 0.17 + p.z * 0.11 + uTime * 0.2);
   float dy = p.y - s;
-  float top = exp(-dy * dy / (a.z * a.z));
+  float thick = a.z * (1.0 + 0.5 * f.y);
+  float top = exp(-dy * dy / (thick * thick));
   float below = dy < 0.0 ? exp(dy / 0.7) : 0.0;
   float n = noise3(vec3(p.x * 0.8, uTime * 0.25, p.z * 0.8));
   float glint = 0.3 + 2.2 * n * n;
-  return vec3((top * 1.5 * glint + below * 0.22) * f.x, top * top * 0.15, clamp(-dy, 0.0, 1.0));
+  return vec3((top * 1.5 * glint + below * 0.22) * f.x * (1.0 + 1.2 * f.y), top * top * (0.15 + 0.1 * f.y),
+    clamp(max(-dy, f.y * 0.7 * top * n * 1.6), 0.0, 1.0));
 }
 
-// A cloud of points: a few puffs that slowly shift, heaped over a flat base,
-// in two drifts (parted by f.xy). Each LED inside lights where the cloud is
-// thick enough for it, so its edge frays into single points and wisps; the
-// thick heart glows brighter and paler, and each point breathes at its own pace.
-vec3 cloudLight(vec3 p, vec4 a, vec4 b, vec4 f, float id) {
+// A cloud of points: round heads of several heights heaped over a flat base,
+// its long side turned by yaw, in two drifts (parted by f.x along it). It is
+// lit from above: the top of each head
+// glows bright and pale, its underside and the base lie in a deeper shade,
+// so the heads stand out from each other. Each LED inside lights where the
+// cloud is thick enough for it, so its edge frays into single points, and
+// each point breathes at its own pace.
+vec3 cloudLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f, float id) {
   float t = uTime * 0.05;
-  vec3 o = vec3(f.x, 0.0, f.y) / a.z;
-  vec3 q = (p - b.xyz) / a.z;
-  // The puffs: (place, radius); the first and the last go one way as it parts.
-  const vec4 PUFF[4] = vec4[4](vec4(-1.15, 0.0, 0.2, 0.95), vec4(0.2, 0.22, -0.35, 1.1),
-                               vec4(1.35, 0.0, 0.3, 0.8), vec4(-0.35, 0.6, 0.1, 0.65));
-  float field = 0.0;
-  for (int i = 0; i < 4; i++) {
+  vec3 o = vec3(f.x, 0.0, 0.0) / a.z;
+  vec3 q = turned(p - b.xyz, yaw, 0.0) / a.z;
+  // The heads: (place, radius); the first three go one way as it parts.
+  const vec4 PUFF[6] = vec4[6](vec4(-1.55, 0.0, 0.3, 0.7), vec4(-0.7, 0.5, -0.3, 0.9), vec4(-0.1, 0.05, 0.6, 0.8),
+                               vec4(0.4, 0.95, 0.15, 1.0), vec4(1.3, 0.35, -0.25, 0.8), vec4(1.95, -0.05, 0.3, 0.55));
+  float field = 0.0, cap = 0.0;
+  for (int i = 0; i < 6; i++) {
     float fi = float(i);
-    vec3 c = PUFF[i].xyz + 0.18 * sin(vec3(1.3, 0.9, 1.1) * t * 3.0 + fi * vec3(2.1, 4.3, 1.7)) + (i == 0 || i == 3 ? o : -o);
+    vec3 c = PUFF[i].xyz + 0.12 * sin(vec3(1.3, 0.9, 1.1) * t * 3.0 + fi * vec3(2.1, 4.3, 1.7)) + (i < 3 ? -o : o);
     vec3 d = (q - c) / PUFF[i].w;
-    field += exp(-dot(d, d) * 1.6);
+    float r = length(d);
+    field += exp(-r * r * 2.0);
+    // The head's lit top: a shell over its upper side.
+    cap = max(cap, exp(-(r - 0.8) * (r - 0.8) * 14.0) * smoothstep(-0.1, 0.55, d.y / max(r, 1e-3)));
   }
-  // Wisps lie in strata (the noise is stretched along the ground); the base is flat.
-  float strata = noise3(p * vec3(0.2, 0.75, 0.2) + vec3(-t * 0.6, t * 0.15, 13.1));
-  float grain = noise3(p * 0.45 + vec3(t, -t * 0.4, t * 0.7));
-  float base = smoothstep(-0.5, -0.25, q.y + 0.2 * (strata - 0.5));
-  float env = field * base + (strata - 0.5) * 0.55 + (grain - 0.5) * 0.4;
-  float dens = smoothstep(0.08, 0.85, env);
+  float grain = noise3(p * 0.5 + vec3(t, -t * 0.4, t * 0.7));
+  float base = smoothstep(-0.42, -0.3, q.y);         // the flat base
+  float env = field * base + (grain - 0.5) * 0.35;
+  float dens = smoothstep(0.12, 0.8, env);
+  float top = cap * base * smoothstep(-0.2, 0.2, grain - 0.5 + cap);
   float h = hash(id + 41.3);
-  float lit = smoothstep(h * 0.75, h * 0.75 + 0.1, dens);
-  float tw = 0.65 + 0.35 * sin(uTime * (0.3 + 0.4 * hash(id + 7.1)) + h * 40.0);
-  float star = step(0.975, hash(id + 19.7)) * smoothstep(0.02, 0.3, dens);
-  float light = lit * (0.9 + 7.0 * dens * dens) * tw + star * 7.0;
-  return vec3(light, dens * dens * 0.1 + star * 0.4, clamp(0.45 + q.y * 0.9 + (strata - 0.5) * 1.4 + (hash(id + 3.3) - 0.5) * 0.5, 0.0, 1.0));
+  float lit = max(smoothstep(h * 0.6, h * 0.6 + 0.1, dens), smoothstep(h * 0.5, h * 0.5 + 0.1, top));
+  float tw = 0.7 + 0.3 * sin(uTime * (0.3 + 0.4 * hash(id + 7.1)) + h * 40.0);
+  float light = lit * (0.32 + 0.6 * dens + 10.0 * top * sqrt(top)) * tw;
+  return vec3(light, top * 0.3, clamp(top * 0.9 + (hash(id + 3.3) - 0.5) * 0.3, 0.0, 1.0));
 }
 
 // A ring: a hoop of light, a bright thread in a soft sheath, its face tilted,
@@ -328,7 +348,7 @@ vec3 ringLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
   }
   float k = f.x == 0.0 ? 1.0 : 0.5 * (1.0 + apart);
   light *= k;
-  return vec3(light * 18.0, hot * 0.45 * k, along / max(light, 1e-4) * k);
+  return vec3(light * 21.0, hot * 0.45 * k, along / max(light, 1e-4) * k);
 }
 
 // A veil, like an aurora: a curtain hanging in folds that travel slowly along
@@ -392,7 +412,7 @@ vec3 formsAt(vec3 p, float id, float v, out vec3 thread, out float around) {
       f = layerLight(q, a, b, ff);
       f.x *= 1.0 - min(0.9, max(c.r, max(c.g, c.b)) * 1.5);
     }
-    else if (type == 3) f = cloudLight(q, a, b, ff, id);
+    else if (type == 3) f = cloudLight(q, a, b, e.z, ff, id);
     else if (type == 4) f = ringLight(q, a, b, e.z, ff);
     else f = veilLight(q, a, b, e.z, ff);
     float order = mix(hash(id + float(k) * 7.7), e.y > 0.0 ? v : 1.0 - v, e.x * 0.8);
@@ -428,6 +448,12 @@ void main() {
     vSize = 1.0;
     return;
   }
+  // This strand's look: the new one comes down each strand, one strand after another.
+  int look = hash(seed + 21.0) * 0.75 + u * 0.25 < uSide * 1.001 ? 1 : 0;
+  for (int i = 0; i < 11; i++) W[i] = uW[look * 11 + i];
+  for (int i = 0; i < 4; i++) Set[i] = uSet[look * 4 + i];
+  Accent = uAccent[look]; Near = uNear[look]; Far = uFar[look]; CloudHue = uCloudHue[look];
+  Grad0 = uGrad0[look]; Grad1 = uGrad1[look]; ColA = uColA[look]; ColB = uColB[look];
   Lit L = Lit(0.0, 0.0, vec3(0.0), vec3(0.0));
 
   // The flow turns from straight down to sideways in uTurnSteps steps; each
@@ -469,9 +495,12 @@ void main() {
     if (age < 0.0 || age > 7.0) continue;
     float x = length(pos - r.xyz) - age * 3.6;
     float fade = 1.0 - age / 7.0;
-    // In the still room a wave is a fine ring that spreads level, like one on water.
+    // In the still room a wave is a ring that spreads level, like one on water:
+    // a band of light as tall as a hand's reach, running out along the strands.
     float dy = pos.y - r.y;
-    ring += exp(-x * x * mix(5.0, 1.8, uRainMix)) * mix(exp(-dy * dy * 1.2), 1.0, uRainMix) * fade * fade;
+    // A crisp front, and a wake that fades behind it.
+    float wave = x > 0.0 ? exp(-x * x * 6.0) : exp(x * 1.3);
+    ring += wave * mix(exp(-dy * dy * 0.3), 1.0, uRainMix) * fade * fade;
   }
 
   // The forms' light. A wave lifts it at most to white: past that the LED
@@ -484,7 +513,7 @@ void main() {
   vec3 flare = form * min(1.0, 1.0 / max(fm, 1e-3));
   float inForm = clamp(fm, 0.0, 1.0);                // drops in a form take its colour
 
-  vec3 c = form + flare * 1.5 * ring;
+  vec3 c = form + flare * 2.5 * ring;
   vec3 glint = vec3(0.0);
   vec3 wireCol = thread + flare * ring;
   float near = 1.0 - smoothstep(3.0, 12.0, dist);
@@ -493,13 +522,13 @@ void main() {
     // The rain's look: its colour modes. Colours travel with each drop; an
     // LED at rest shows one of its own.
     col += placeColor(pos, u, dist);
-    vec3 restDrop = dropColor(id, 0.0) + uColA * 1.2 * uW[5];
+    vec3 restDrop = dropColor(id, 0.0) + ColA * 1.2 * W[5];
     vec3 rainCol = col + (rain > 1e-4 ? L.rainCol / rain : restDrop);
     vec3 tipCol = col + (tip > 1e-4 ? L.tipCol / tip : restDrop);
     vec3 restCol = col + restDrop;
     // The rainbow per LED: each LED has its own hue, shown as the light passes.
     if (uBowStyle > 1.5) {
-      vec3 led = bowAt(hash(id)) * uW[2];
+      vec3 led = bowAt(hash(id)) * W[2];
       rainCol += led; tipCol += led; restCol += led;
     }
     // A storm: the rain takes the colour of the form it falls through, and
@@ -513,13 +542,13 @@ void main() {
     rainCol = mix(rainCol, flare * 1.3, inForm * 0.8);
     tipCol = mix(tipCol, mix(flare, vec3(1.0), 0.4) * 1.3, inForm * 0.8);
     // Heads turn white in most modes; in the colourful ones they keep their colour.
-    const float WHITE[11] = float[11](0.75, 0.75, 0.15, 0.2, 0.3, 0.0, 0.3, 0.35, 0.5, 0.3, 0.5);
+    const float WHITE[11] = float[11](0.5, 0.5, 0.15, 0.2, 0.3, 0.0, 0.3, 0.35, 0.35, 0.3, 0.35);
     float white = 0.0;
-    for (int i = 0; i < 11; i++) white += WHITE[i] * uW[i];
+    for (int i = 0; i < 11; i++) white += WHITE[i] * W[i];
     c += (restCol * uRest + rainCol * rain * uRainGain + mix(tipCol, vec3(1.0), white) * tip * uTipGain
-        + mix(restCol, vec3(1.0), 0.35) * ring * 1.6) * rk * (1.0 - 0.25 * uStorm) * (1.0 - 0.75 * around * (1.0 - inForm));
+        + mix(restCol, vec3(1.0), 0.35) * ring * 4.0) * rk * (1.0 - 0.25 * uStorm) * (1.0 - 0.75 * around * (1.0 - inForm));
     glint = tipCol * tip * uTipGain * rk;            // the head's light in its own colour: the light rays
-    wireCol += (rainCol * rain * uRainGain * 0.2 + restCol * uRest * 1.5 * near + restCol * ring * 0.4) * rk;
+    wireCol += (rainCol * rain * uRainGain * 0.2 + restCol * uRest * 1.5 * near + restCol * ring * 1.2) * rk;
   }
   if (rk < 0.999) {
     // The still room's look: a faint lattice in the room's colour with a
@@ -528,10 +557,10 @@ void main() {
     vec3 drop = mix(pale, flare, inForm * 0.8);
     float tw = hash(id + 3.0) < 0.2
       ? pow(0.5 + 0.5 * sin(uTime * (0.3 + 1.2 * hash(id + 1.0)) + hash(id + 2.0) * 6.2832), 30.0) * uTwinkle : 0.0;
-    c += (uTint * uRest + pale * tw + drop * (rain * uRainGain * 0.5 + tip * uTipGain) + pale * 1.6 * ring) * (1.0 - rk);
+    c += (uTint * uRest + pale * tw + drop * (rain * uRainGain * 0.5 + tip * uTipGain) + pale * 5.0 * ring) * (1.0 - rk);
     // The strands catch the light of the forms they run through, and a faint
     // sheen of the room's: thin lit threads, never dark bars.
-    wireCol += (drop * rain * uRainGain * 0.2 + uTint * uRest * 1.5 * near) * (1.0 - rk);
+    wireCol += (drop * rain * uRainGain * 0.2 + uTint * uRest * 1.5 * near + pale * ring * 1.2) * (1.0 - rk);
   }
 
   float fog = 1.0 - smoothstep(uFogFar * 0.3, uFogFar, dist);

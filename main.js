@@ -8,10 +8,11 @@ import { createTuner, loadSettings } from './tuner.js';
 import { createAudio } from './audio.js';
 import { createSway } from './sway.js';
 import {
-  PALETTES, WEATHER, FLOWS, COLOR_MODES, MODE, SETS, ACCENTS, DEPTHS, SKY, CAMERAS,
+  PALETTES, WEATHER, FLOWS, COLOR_MODES, SETS, SKY, CAMERAS,
   DEFAULTS, STORAGE_KEY, SCHEMA, ROOM,
 } from './config.js';
 import { createShow } from './show.js';
+import { createDirector, hash } from './director.js';
 import { FLOW_WRAP, POINT_VS, POINT_FS, WIRE_FS, RAY_FS, QUAD_VS, DOWN_FS, BLUR_FS, COMPOSITE_FS } from './shaders.js';
 import { createGL, sub, cross, dot, norm, perspective, lookAt } from './gl.js';
 import { createLattice, fillLattice } from './lattice.js';
@@ -72,15 +73,23 @@ for (const item of SCHEMA.flatMap((g) => g.items)) {
 // too big. So the view zooms out, smoothly with the shape of the view: the
 // field of view opens (up to FOV_MAX, past which the picture distorts), and
 // the eye steps back from the centre (while it stays inside the room), the
-// visible distance with it. At 16:9 and wider nothing changes: there the Field
-// of view and Distance settings are what is seen.
-const WIDE = 16 / 9, FOV_MAX = 104, FOV_SHARE = 0.32, BACK_SHARE = 0.35;
+// visible distance with it (by half as much: farther strands than that only
+// crowd the picture, and cost frames). A tall view also has room above and
+// below the horizon: the eye looks level, and the forms float higher over
+// the floor (see forms.js), so a form stands in the upper middle with its
+// image in the floor well below it. At 16:9 and wider nothing changes: there
+// the Field of view and Distance settings are what is seen.
+const WIDE = 16 / 9, FOV_MAX = 96, FOV_SHARE = 0.2, BACK_SHARE = 0.35;
+const TALL = { pitch: -0.06, rise: 0.6 };   // in a view as tall as a phone's: added to the eye's pitch, and to the forms' height (a share)
 function viewFit() {
   const need = W > 0 && H > 0 ? Math.max(1, WIDE * H / W) : 1;   // how many times too narrow the view is
   const tan = Math.min(Math.tan(S.fov * Math.PI / 360) * need ** FOV_SHARE,
     Math.tan(Math.max(S.fov, FOV_MAX) * Math.PI / 360));
   const radius = Math.min(S.radius * need ** BACK_SHARE, Math.max(S.radius, SPAN / 2 - 1.5));
-  return { fov: 2 * Math.atan(tan), radius, back: S.radius > 0 ? radius / S.radius : 1 };
+  const back = S.radius > 0 ? radius / S.radius : 1;
+  const tall = Math.min(1, (need - 1) / 2.8);                    // 0 at 16:9 .. 1 on a phone held upright
+  return { fov: 2 * Math.atan(tan), radius, far: 1 + (back - 1) * 0.5,
+    pitch: ROOM.pitch + TALL.pitch * tall, rise: 1 + TALL.rise * tall };
 }
 const fovRad = () => viewFit().fov;
 
@@ -315,7 +324,7 @@ function rippleAt(x, y) {
     f[1] + r[1] * nx * th * aspect + u[1] * ny * th,
     f[2] + r[2] * nx * th * aspect + u[2] * ny * th,
   ]);
-  const D = 7;
+  const D = 10;   // about where the forms are: far enough for the wave to be seen whole
   // A tap on the floor's image rings the light whose image it is.
   const hy = eye[1] + dir[1] * D;
   addRipple(eye[0] + dir[0] * D, hy < FLOOR ? 2 * FLOOR - hy : hy, eye[2] + dir[2] * D, time);
@@ -359,9 +368,9 @@ addEventListener('keydown', (e) => {
   if (e.key === 'v') step('camera', CAMERAS);    // next camera move
   if (e.key === 'm') controls.toggleSound();     // sound on and off
 });
-// A key moves on at random while the setting is auto, else to the next choice.
+// A key moves on to another episode while the setting is auto, else to the next choice.
 function step(key, list) {
-  if (S[key] === 'auto') { apply(key); return; }
+  if (S[key] === 'auto') { director[key].skip(time); return; }
   const i = list.findIndex((x) => x.name === S[key]);
   tuner.set(key, list[(i + 1) % list.length].name);
   tuner.refresh();
@@ -374,63 +383,85 @@ function hideOverlay() {
 }
 
 let time = Number(params.get('t')) || 0;
-let nextAuto = 2;   // the next automatic wave
+let nextAuto = time + 2, autoWaves = 0;   // the next automatic wave, and how many there were
 const rippleGap = createSway({ fastest: 1, octaves: 5 }); // per wave: how long until the next
-let look = null;    // the look now, easing towards the goal (set up below)
+let look = null;    // the rain now: its flow, rate, amount and density, easing towards the weather (set up below)
 
 // ---------- director: weather and colour change on their own ----------
-const rand = (a, b) => a + Math.random() * (b - a);
-function pick(list, current, name) {
-  const forced = name && list.find((x) => x.name === name);
-  if (forced) return forced;
-  const options = list.filter((x) => x !== current);
-  let r = Math.random() * options.reduce((n, x) => n + x.weight, 0);
-  for (const x of options) if ((r -= x.weight) <= 0) return x;
-  return options.find((x) => x.weight > 0);
-}
-const pickPalette = (not) => {
-  const options = PALETTES.filter((p) => p !== not);
-  return options[Math.floor(Math.random() * options.length)];
-};
+// What comes when is in director.js: tracks of episodes made from the seed.
+// Here each episode is put to work as its time comes. A setting other than
+// auto holds its choice over the track's.
+const director = createDirector(SEED);
+const forced = (key) => (S[key] === 'auto' ? undefined : S[key]);
+const chosen = (key, list, e) => list.find((x) => x.name === forced(key)) || e.item;
 
-let weather = null, weatherUntil = 0;
-let colorMode = null, colorUntil = 0;
-let flowMode = null, flowUntil = 0;
+let weather = null, colorMode = null, flowMode = null;
 const densityGoal = [1, 1];
-let densityUntil = 0;
 let flowDir = [0, 1];
 // Turning between falling (0) and sideways (1): from, to, progress 0..1, now.
 let turnFrom = 0, turnTo = 0, turnP = 1, turnNow = 0;
-const goal = {
-  mode: COLOR_MODES[0].mode, a: PALETTES[0].a, b: PALETTES[0].b, g0: PALETTES[0].a, g1: PALETTES[1].b,
-  s0: SETS[0].c[0], s1: SETS[0].c[1], s2: SETS[0].c[2], s3: SETS[0].c[3],
-  acc: ACCENTS[0], near: DEPTHS[0][0], far: DEPTHS[0][1], cloud: [0, 0, 0],
-};
-// Colours that belong to one mode; they change at once while that mode is unseen.
-const OWN = { s0: 'palette', s1: 'palette', s2: 'palette', s3: 'palette', acc: 'accent',
-  near: 'depth', far: 'depth', cloud: 'cloud' };
-const EASED = Object.keys(goal);
-const pickOf = (list) => list[Math.floor(Math.random() * list.length)];
+// The rain's colours: two looks, and each strand shows one of them. A new
+// colour episode is written to the look that is out of sight, and the strands
+// then go over to it one after another (see POINT_VS): a blend of two colours
+// would pass through grey.
+const goals = [null, null], looks = [null, null];
+let side = 0, sideNow = 0;   // the look the running episode has; how far the strands have gone over to look 1
+const SWITCH = 7;            // seconds for all strands to go over
+const copyLook = (g) => Object.fromEntries(Object.entries(g).map(([k, v]) => [k, [...v]]));
 
-// A setting other than auto holds its choice until it is changed.
-const forced = (key) => (S[key] === 'auto' ? undefined : S[key]);
-function nextWeather(now) {
-  weather = pick(WEATHER, weather, forced('weather'));
-  weatherUntil = forced('weather') ? Infinity : now + rand(...weather.hold);
-}
-function nextFlow(now) {
-  flowMode = pick(FLOWS, flowMode, forced('flow'));
-  flowUntil = forced('flow') ? Infinity : now + rand(...flowMode.hold);
-  // A new horizontal direction for each sideways episode, picked while the
-  // rain still falls straight down, so the turn never swings round.
-  if (flowMode.toward && turnNow < 0.01) {
-    const a = Math.random() * Math.PI * 2;
-    flowDir = [Math.cos(a), Math.sin(a)];
-  }
-  if (flowMode.toward !== turnTo) {
-    turnFrom = turnNow;
-    turnTo = flowMode.toward;
-    turnP = 0;
+// Per track: what an episode e does as it begins (snap: at once, as on load).
+const BEGIN = {
+  weather(e) { weather = chosen('weather', WEATHER, e); },
+  flow(e, snap) {
+    flowMode = chosen('flow', FLOWS, e);
+    // A new horizontal direction for each sideways episode, taken while the
+    // rain still falls straight down, so the turn never swings round.
+    if (flowMode.toward && (snap || turnNow < 0.01)) flowDir = [Math.cos(e.angle), Math.sin(e.angle)];
+    if (snap) { turnFrom = turnTo = turnNow = flowMode.toward; turnP = 1; }
+    else if (flowMode.toward !== turnTo) { turnFrom = turnNow; turnTo = flowMode.toward; turnP = 0; }
+  },
+  color(e, snap) {
+    colorMode = chosen('color', COLOR_MODES, e);
+    const p = PALETTES.find((x) => x.name === S.palette) || e.p;
+    const q = p === e.q ? e.p : e.q;
+    const set = SETS.find((x) => x.name === S.set) || e.set;
+    const next = {
+      mode: colorMode.mode, a: p.a, b: p.b, g0: p.a, g1: q.b,
+      s0: set.c[0], s1: set.c[1], s2: set.c[2], s3: set.c[3],
+      acc: e.accent, near: e.depth[0], far: e.depth[1], cloud: [e.hue, 0, 0],
+    };
+    if (snap) {
+      for (const i of [0, 1]) { goals[i] = next; looks[i] = copyLook(next); }
+      return;
+    }
+    // Out of sight, the other look changes at once; if strands still show it
+    // (a change in the middle of the last one), it eases to the new colours.
+    const unseen = sideNow === side;
+    side = 1 - side;
+    goals[side] = next;
+    if (unseen) looks[side] = copyLook(next);
+    if (colorMode.name === 'repaint') nextAuto = Math.min(nextAuto, time + 1.5); // a first wave soon
+  },
+  // Density wanders between its lower limits and full, or holds the manual shares.
+  density(e) {
+    const manual = S.density === 'manual';
+    [[S.strandShare, S.strandMin], [S.rowShare, S.rowMin]].forEach(([share, min], i) => {
+      densityGoal[i] = manual ? share : Math.min(1, min) + (1 - Math.min(1, min)) * e.share[i];
+    });
+  },
+  camera(e, snap) {
+    camMode = chosen('camera', CAMERAS, e);
+    camFrom = [...camW];
+    camBlend = 0;
+    if (snap) { camW.fill(0); camW[CAMERAS.indexOf(camMode)] = 1; camFrom = [...camW]; camBlend = 1; }
+  },
+};
+const TRACKS = Object.keys(BEGIN);
+const episode = {};   // per track: the episode that runs now
+function direct(now, snap) {
+  for (const key of TRACKS) {
+    const e = director[key].at(now);
+    if (e !== episode[key]) { episode[key] = e; BEGIN[key](e, snap); }
   }
 }
 // Only light past a knee glows (scene light, before exposure): the glow stays
@@ -438,24 +469,17 @@ function nextFlow(now) {
 // The haze, wider, takes only what is brighter still.
 const BLOOM_KNEE = 0.5;
 // While rain falls the room closes in: the visible distance shrinks by this share.
-const RAIN_MIST = 0.35;
+const RAIN_MIST = 0.22;
 const HAZE_KNEE = 1.5;
 // The floor's image fades over this height above the floor, as on dark glass.
-const MIRROR_FADE = 14;
+const MIRROR_FADE = 22;
 const CAMERA_BLEND = 8; // seconds to turn one move into the next
 const smooth = (x) => x * x * (3 - 2 * x);
 // The camera starts at ?t= too, so a time shows one view.
-let camMode = CAMERAS[0], camUntil = 0, camClock = time, camBlend = 1;
+let camMode = CAMERAS[0], camClock = time, camBlend = 1;
 const camW = CAMERAS.map((c) => (c === camMode ? 1 : 0));
 let camFrom = [...camW];
 let lastDir = [0, 0, -1];
-
-function nextCamera(now) {
-  camMode = pick(CAMERAS, camMode, forced('camera'));
-  camUntil = forced('camera') ? Infinity : now + rand(...camMode.hold);
-  camFrom = [...camW];
-  camBlend = 0;
-}
 
 // Where one move puts the eye at clock t, and which way it looks. On a floor
 // (ground: the eye's height there) the rise goes up from it and back.
@@ -485,39 +509,8 @@ function cameraPose(name, t, R, bob, ground) {
   }
 }
 
-// Density wanders between its lower limits and full, or holds the manual shares.
-function nextDensity(now) {
-  if (S.density === 'manual') {
-    densityGoal[0] = S.strandShare;
-    densityGoal[1] = S.rowShare;
-    densityUntil = Infinity;
-    return;
-  }
-  densityGoal[0] = rand(Math.min(1, S.strandMin), 1);
-  densityGoal[1] = rand(Math.min(1, S.rowMin), 1);
-  densityUntil = now + rand(15, 30);
-}
-function nextColor(now) {
-  colorMode = pick(COLOR_MODES, colorMode, forced('color'));
-  colorUntil = forced('color') ? Infinity : now + rand(...colorMode.hold);
-  const p = PALETTES.find((x) => x.name === S.palette) || pickPalette();
-  const q = pickPalette(p);
-  const set = SETS.find((x) => x.name === S.set) || pickOf(SETS);
-  const depth = pickOf(DEPTHS);
-  Object.assign(goal, {
-    mode: colorMode.mode, a: p.a, b: p.b, g0: p.a, g1: q.b,
-    s0: set.c[0], s1: set.c[1], s2: set.c[2], s3: set.c[3],
-    acc: pickOf(ACCENTS), near: depth[0], far: depth[1], cloud: [Math.random(), 0, 0],
-  });
-  if (!look) return;
-  for (const [key, mode] of Object.entries(OWN)) {
-    if (look.mode[MODE[mode]] < 0.05) look[key] = [...goal[key]];
-  }
-  if (colorMode.name === 'repaint') nextAuto = Math.min(nextAuto, now + 1.5); // a first wave soon
-}
-
 // The sky's colours at this moment of its day.
-let skyClock = Math.random();
+let skyClock = (director.skyStart + time / Math.max(1, S.skyDay)) % 1;
 function skyColors() {
   const x = skyClock * SKY.length;
   const i = Math.floor(x) % SKY.length, j = (i + 1) % SKY.length, k = smooth(x - Math.floor(x));
@@ -525,15 +518,8 @@ function skyColors() {
   return [lerp(SKY[i][0], SKY[j][0]), lerp(SKY[i][1], SKY[j][1])];
 }
 
-// Start with light rain falling in a rainbow, unless a setting says otherwise.
-weather = WEATHER[1]; colorMode = COLOR_MODES[MODE.rainbow]; flowMode = FLOWS[0];
-if (forced('weather')) nextWeather(0); else weatherUntil = rand(...weather.hold);
-if (forced('flow')) nextFlow(0); else flowUntil = rand(...flowMode.hold);
-if (forced('color') || forced('palette')) nextColor(0);
-else {
-  colorUntil = rand(...colorMode.hold);
-  Object.assign(goal, { mode: colorMode.mode });
-}
+// The episodes that run at the time the page opens with, at once.
+direct(time, true);
 
 // What a change in the panel does at once. The scene, form and layer need
 // nothing here: the show reads them every frame and blends into the change.
@@ -544,17 +530,11 @@ function apply(key) {
     rebuildTimer = setTimeout(buildLattice, 250); // wait for the slider to settle
   }
   if (key === 'volume') { sound.volume(); controls.setVolume(S.volume); }
-  if (key === 'weather') nextWeather(time);
-  if (key === 'flow') nextFlow(time);
-  if (key === 'camera') nextCamera(time);
-  if (['density', 'strandShare', 'rowShare', 'strandMin', 'rowMin'].includes(key)) nextDensity(time);
-  if (key === 'color' || key === 'palette' || key === 'set') nextColor(time);
+  // The setting takes over from the running episode, or hands back to it.
+  const track = ['palette', 'set'].includes(key) ? 'color'
+    : ['strandShare', 'rowShare', 'strandMin', 'rowMin'].includes(key) ? 'density' : key;
+  if (BEGIN[track]) BEGIN[track](episode[track]);
 }
-if (S.density === 'manual') nextDensity(0); else densityUntil = rand(12, 20);
-if (forced('camera')) {
-  nextCamera(0);
-  camW.fill(0); camW[CAMERAS.indexOf(camMode)] = 1; camFrom = [...camW]; camBlend = 1;
-} else camUntil = rand(...CAMERAS[0].hold);
 
 const tuner = createTuner({
   schema: SCHEMA, settings: S, defaults: DEF, storageKey: STORAGE_KEY,
@@ -563,9 +543,8 @@ const tuner = createTuner({
 look = {
   flow: Number(params.get('t')) || 0,
   flowRate: weather.flow, rain: weather.rain,
-  density: [S.density === 'manual' ? S.strandShare : 1, S.density === 'manual' ? S.rowShare : 1],
+  density: [...densityGoal],
 };
-for (const key of EASED) look[key] = [...goal[key]];
 let bandShift = (look.flow * S.bandSpeed) % (10 / S.bandScale);
 look.flow %= FLOW_WRAP;
 
@@ -585,9 +564,13 @@ function ease(dt) {
   turnNow = turnFrom + (turnTo - turnFrom) * smooth(turnP);
   const kd = 1 - Math.exp(-dt / 5.0); // density drifts slowly
   for (let i = 0; i < 2; i++) look.density[i] += (densityGoal[i] - look.density[i]) * kd;
-  for (const key of EASED) {
-    for (let i = 0; i < goal[key].length; i++) look[key][i] += (goal[key][i] - look[key][i]) * kc;
-  }
+  looks.forEach((l, n) => {
+    for (const key of Object.keys(l)) {
+      for (let i = 0; i < l[key].length; i++) l[key][i] += (goals[n][key][i] - l[key][i]) * kc;
+    }
+  });
+  sideNow = Math.max(0, Math.min(1, sideNow + Math.sign(side - sideNow) * dt / SWITCH));
+  if (Math.abs(side - sideNow) < 1e-3) sideNow = side;
   skyClock = (skyClock + dt / Math.max(1, S.skyDay)) % 1;
   const advance = dt * look.flowRate * SPEED * S.speed;
   look.flow = (look.flow + advance) % FLOW_WRAP; // the shader's drops repeat exactly at the wrap
@@ -637,12 +620,13 @@ function frame(now) {
   const kb = smooth(camBlend);
   let eye = [0, 0, 0], dir = [0, 0, 0];
   // The eye stands on the floor, with a little sway.
+  const fit = viewFit();
   const ground = FLOOR + ROOM.eye;
   const bob = ground + Math.sin(time * 0.05) * 0.2;
   CAMERAS.forEach((cam, i) => {
     camW[i] = camFrom[i] + ((cam === camMode ? 1 : 0) - camFrom[i]) * kb;
     if (camW[i] < 1e-4) return;
-    const pose = cameraPose(cam.name, camClock, viewFit().radius, bob, ground);
+    const pose = cameraPose(cam.name, camClock, fit.radius, bob, ground);
     for (let k = 0; k < 3; k++) {
       eye[k] += pose.eye[k] * camW[i];
       dir[k] += pose.dir[k] * camW[i];
@@ -657,30 +641,26 @@ function frame(now) {
   eye[1] -= pointer.sy * 2.0;
   dir = turn(dir);
   eye[1] = Math.max(FLOOR + 0.4, eye[1]);          // above the floor, looking a little up
-  dir = norm([dir[0], dir[1] + ROOM.pitch, dir[2]]);
+  dir = norm([dir[0], dir[1] + fit.pitch, dir[2]]);
   const at = [eye[0] + dir[0], eye[1] + dir[1], eye[2] + dir[2]];
   const aspect = W / H;
   const view = lookAt(eye, at, [0, 1, 0]);
   const proj = perspective(fovRad(), aspect, 0.1, 60);
   const f = norm(sub(at, eye));
   const r = norm(cross(f, [0, 1, 0]));
-  camera = { eye, f, r, u: cross(r, f), aspect };
+  camera = { eye, f, r, u: cross(r, f), aspect, rise: fit.rise };
 
   // A wave now and then, somewhere in the field.
   if (S.ripples > 0 && time > nextAuto) {
-    addRipple((Math.random() - 0.5) * SPAN * 0.6, (Math.random() - 0.5) * HEIGHT * 0.5,
-      (Math.random() - 0.5) * SPAN * 0.6, time);
+    const where = (i) => hash(SEED + ++autoWaves * 5.71 + i) - 0.5;   // from the seed, like the rest of the show
+    addRipple(where(1) * SPAN * 0.6, where(2) * HEIGHT * 0.5, where(3) * SPAN * 0.6, time);
     // While waves repaint the field, they come more often.
     // The gaps sway with 1/f fluctuation: about half to twice the setting.
     const every = colorMode.name === 'repaint' ? Math.min(S.ripples, 6) : S.ripples;
     nextAuto = time + every * Math.exp(0.7 * rippleGap(1));
   }
 
-  if (time > weatherUntil) nextWeather(time);
-  if (time > colorUntil) nextColor(time);
-  if (time > flowUntil) nextFlow(time);
-  if (time > densityUntil) nextDensity(time);
-  if (time > camUntil) nextCamera(time);
+  direct(time);
   ease(dt);
   const shown = show.update(time, dt, camera);
   const rk = shown.rain;                 // how much rain falls now: 0 a still room .. 1 a rain passage
@@ -746,22 +726,24 @@ function frame(now) {
   gl.uniform2fv(u.uFlowDir, flowDir);
   gl.uniform2f(u.uLane, SPAN / (GRID - 1), HEIGHT / ROWS);
   gl.uniform1f(u.uSpan, SPAN);
-  gl.uniform1fv(u.uW, look.mode);
-  gl.uniform3fv(u.uSet, [...look.s0, ...look.s1, ...look.s2, ...look.s3]);
-  gl.uniform3fv(u.uAccent, look.acc);
-  gl.uniform3fv(u.uNear, look.near);
-  gl.uniform3fv(u.uFar, look.far);
-  gl.uniform1f(u.uCloudHue, look.cloud[0]);
+  const both = (...keys) => looks.flatMap((l) => keys.flatMap((key) => l[key]));
+  gl.uniform1fv(u.uW, both('mode'));
+  gl.uniform3fv(u.uSet, both('s0', 's1', 's2', 's3'));
+  gl.uniform3fv(u.uAccent, both('acc'));
+  gl.uniform3fv(u.uNear, both('near'));
+  gl.uniform3fv(u.uFar, both('far'));
+  gl.uniform1fv(u.uCloudHue, looks.map((l) => l.cloud[0]));
+  gl.uniform1f(u.uSide, sideNow);
   const [sky0, sky1] = skyColors();
   gl.uniform3fv(u.uSky0, sky0);
   gl.uniform3fv(u.uSky1, sky1);
   gl.uniform1f(u.uFlowRate, look.flowRate);
-  gl.uniform3fv(u.uGrad0, look.g0);
-  gl.uniform3fv(u.uGrad1, look.g1);
+  gl.uniform3fv(u.uGrad0, both('g0'));
+  gl.uniform3fv(u.uGrad1, both('g1'));
   // Rain brings a mist: the far strands fade. An eye that stepped back sees as far into the room as before.
-  gl.uniform1f(u.uFogFar, S.fog * viewFit().back * (1 - RAIN_MIST * rk));
-  gl.uniform3fv(u.uColA, look.a);
-  gl.uniform3fv(u.uColB, look.b);
+  gl.uniform1f(u.uFogFar, S.fog * fit.far * (1 - RAIN_MIST * rk));
+  gl.uniform3fv(u.uColA, both('a'));
+  gl.uniform3fv(u.uColB, both('b'));
   gl.uniform4fv(u.uRipples, ripples);
   // Rain spreads strand by strand as a rain passage comes, from the few
   // strands that carry pale drops in a still room.
@@ -792,6 +774,9 @@ function frame(now) {
   gl.blendFunc(gl.ONE, gl.ONE);
   for (const mirror of passes) {
     for (const prog of progs) {
+      // The rays are a glint in the eye, not light in the room: the heads'
+      // images in the floor, dimmer, cast none (and the lattice is drawn once less).
+      if (mirror > 0 && prog === rayProg) continue;
       gl.useProgram(prog.p);
       gl.uniform3f(prog.u.uMirror, FLOOR, mirror, MIRROR_FADE);
       if (images > 1 && prog !== wireProg) gl.drawArraysInstanced(gl.POINTS, 0, count, images);
