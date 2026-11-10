@@ -15,8 +15,8 @@ export const PALETTES = [
 export const WEATHER = [
   { name: 'drizzle',  flow: 0.6, rain: 0.0,  hold: [10, 18], weight: 2 },
   { name: 'rain',     flow: 1.0, rain: 0.25, hold: [12, 22], weight: 3 },
-  { name: 'shower',   flow: 1.9, rain: 0.6,  hold: [8, 14],  weight: 2 },
-  { name: 'downpour', flow: 3.6, rain: 1.0,  hold: [6, 12],  weight: 0 },   // never on its own: the w key or the Weather setting
+  { name: 'shower',   flow: 1.9, rain: 0.6,  hold: [8, 14],  weight: 0 },   // the two heavy ones never come on their own:
+  { name: 'downpour', flow: 3.6, rain: 1.0,  hold: [6, 12],  weight: 0 },   // only by the w key or the Weather setting
 ];
 // Direction: rain falls from above, or now and then flows sideways, each time a new way.
 export const FLOWS = [
