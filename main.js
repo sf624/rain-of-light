@@ -244,10 +244,9 @@ function wake() {
 }
 wake();
 
-// The view follows a drag: a finger's place on the screen, or how far the
-// mouse moved with its button down. A mouse that only moves leaves the view
-// alone. Over the settings panel and the buttons the view holds still.
-const STILL = '.tuner, .tuner-toggle, .sound-toggle, .full-toggle, .volume-bar';
+// The view follows a drag begun on the canvas, by how far the mouse (with
+// its button down) or the finger moved. A mouse that only moves leaves the
+// view alone.
 let mouseDrag = null; // the last mouse position of a drag begun on the canvas
 const half = (v) => Math.max(-0.5, Math.min(0.5, v));
 addEventListener('pointermove', (e) => {
@@ -261,9 +260,11 @@ addEventListener('pointermove', (e) => {
     mouseDrag = { x: e.clientX, y: e.clientY };
     return;
   }
-  if (e.target instanceof Element && e.target.closest(STILL)) return;
-  pointer.x = e.clientX / innerWidth - 0.5;
-  pointer.y = e.clientY / innerHeight - 0.5;
+  const d = touches.get(e.pointerId);
+  if (!d) return;
+  pointer.x = half(pointer.x - (e.clientX - d.lx) / innerWidth);
+  pointer.y = half(pointer.y - (e.clientY - d.ly) / innerHeight);
+  d.lx = e.clientX; d.ly = e.clientY;
 });
 addEventListener('pointerdown', wake);
 addEventListener('keydown', wake);
@@ -302,7 +303,7 @@ function rippleAt(x, y) {
 // it rings on lift if it was a tap: short, and moved less than TAP_MOVE.
 const TAP_MOVE = 10;  // CSS px
 const TAP_TIME = 350; // ms
-const touches = new Map(); // pointerId -> { x, y, t, drag }
+const touches = new Map(); // pointerId -> { x, y, t, drag, lx, ly }: where it began, and where it was last
 canvas.addEventListener('pointerdown', (e) => {
   hideOverlay();
   if (e.pointerType === 'mouse') {
@@ -311,7 +312,7 @@ canvas.addEventListener('pointerdown', (e) => {
       mouseDrag = { x: e.clientX, y: e.clientY };
       try { canvas.setPointerCapture(e.pointerId); } catch { /* the drag then ends at the window's edge */ }
     }
-  } else touches.set(e.pointerId, { x: e.clientX, y: e.clientY, t: e.timeStamp, drag: false });
+  } else touches.set(e.pointerId, { x: e.clientX, y: e.clientY, t: e.timeStamp, drag: false, lx: e.clientX, ly: e.clientY });
 });
 addEventListener('pointermove', (e) => {
   const d = touches.get(e.pointerId);
