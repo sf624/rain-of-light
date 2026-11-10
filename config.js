@@ -71,9 +71,9 @@ export const CAMERAS = [
   { name: 'rise',  hold: [25, 40], weight: 1.5 },
 ];
 
-// Forms of light in the crystal scene. Sky forms come one at a time; the
-// layer (a sea of light near the floor) comes and goes beside them. Each
-// form picks its colours from a few of the palettes.
+// Forms of light. Sky forms come one at a time (two while one turns into the
+// next); the layer (a sea of light near the floor) comes and goes beside
+// them. Each form picks its colours from a few of the palettes.
 export const FORMS = [
   { name: 'orb',    type: 0, palettes: ['amber', 'candle', 'sakura', 'ice'] },
   { name: 'spiral', type: 1, palettes: ['deep sea', 'sakura', 'ice', 'aurora'] },
@@ -81,36 +81,41 @@ export const FORMS = [
 ];
 export const LAYER = { name: 'layer', type: 2, palettes: ['deep sea', 'ice', 'aurora'] };
 
-// Scenes: the rain, or a mirrored room where forms of light appear among
-// the strands. A scene changes the defaults below; what you set wins.
-export const SCENES = {
-  rain: { settings: {} },
-  crystal: {
-    span: 36,      // a larger room than the rain's, so the forms are seen from afar
-    eye: 2.5,      // the eye's height above the floor
-    pitch: 0.06,   // and how far it looks up
-    settings: {
-      grid: small ? 44 : 72, density: 'manual', size: 0.02, rest: 0.035, wire: 0.2,
-      radius: 13, rainShare: 0.04, ripples: 16, fov: 76, fog: 34, bloom: 0.8, blackFloor: 0,
-      exposure: 2.0, mirror: 0.6, walls: 0, haze: 1.4, burn: 0.7, twinkle: 0.4, rays: 'off',
-    },
-  },
+// The room: strands of LEDs over a mirror floor, the same for the whole show.
+export const ROOM = {
+  span: 36,      // width and depth of the lattice
+  height: 15,    // its height, centred on 0
+  foot: 0.45,    // the strands end this far above the mirror floor
+  eye: 2.2,      // the eye's height above the floor
+  pitch: 0.06,   // and how far it looks up
 };
+
+// The show moves between passages (see show.js). A passage sets how much
+// rain falls, which form of light shows, and whether the layer glows.
+// Durations are in seconds; weight is how often a kind comes.
+export const PASSAGES = [
+  { name: 'rain',   rain: 1, sky: false, layer: 0.25, hold: [36, 70], weight: 2.2 },   // rain of light
+  { name: 'form',   rain: 0, sky: true,  layer: 0.45, hold: [40, 66], weight: 3 },   // a form in the still room
+  { name: 'storm',  rain: 1, sky: true,  layer: 0.3,  hold: [30, 52], weight: 1.6 },   // rain falls through a form
+  { name: 'still',  rain: 0, sky: false, layer: 1,    hold: [18, 32], weight: 1 },   // only the layer, and sparse drops
+];
+// Scenes: the whole show, or only its rain, or only its forms.
+export const SCENES = ['mix', 'rain', 'crystal'];
 
 // ---------- tunable settings (panel: p key or the gear button; also ?key=value) ----------
 export const DEFAULTS = {
-  scene: 'rain', form: 'auto', layer: 'auto', mirror: 0, walls: 0, haze: 0, burn: 0, twinkle: 0, rainShare: 1,
-  grid: small ? 36 : 60,  rows: small ? 72 : 96,
+  scene: 'mix', form: 'auto', layer: 'auto', mirror: 0.6, walls: 0, haze: 0, burn: 0.7, twinkle: 0.4, rainShare: 1,
+  grid: small ? 44 : 72,  rows: small ? 72 : 96,
   layout: 'strands', density: 'auto', strandShare: 1.0, rowShare: 1.0, strandMin: 0.3, rowMin: 0.35,
-  size: 0.013, maxPx: 4.5, rest: 0.025, wire: 0.1,
-  rainGain: 4.0, tipGain: 5.0, exposure: 1.5, bloom: 0.4, fog: 22, blackFloor: 4,
+  size: 0.018, maxPx: 4.5, rest: 0.03, wire: 0.2,
+  rainGain: 4.0, tipGain: 5.0, exposure: 1.8, bloom: 0.35, fog: 34, blackFloor: 3,
   rays: '2', rayGain: 0.3, rayLength: 20, rayThreshold: 0.7,
   speed: 1.0, trail: 1.0, weather: 'auto', turnTime: 8, turnSteps: 9,
   color: 'auto', palette: 'auto', rainbow: 'drop', bandSpeed: 0.17, bandScale: 1.0, saturation: 1.0,
   set: 'auto', skyDay: 90,
   flow: 'auto',
-  camera: 'orbit', orbit: 0.025, radius: 7.5, fov: 60,
-  ripples: 12,
+  camera: 'orbit', orbit: 0.025, radius: 10, fov: 76,
+  ripples: 14,
   quality: 'auto',
   breath: 'on', breathRate: 6, breathDepth: 0.3,
   volume: 0.8, music: 0.6, chimes: 0.6, rainSound: 0.3,
@@ -120,15 +125,16 @@ export const STORAGE_KEY = 'rain-of-light:settings';
 
 export const SCHEMA = [
   { title: 'Scene', items: [
-    { key: 'scene', label: 'Scene', options: Object.keys(SCENES),
-      hint: 'rain: rain of light / crystal: a mirrored room where forms of light appear (reloads the page)' },
-    { key: 'form', label: 'Form (crystal)', options: ['auto', ...FORMS.map((f) => f.name), 'none'] },
-    { key: 'layer', label: 'Layer of light (crystal)', options: ['auto', 'on', 'off'] },
+    { key: 'scene', label: 'Scene', options: SCENES,
+      hint: 'mix: rain and forms of light come and go, and blend / rain: only the rain / crystal: only the forms of light' },
+    { key: 'form', label: 'Form', options: ['auto', ...FORMS.map((f) => f.name), 'none'],
+      hint: 'auto: as the scene brings them / or hold one form (none: no form)' },
+    { key: 'layer', label: 'Layer of light', options: ['auto', 'on', 'off'] },
     { key: 'mirror', label: 'Floor mirror (0: off)', min: 0, max: 1, step: 0.05 },
     { key: 'walls', label: 'Wall mirrors (copies per side)', min: 0, max: 1, step: 1,
       hint: 'Each copy draws the lattice again: costly' },
     { key: 'haze', label: 'Haze (0: off)', min: 0, max: 2, step: 0.05,
-      hint: 'A wide, soft glow of the light that fills the room' },
+      hint: 'A wide, soft glow around the brightest light' },
     { key: 'burn', label: 'Burn-out (0: off)', min: 0, max: 1, step: 0.05,
       hint: 'The brightest light loses its colour and burns out to white' },
     { key: 'twinkle', label: 'Twinkle', min: 0, max: 2, step: 0.05 },
@@ -201,7 +207,7 @@ export const SCHEMA = [
     { key: 'camera', label: 'Move', options: ['auto', ...CAMERAS.map((c) => c.name)],
       hint: 'orbit: circle the field / walk: wander through it / spin: look around from the centre / gaze: look up and down / rise: drift up and down' },
     { key: 'orbit', label: 'Move speed', min: 0, max: 0.2, step: 0.005 },
-    { key: 'radius', label: 'Distance from the centre', min: 0, max: 10, step: 0.1 },
+    { key: 'radius', label: 'Distance from the centre', min: 0, max: 16, step: 0.1 },
     { key: 'fov', label: 'Field of view (deg)', min: 30, max: 110, step: 1 },
   ] },
   { title: 'Ripples', items: [

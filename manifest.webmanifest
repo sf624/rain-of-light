@@ -1,7 +1,7 @@
 {
   "name": "Rain of Light",
   "short_name": "Rain of Light",
-  "description": "A field of points of light, with rain falling through it. Calm generative music; click for ripples.",
+  "description": "A room of points of light over a mirror floor: rain of light, and forms of light that come and go. Calm generative music; click for ripples.",
   "start_url": "./",
   "scope": "./",
   "id": "./",

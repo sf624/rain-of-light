@@ -1,9 +1,12 @@
 # Rain of Light
 
-A field of small points of light, with rain of light falling through it.
-The weather, the colours, the direction of the rain and the camera change on
-their own, slowly. Calm generative music plays along, and every ripple of
-light rings a bell.
+A room of small points of light over a mirror floor. Rain of light falls
+through it; now and then the rain eases off and a large form of light gathers
+in the room (an orb, a spiral, a cloud), or glows while the rain falls through
+it. The show moves between these on its own, with slow cross-fades. The
+weather, the colours, the direction of the rain and the camera change on
+their own too. Calm generative music plays along, and every ripple of light
+rings a bell.
 
 ![A short clip of the piece: strands of amber light points, with drops of light falling through them as the camera walks among the strands](demo.gif)
 
@@ -36,12 +39,30 @@ your first click. The settings panel keeps what you change in this browser
 (Reset brings back the defaults). Any setting can also be given in the URL,
 such as `?color=cloud&weather=drizzle`; `#tune` opens the panel.
 
-A second scene, still a prototype: `?scene=crystal` (or Scene in the panel).
-Strands of LEDs hang in a room with a mirror floor; large forms of light
-appear in it one after another (an orb, a spiral, a cloud), with now and then
-a layer of light near the floor. The strands glow with the light they pass
-through, the air around a form is hazy, and its core burns out to white. `?form=orb` (spiral, cloud, none) and
-`?layer=on` (off) hold one.
+The strands hang a little above the mirror floor, so a thin dark line runs
+between each strand and its image; light that runs down a strand runs up its
+image, towards that line. The show passes through:
+
+- **rain**: rain of light, in the colour modes; while it falls the far
+  strands fade into a mist;
+- **a form**: the rain stops, and a form of light glows in the still room,
+  with a few pale drops and a sparse twinkle;
+- **rain through a form**: drops that pass through the form take its colour;
+- **a still room**: only a layer of light near the floor, which also comes
+  and goes beside the others.
+
+A form that comes or goes while rain falls does so from the top down, as if
+rain gathered into it or it ran off as rain. Each passage lasts from about
+20 seconds to over a minute, and each visit has its own order. `?seed=` (any
+number) gives one order, and `?t=` (seconds) starts at that time in it.
+
+Scene in the panel (or `?scene=`) pins the content: `mix` (the default, the
+whole show), `rain` (only the rain) or `crystal` (only the forms). It changes
+without a reload. `?form=orb` (spiral, cloud, none) and `?layer=on` (off)
+hold one form or the layer. `c` turns both the rain's colours and the forms'
+colours; `w` changes the weather, which also sets how many pale drops fall in
+a still room. The sound of rain follows how much rain falls: in a still room
+it is almost silent.
 
 Quality is automatic: if frames are slow, the canvas is drawn at a lower
 resolution (down to half), and raised again when the device keeps up. Set
@@ -71,8 +92,8 @@ work, because the scripts are ES modules.
 | --- | --- |
 | `index.html`, `style.css` | the page |
 | `main.js` | the director that changes weather, colour, flow and camera, and the frame loop |
-| `config.js` | palettes, colour modes, weathers, camera moves, forms, scenes, default settings and the panel's layout |
-| `crystal.js` | the crystal scene's director: which forms of light show, where, and how bright |
+| `config.js` | palettes, colour modes, weathers, camera moves, forms, passages, the room, default settings and the panel's layout |
+| `show.js` | the show's director: the timeline of passages, how much rain falls, which forms of light show, where, and how bright |
 | `shaders.js` | the GLSL shaders: the points of light, bloom and tone mapping |
 | `lattice.js` | the strands and LEDs, and the order in which they thin out |
 | `gl.js` | WebGL helpers and vector maths |
@@ -95,7 +116,9 @@ Needs Node 22 and Chrome (`google-chrome` or `chromium` on PATH, or set
 `CHROME=/path/to/chrome`). It serves the repo, opens it in headless Chrome with
 software GL, and fails on any error, a shown fallback message, a stalled frame
 loop or a black canvas. It also clicks, presses the keys and tries every colour
-mode. GitHub Actions runs it on every pull request and push to main.
+mode, the pinned scenes (`rain`, `crystal`) and a time part-way through the
+show, changes the scene in the panel (it must not reload) and checks that
+Reset brings back the mix. GitHub Actions runs it on every pull request and push to main.
 
 ## Licence
 

@@ -48,7 +48,7 @@ export function fillLattice(gl, { pointVao, pointBuf, rankBuf, wireBuf }, S, SPA
   const rowRank = new Float32Array(ROWS);
   rowOrder.forEach(([, r], n) => { rowRank[r] = (n + 0.5) / ROWS; });
   // A grid is regular: no jitter, all rows at one height, so the lattice
-  // lines up in perspective (the crystal scene wants those patterns).
+  // lines up in perspective.
   const grid = S.layout === 'grid';
   let k = 0, q = 0;
   for (let i = 0; i < GRID; i++) {
@@ -78,12 +78,15 @@ export function fillLattice(gl, { pointVao, pointBuf, rankBuf, wireBuf }, S, SPA
   gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
   gl.bindBuffer(gl.ARRAY_BUFFER, rankBuf);
   gl.bufferData(gl.ARRAY_BUFFER, rank, gl.STATIC_DRAW);
-  // Wires join each LED to the next on its strand (scattered LEDs have none).
-  const wires = S.layout === 'scatter' ? new Uint32Array(0) : new Uint32Array(GRID * GRID * (ROWS - 1) * 2);
+  // Wires: one line strip down each strand, through its LEDs (scattered LEDs
+  // have none). Strips are parted by the restart index, which WebGL2 always
+  // honours, so each LED is worked out once for the wires, not once per segment.
+  const wires = S.layout === 'scatter' ? new Uint32Array(0) : new Uint32Array(GRID * GRID * (ROWS + 1));
   if (wires.length) {
     let w = 0;
     for (let s = 0; s < GRID * GRID; s++) {
-      for (let r = 0; r < ROWS - 1; r++) { wires[w++] = s * ROWS + r; wires[w++] = s * ROWS + r + 1; }
+      for (let r = 0; r < ROWS; r++) wires[w++] = s * ROWS + r;
+      wires[w++] = 0xFFFFFFFF;
     }
   }
   gl.bindVertexArray(pointVao);

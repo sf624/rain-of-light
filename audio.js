@@ -273,10 +273,11 @@ export function createAudio({ settings }) {
       master.gain.setTargetAtTime(settings.volume, ctx.currentTime, 0.05);
     },
     // The hush follows the weather (0 light rain .. 1 downpour) and the sway
-    // the light rain sways with (-1 .. 1), so sound and light swell together.
-    rain(amount, sway = 0) {
+    // the light rain sways with (-1 .. 1), so sound and light swell together;
+    // and how much rain falls at all (0 a still room .. 1 a rain passage).
+    rain(amount, sway = 0, falling = 1) {
       if (!ctx || !on) return;
-      const level = (0.15 + 0.85 * amount) * (1 + 0.4 * sway) * settings.rainSound * 0.5;
+      const level = (0.15 + 0.85 * amount) * (1 + 0.4 * sway) * (0.06 + 0.94 * falling) * settings.rainSound * 0.5;
       rainGain.gain.setTargetAtTime(level, ctx.currentTime, 1.5);
     },
   };
