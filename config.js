@@ -16,7 +16,7 @@ export const WEATHER = [
   { name: 'drizzle',  flow: 0.6, rain: 0.0,  hold: [10, 18], weight: 2 },
   { name: 'rain',     flow: 1.0, rain: 0.25, hold: [12, 22], weight: 3 },
   { name: 'shower',   flow: 1.9, rain: 0.6,  hold: [8, 14],  weight: 2 },
-  { name: 'downpour', flow: 3.6, rain: 1.0,  hold: [6, 12],  weight: 1.5 },
+  { name: 'downpour', flow: 3.6, rain: 1.0,  hold: [6, 12],  weight: 0 },   // never on its own: the w key or the Weather setting
 ];
 // Direction: rain falls from above. Sideways (each time a new way) is a choice,
 // by the d key or the Direction setting; 'auto' changes between the two.
@@ -97,6 +97,7 @@ export const ROOM = {
 export const PASSAGES = [
   { name: 'rain',   rain: 1, sky: false, layer: 0.25, hold: [36, 70], weight: 2.2 },   // rain of light
   { name: 'form',   rain: 0, sky: true,  layer: 0.45, hold: [40, 66], weight: 3 },   // a form in the still room
+  { name: 'storm',  rain: 1, sky: true,  layer: 0.3,  hold: [30, 52], weight: 1.6 },   // rain falls through a form
   { name: 'still',  rain: 0, sky: false, layer: 1,    hold: [18, 32], weight: 1 },   // only the layer, and sparse drops
 ];
 // Scenes: the whole show, or only its rain, or only its forms.

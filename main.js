@@ -344,7 +344,7 @@ function pick(list, current, name) {
   const options = list.filter((x) => x !== current);
   let r = Math.random() * options.reduce((n, x) => n + x.weight, 0);
   for (const x of options) if ((r -= x.weight) <= 0) return x;
-  return options[options.length - 1];
+  return options.find((x) => x.weight > 0);
 }
 const pickPalette = (not) => {
   const options = PALETTES.filter((p) => p !== not);
