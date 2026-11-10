@@ -193,6 +193,9 @@ async function visit(cdp, base, query, interact) {
     }
     if (foot.gh !== 'https://github.com/sf624/rain-of-light' || !foot.rel.includes('noopener')) fail(`[${label}] no GitHub link in the panel: ${JSON.stringify(foot)}`);
     if (foot.sha !== FAKE_SHA.slice(0, 7) || foot.href !== `https://github.com/sf624/rain-of-light/commit/${FAKE_SHA}`) fail(`[${label}] commit link wrong: ${JSON.stringify(foot)}`);
+    // a vertical drag that starts on a slider must scroll the panel, not move the slider
+    const ta = await evalJs(`getComputedStyle(document.querySelector('.tuner input[type=range]')).touchAction`);
+    if (ta !== 'pan-y') fail(`[${label}] the panel's sliders have touch-action ${ta}, not pan-y`);
   }
   let f2 = state.f; // wait up to 15 s for MIN_FRAMES frames, and for more frames after the check above
   for (let i = 0; i < 30 && (f2 < MIN_FRAMES || f2 - state.f < 3); i++) { await sleep(500); f2 = await evalJs('window.__frames'); }

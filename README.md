@@ -52,7 +52,7 @@ remembered). A ripple also rings by itself now and then (Ripples in the
 panel), and a breathing guide swells the light and the pad slowly (Meditation
 in the panel; off with `?breath=off`). The settings panel keeps what you change in this browser
 (Reset brings back the defaults). Any setting can also be given in the URL,
-such as `?color=cloud&weather=drizzle`; `#tune` opens the panel.
+such as `?color=cloud&weather=drizzle`; `#tune` opens the panel. On a touch screen the panel scrolls with a finger anywhere, also over a slider: a slider moves only when you drag it sideways, and a tap on it does nothing; in portrait the panel is a sheet over the lower part so the picture stays in view.
 
 The strands hang a little above the mirror floor, so a thin dark line runs
 between each strand and its image; light that runs down a strand runs up its
