@@ -78,6 +78,8 @@ export const FORMS = [
   { name: 'orb',    type: 0, palettes: ['amber', 'candle', 'sakura', 'ice'] },
   { name: 'spiral', type: 1, palettes: ['deep sea', 'sakura', 'ice', 'aurora'] },
   { name: 'cloud',  type: 3, palettes: ['sakura', 'aurora', 'ice', 'deep sea'] },
+  { name: 'ring',   type: 4, palettes: ['amber', 'aurora', 'sakura', 'deep sea'] },
+  { name: 'veil',   type: 5, palettes: ['aurora', 'sakura', 'deep sea', 'amber'] },
 ];
 export const LAYER = { name: 'layer', type: 2, palettes: ['deep sea', 'ice', 'aurora'] };
 
@@ -225,6 +227,6 @@ export const SCHEMA = [
     { key: 'chimes', label: 'Bells', min: 0, max: 1, step: 0.05 },
     { key: 'rainSound', label: 'Rain', min: 0, max: 1, step: 0.05 },
     { key: 'formSound', label: 'Forms', min: 0, max: 1, step: 0.05,
-      hint: 'The voice each form of light brings: the orb a low hum, the spiral a turning figure, the cloud a high shimmer' },
+      hint: 'The voice each form of light brings: the orb a low hum, the spiral a turning figure, the cloud a high shimmer, the ring a glassy tone, the veil a soft air' },
   ] },
 ];

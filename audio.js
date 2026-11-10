@@ -10,8 +10,9 @@
 // only eases a little behind them.
 // - Each form of light has a voice that swells and fades with it: the orb a
 //   warm, low hum; the spiral a slow figure of notes that turns; the cloud a
-//   high, airy shimmer. As a form gathers, a chord of its own blooms; as it
-//   leaves, the harmony comes home to D.
+//   high, airy shimmer; the ring a clear, glassy tone; the veil a soft, open
+//   air. As a form gathers, a chord of its own blooms; as it leaves, the
+//   harmony comes home to D. Each voice comes from where its form is seen.
 // - With a form the pad opens (brighter); in rain it is veiled.
 // - In a still room (no rain, no form) the pad thins out, and now and then a
 //   high, soft note falls, like the room's pale drops.
@@ -35,9 +36,10 @@ const HOME = 0;                                          // where the harmony re
 const BELLS = [62, 64, 66, 69, 71, 74, 76, 78, 81]; // D major pentatonic
 // The forms' voices, and the chord each one brings when it gathers: the orb
 // (warm palettes) the low, warm G; the spiral the open, unresolved A sus2;
-// the cloud the soft Em9.
-const VOICES = ['orb', 'spiral', 'cloud'];
-const FORM_CHORD = { orb: 2, spiral: 3, cloud: 4 };
+// the cloud and the veil the soft Em9; the ring the still B minor.
+const FORM_CHORD = { orb: 2, spiral: 3, cloud: 4, ring: 1, veil: 4 };
+const VOICES = Object.keys(FORM_CHORD);
+const AIRY = { cloud: 0.012, veil: 0.007 };              // the forms with the air of the noise, and how much
 const SETTLE = 6;    // s: a chord a form brought is not changed again sooner
 
 export function createAudio({ settings }) {
@@ -53,7 +55,8 @@ export function createAudio({ settings }) {
 
   // What the show shows, as last handed in (kept while the sound is off, so
   // it starts in step).
-  const heard = { falling: 1, breath: 1, w: { orb: 0, spiral: 0, cloud: 0 }, pan: { orb: 0, spiral: 0, cloud: 0 } };
+  const zero = () => Object.fromEntries(VOICES.map((name) => [name, 0]));
+  const heard = { falling: 1, breath: 1, w: zero(), pan: zero() };
   const present = new Set();                            // forms whose voice has begun
   const leaving = new Set();                            // forms that have begun to go
   const voice = {};                                     // per form: its gain and pan
@@ -122,14 +125,17 @@ export function createAudio({ settings }) {
       p.connect(send(0.9));
       voice[name] = { g, p };
     }
-    // The cloud's air: the rain's noise, high and narrow, very soft.
+    // The air of the cloud and the veil: the rain's noise, high and narrow, very soft.
     const air = ctx.createBiquadFilter();
     air.type = 'bandpass';
     air.frequency.value = 3800;
     air.Q.value = 0.9;
-    const airGain = ctx.createGain();
-    airGain.gain.value = 0.012;
-    noise.connect(air).connect(airGain).connect(voice.cloud.g);
+    noise.connect(air);
+    for (const [name, level] of Object.entries(AIRY)) {
+      const airGain = ctx.createGain();
+      airGain.gain.value = level;
+      air.connect(airGain).connect(voice[name].g);
+    }
   }
 
   function send(level) {
@@ -231,10 +237,10 @@ export function createAudio({ settings }) {
   }
 
   // A form's voice on this chord. The spiral's is a figure of notes (see
-  // tick); the orb's and the cloud's are held, like the pad.
+  // tick); the others are held, like the pad.
   function formLayer(name, notes, t, hold) {
     if (name === 'spiral' || settings.formSound <= 0) return;
-    const level = name === 'orb' ? 0.035 : 0.025;
+    const level = { orb: 0.035, cloud: 0.025, ring: 0.02, veil: 0.022 }[name];
     const dest = fadeTo(voice[name].g);
     if (name === 'orb') {
       // Warm and low: the root, its fifth and its octave, soft and dark.
@@ -252,6 +258,19 @@ export function createAudio({ settings }) {
       for (const [i, m] of notes.slice(-2).entries()) {
         sustain(m + 12, [['sine', 0, -5, 1], ['triangle', 0, 5, 0.3]],
           { t, hold, attack: 7, peak: level * 0.35, cutoff: 3000, pan: i ? 0.4 : -0.4, dest, follow: false });
+      }
+    } else if (name === 'ring') {
+      // Clear and glassy: the root and its fifth two octaves up, pure sines,
+      // each a pair a hair apart in tune, so the tone turns slowly.
+      const r = notes[0];
+      sustain(r + 24, [['sine', 0, -3, 1], ['sine', 0, 3, 1]], { t, hold, attack: 9, peak: level * 0.3, cutoff: 5000, pan: -0.15, dest, follow: false });
+      sustain(r + 31, [['sine', 0, -2, 1], ['sine', 0, 2, 1]], { t, hold, attack: 10, peak: level * 0.18, cutoff: 5000, pan: 0.15, dest, follow: false });
+    } else if (name === 'veil') {
+      // Soft and open: the top two notes an octave up, slowly beating sines
+      // that swell late, with a little of the air.
+      for (const [i, m] of notes.slice(-2).entries()) {
+        sustain(m + 12, [['sine', 0, -6, 1], ['sine', 0, 6, 0.8]],
+          { t, hold, attack: 10, peak: level * 0.3, cutoff: 2500, pan: i ? 0.35 : -0.35, dest, follow: false });
       }
     }
   }
@@ -280,7 +299,7 @@ export function createAudio({ settings }) {
   }
 
   // How much of the room is still: no rain falls and no form shows.
-  const formsNow = () => Math.min(1, heard.w.orb + heard.w.spiral + heard.w.cloud);
+  const formsNow = () => Math.min(1, VOICES.reduce((sum, name) => sum + heard.w[name], 0));
   const stillness = () => (1 - heard.falling) * (1 - formsNow());
 
   // The pad opens and closes slowly, with 1/f fluctuation; and with the show.

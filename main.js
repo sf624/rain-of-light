@@ -667,7 +667,7 @@ function frame(now) {
   if (time > densityUntil) nextDensity(time);
   if (time > camUntil) nextCamera(time);
   ease(dt);
-  const shown = show.update(time, dt);
+  const shown = show.update(time, dt, camera.eye);
   const rk = shown.rain;                 // how much rain falls now: 0 a still room .. 1 a rain passage
   placeImages();
   sound.rain(look.rain, sway, rk);
@@ -753,8 +753,8 @@ function frame(now) {
   gl.uniform1f(u.uRainMix, rk);
   gl.uniform4fv(u.uFormA, shown.A);
   gl.uniform4fv(u.uFormB, shown.B);
-  gl.uniform2fv(u.uFormE, shown.E);
-  gl.uniform1fv(u.uFormYaw, shown.yaw);
+  gl.uniform4fv(u.uFormE, shown.E);
+  gl.uniform4fv(u.uFormF, shown.F);
   gl.uniform3fv(u.uFormC, shown.C);
   gl.uniform3fv(u.uFormD, shown.D);
   gl.uniform3fv(u.uTint, shown.tint);

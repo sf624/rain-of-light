@@ -6,6 +6,7 @@
 // timeline is made from hashes of one seed: a time (?t=) gives its picture.
 
 import { PALETTES, FORMS, LAYER, PASSAGES } from './config.js';
+import { motion, FACING } from './forms.js';
 
 const ROOM_TINT = [0.35, 0.5, 1.0];          // the room's colour while no form shows
 const hash = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
@@ -59,13 +60,13 @@ function createTimeline(seed, pool, name) {
       if (kind.sky) {
         if (prev?.sky && prev.kind !== kind && hash(r * 37 + 5) < 0.6) sky = prev.sky;
         else {
-          // Never the last form again, and more likely the one unseen the longest.
-          const options = FORMS.filter((f) => f !== recent[0]);
-          const since = (f) => (recent.includes(f) ? recent.indexOf(f) : Infinity);
-          options.sort((x, y) => since(y) - since(x));
+          // Never one of the last two forms again, and more likely the one
+          // unseen the longest (of those never seen, any one).
+          const options = FORMS.filter((f) => !recent.slice(0, Math.min(2, FORMS.length - 1)).includes(f));
+          const since = (f, i) => (recent.includes(f) ? recent.indexOf(f) : FORMS.length + hash(r * 13 + i));
+          const order = options.map((f, i) => [since(f, i), f]).sort((x, y) => y[0] - x[0]).map(([, f]) => f);
           const x = hash(r * 41 + 6);
-          const form = !recent.length ? options[Math.floor(x * options.length) % options.length]
-            : x < 0.7 ? options[0] : options[options.length - 1];
+          const form = x < 0.6 ? order[0] : order[Math.floor((x - 0.6) / 0.4 * order.length) % order.length];
           sky = episode(form, r, T, SKY_IN);
           recent.unshift(form);
         }
@@ -98,7 +99,7 @@ function createTimeline(seed, pool, name) {
       for (const e of [p.sky, p.layer]) {
         if (!e || items.has(e.id)) continue;
         const w = weight(e, t);
-        if (w > 0.001) items.set(e.id, { e, w, age: t - e.inAt, out: t > e.outAt });
+        if (w > 0.001) items.set(e.id, { e, w, age: t - e.inAt, out: t > e.outAt, gone: t - e.outAt });
       }
       if (p.start > t + 30) break;
     }
@@ -141,9 +142,18 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
   // form setting blends in rather than cutting. Per episode: its weight now.
   const shown = new Map();                    // id -> { x, w, col: [c, d] }
   let rainNow = null, shift = 0;
-  const colorsOf = (e) => {
+  // The layer answers the form above it: never the form's own palette, and
+  // never a pale one under a form (a form over a grey sea reads as no colour).
+  const PALE = ['ice', 'candle'];
+  const paletteOf = (e) => e.form.palettes[(e.pal + shift) % e.form.palettes.length];
+  const colorsOf = (e, above) => {
     const names = e.form.palettes;
-    const p = PALETTES.find((q) => q.name === names[(e.pal + shift) % names.length]);
+    let name = paletteOf(e);
+    if (e.form === LAYER && above) {
+      const clash = (n) => n === above || PALE.includes(n);
+      for (let i = 0; i < names.length && clash(name); i++) name = names[(e.pal + shift + i + 1) % names.length];
+    }
+    const p = PALETTES.find((q) => q.name === name);
     // An orb is pale at its heart and deepens to its rim; the others start deep.
     return e.form.name === 'orb' ? [p.b, p.a] : [p.a, p.b];
   };
@@ -151,52 +161,53 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
   const SLOTS = 3;                            // two sky forms (one coming, one going) and the layer
   const A = new Float32Array(SLOTS * 4), B = new Float32Array(SLOTS * 4);
   const C = new Float32Array(SLOTS * 3), D = new Float32Array(SLOTS * 3);
-  const E = new Float32Array(SLOTS * 2), yaw = new Float32Array(SLOTS);
+  const E = new Float32Array(SLOTS * 4), F = new Float32Array(SLOTS * 4);
   const tint = [...ROOM_TINT];
 
-  // Where a form is at its age, how large, how turned.
-  function place(k, { x, w, col }, sweep) {
-    const { e, age, out } = x;
+  // Where a form is at its age, how large, how turned (see forms.js). The
+  // forms that turn a face to the room follow the eye slowly, as it moves.
+  function place(k, s, sweep, eye, dt) {
+    const { x, w, col } = s;
+    const { e, age, out, gone } = x;
     const { form, r } = e;
-    const ph = r * 6.2832;
-    let centre = [0, 0, 0], size = 1, turn = 0, tilt = 0, lean = 0;
-    if (form.name === 'orb') {
-      centre = [3.5 * Math.sin(0.05 * age + ph), -2 + 1.2 * Math.sin(0.03 * age + ph), 3.5 * Math.cos(0.04 * age + ph)];
-      size = 3.8 + 0.3 * Math.sin(0.2 * age);
-    } else if (form.name === 'spiral') {
-      centre = [1.5 * Math.sin(0.03 * age + ph), -2, 1.5 * Math.cos(0.025 * age + ph)];
-      size = 7.5;
-      tilt = 1.1 + 0.15 * Math.sin(0.04 * age + ph);
-      lean = 0.04 * age + ph;
-      turn = 0.12 * age + ph;
-    } else if (form.name === 'cloud') {
-      centre = [4 * Math.sin(0.035 * age + ph), -1.5 + Math.sin(0.05 * age), 3 * Math.cos(0.03 * age + ph)];
-      size = 6;
-    } else {                                  // the layer: its surface height, its thickness
-      centre = [0, feet + 1.1, 0];
-      size = 0.35;
+    let m;
+    if (form === LAYER) {                     // the layer: its surface height, its thickness
+      m = { centre: [0, feet + 1.1, 0], size: 0.35, turn: 0, tilt: 0, yaw: 0, f: [0, 0, 0], dissolve: 0, bound: 1e4 };
+    } else {
+      const leave = out ? smooth(gone / e.outFade) : 0;
+      m = motion(form.name, age, leave, r, s.face ?? 0);
+      if (FACING.has(form.name) && eye) {
+        const goal = Math.atan2(m.centre[0] - eye[0], m.centre[2] - eye[2]);
+        const turn = s.face === undefined ? 1 : 1 - Math.exp(-dt / 5);
+        const d = goal - (s.face ?? goal);
+        s.face = (s.face ?? goal) + (d - Math.round(d / (2 * Math.PI)) * 2 * Math.PI) * turn;
+        m = motion(form.name, age, leave, r, s.face);
+      }
     }
-    A.set([form.type, w, size, turn], k * 4);
-    B.set([...centre, tilt], k * 4);
-    yaw[k] = lean;
+    A.set([form.type, w, m.size, m.turn], k * 4);
+    B.set([...m.centre, m.tilt], k * 4);
     C.set(col[0], k * 3);
     D.set(col[1], k * 3);
     // While rain falls, a form comes from the top down and goes from the top
     // down, as if rain gathered into it or it ran off as rain; else LED by LED.
-    E.set([sweep, out ? -1 : 1], k * 2);
+    E.set([sweep, out ? -1 : 1, m.yaw, m.dissolve], k * 4);
+    F.set([...m.f, m.bound], k * 4);
   }
 
-  function update(t, dt) {
+  // eye: where the camera is, for the forms that turn towards it.
+  function update(t, dt, eye) {
     const want = wanted(t);
     const first = rainNow === null;
     const k = first ? 1 : 1 - Math.exp(-dt / EASE);
     rainNow = first ? want.rain : rainNow + (want.rain - rainNow) * k;
     const kc = first ? 1 : 1 - Math.exp(-dt / 2.0);
     const ids = new Set();
+    const top = want.items.filter((x) => x.e.form !== LAYER).sort((a, b) => b.w - a.w)[0];
+    const above = top && paletteOf(top.e);
     for (const x of want.items) {
       ids.add(x.e.id);
       const s = shown.get(x.e.id);
-      const goal = colorsOf(x.e);
+      const goal = colorsOf(x.e, above);
       if (!s) shown.set(x.e.id, { x, w: first ? x.w : 0, col: goal.map((c) => [...c]) });
       else {
         s.x = x;
@@ -225,9 +236,9 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
       if (!s || s.w <= 0.001) return;
       // While rain falls the layer thins out, LED by LED, so the rain shows
       // through it. It lies too low to come from the top down: always LED by LED.
-      if (n === 2) place(n, { ...s, w: s.w * (1 - 0.45 * rainNow) }, 0);
+      if (n === 2) place(n, { ...s, w: s.w * (1 - 0.45 * rainNow) }, 0, eye, dt);
       else {
-        place(n, s, rainNow);
+        place(n, s, rainNow, eye, dt);
         forms.push({ name: s.x.e.form.name, w: s.w, out: s.x.out, at: [B[n * 4], B[n * 4 + 1], B[n * 4 + 2]] });
       }
       for (let i = 0; i < 3; i++) mixed[i] += s.col[0][i] * s.w;
@@ -237,7 +248,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
     const m = Math.min(1, sum);
     for (let i = 0; i < 3; i++) tint[i] = (sum > 0 ? mixed[i] / sum : 0) * m + ROOM_TINT[i] * (1 - m);
     // forms: the sky forms that show, for the music (see audio.js forms()).
-    return { rain: rainNow, A, B, C, D, E, yaw, tint, forms };
+    return { rain: rainNow, A, B, C, D, E, F, tint, forms };
   }
 
   // The colour key: every form, shown now or later, takes its next palette.
