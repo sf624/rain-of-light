@@ -10,15 +10,16 @@ every ripple of light rings a bell.
 
 <table>
   <tr>
-    <td align="center"><img src="docs/rain.gif" alt="Rain of light: teal drops fall in long strands of light points, and the camera circles slowly" width="100%"><br><sub>rain of light</sub></td>
+    <td align="center"><img src="docs/rain.gif" alt="Rain of light: drops in drifting clouds of magenta, violet and teal fall along strands of light points, over their dimmer image in the mirror floor" width="100%"><br><sub>rain of light</sub></td>
+    <td align="center"><img src="docs/storm.gif" alt="Amber rain of light falls around an orb of amber light and gives way to it; the floor mirrors both" width="100%"><br><sub>rain falling through a form</sub></td>
+  </tr>
+  <tr>
     <td align="center"><img src="docs/orb.gif" alt="An orb of amber light, pale at its heart, glows in the still room above a mirror floor, with a thin blue layer of light along the floor" width="100%"><br><sub>an orb in the still room, with the layer</sub></td>
+    <td align="center"><img src="docs/spiral.gif" alt="A spiral of pale blue light turns slowly above a green layer of light and is mirrored in the floor" width="100%"><br><sub>a spiral</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/spiral.gif" alt="A spiral of pale blue light gathers above the mirror floor and is mirrored in it" width="100%"><br><sub>a spiral</sub></td>
-    <td align="center"><img src="docs/cloud.gif" alt="A cloud of pink points of light, bright at its heart and flat at its base, floats above a thin blue layer of light and its image in the mirror floor" width="100%"><br><sub>a cloud</sub></td>
-  </tr>
-  <tr>
-    <td align="center" colspan="2"><img src="docs/storm.gif" alt="Amber rain of light falls around an orb of amber light and gives way to it" width="50%"><br><sub>rain falling through a form</sub></td>
+    <td align="center"><img src="docs/cloud.gif" alt="A cloud of pink points of light, round heads lit from above over a flat base, floats above a thin blue layer of light and its image in the mirror floor" width="100%"><br><sub>a cloud</sub></td>
+    <td align="center"><img src="docs/veil.gif" alt="A veil of green light like an aurora: rays of many heights rise from a bright wavy hem, above a blue layer of light and its image in the floor" width="100%"><br><sub>a veil</sub></td>
   </tr>
 </table>
 
@@ -60,8 +61,10 @@ The strands hang a little above the mirror floor, so a thin dark line runs
 between each strand and its image; light that runs down a strand runs up its
 image, towards that line. The show passes through:
 
-- **rain**: rain of light, in the colour modes; while it falls the far
-  strands fade into a mist;
+- **rain**: rain of light, in the colour modes, with its image in the floor;
+  while it falls the farthest strands fade into a mist. A new colour takes
+  the rain over strand by strand, from the top down, so two colours never
+  blend into grey;
 - **a form**: the rain stops, and a form of light glows in the still room,
   with a few pale drops and a sparse twinkle;
 - **rain through a form**: the rain takes the form's colours, thins, and
@@ -70,8 +73,10 @@ image, towards that line. The show passes through:
 - **a still room**: only a layer of light near the floor, which also comes
   and goes beside the others, each time at a height, a thickness and a
   brightness of its own; under a form it thins out, so the form stays the
-  subject. In a still room a ripple is a fine ring that spreads level, like
-  one on water; in the rain it is a round wave.
+  subject. With the room to itself it is the subject: a brighter sea in a
+  longer swell, its crests paler. In a still room a ripple is a ring that
+  spreads level, like one on water, lighting the strands as it passes; in
+  the rain it is a round wave. A tap sets it off about where the forms are.
 
 The forms move, slowly, each in its own way, and the mirror floor shows each
 move:
@@ -81,10 +86,11 @@ move:
   again; it goes by sinking back into the floor;
 - **spiral**: unfurls out of its bright core, its arms turning, and winds back
   into it as it goes; it turns its face to the room, leaning to and fro;
-- **cloud**: a cloud of separate points, a few puffs heaped over a flat base,
-  thick and bright at its heart and frayed into single points at its edge;
-  it gathers as points fall into place, drifts across the room, now and then
-  parts in two, and goes by rising away as points;
+- **cloud**: a cloud of separate points, round heads of several heights
+  heaped over a flat base, lit from above: the top of each head glows bright
+  and pale, its underside lies in a deeper shade. It turns its long side to
+  the room, gathers as points fall into place, drifts across the room, now
+  and then parts in two, and goes by rising away as points;
 - **ring**: rises out of the floor lying flat, beside its image, then stands up
   and turns slowly; now and then it parts into two hoops that cross and come
   back into one; it goes by lying down and sinking into the floor;
@@ -96,22 +102,28 @@ move:
 The layer near the floor takes a colour that answers the form above it (blue
 under amber, violet under green, and so on); a pale form (ice, candle) sets
 the room and its rain in a deeper colour. The forms keep a little beyond the
-middle of the room as you look at them. A
+middle of the room as you look at them, low enough that the top of the view
+never cuts them. A
 form that comes or goes while rain falls does so from the top down, as if
 rain gathered into it or it ran off as rain. Each passage lasts from about
 20 seconds to over a minute, and each visit has its own order. `?seed=` (any
-number) gives one order, and `?t=` (seconds) starts at that time in it.
+number) gives one order, of the passages and of the rain's weather, colours,
+direction and density, and `?t=` (seconds) starts at that time in it.
 
 The weather of the rain (drizzle, rain) changes on its own too; the heavy
 ones, `shower` and `downpour`, never come by themselves: choose them with `w`
-or the Weather setting. When the rain turns between falling and sideways, the
-two cross-fade (Turn steps in the panel makes it turn in steps instead).
+or the Weather setting. The rain falls most of the time; now and then it
+flows sideways for a quarter of a minute, a field of drifting points. When
+it turns between falling and sideways, the two cross-fade (Turn steps in the
+panel makes it turn in steps instead).
 
 A view narrower than 16:9 (a narrow window, a phone held upright) zooms out,
-smoothly with its shape: the field of view opens (up to 104 degrees) and the
+smoothly with its shape: the field of view opens (up to 96 degrees) and the
 eye steps back from the centre, so the room and the forms keep about the
-size they have in landscape instead of filling the narrow view. The Field of
-view and Distance settings are what a 16:9 view shows.
+size they have in landscape instead of filling the narrow view. In a tall
+view the eye looks level and the forms float higher over the floor, so a
+form stands in the upper middle with its image in the floor below. The Field
+of view and Distance settings are what a 16:9 view shows.
 
 Scene in the panel (or `?scene=`) pins the content: `mix` (the default, the
 whole show), `rain` (only the rain) or `crystal` (only the forms). It changes
@@ -168,7 +180,8 @@ work, because the scripts are ES modules.
 | File | What |
 | --- | --- |
 | `index.html`, `style.css` | the page |
-| `main.js` | the director that changes weather, colour, flow and camera, and the frame loop |
+| `main.js` | the frame loop: puts the directors' choices to work, the camera, the drawing |
+| `director.js` | the rain's director: which weather, colour mode, direction, density and camera move come when, from the seed |
 | `config.js` | palettes, colour modes, weathers, camera moves, forms, passages, the room, default settings and the panel's layout |
 | `show.js` | the show's director: the timeline of passages, how much rain falls, which forms of light show, and how bright |
 | `forms.js` | how each form of light moves through its life: where it is, how large and how turned |

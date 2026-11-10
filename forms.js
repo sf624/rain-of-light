@@ -33,11 +33,11 @@ const swell = (age, first, every, len) => {
 // risen (its heart glows only once it is clear of the floor).
 function orb(age, leave, ph, face) {
   const size = 3.3 + 0.3 * Math.sin(0.11 * age + ph);
-  const hover = -2.4 + 0.9 * Math.sin(0.03 * age + ph);
+  const hover = -3.4 + 0.6 * Math.sin(0.03 * age + ph);
   const deep = FLOOR - size * 1.1;                  // below the floor, out of sight
   const y = mix(mix(deep, hover, smooth(age / 22)), deep, smooth(leave * 1.1) * 0.75);
   const apart = 2.3 * swell(age, 30, 110, 46);
-  const way = 0.02 * age + ph, drift = 2.6;
+  const way = 0.02 * age + ph, drift = 2.0;
   return {
     centre: [drift * Math.sin(0.035 * age + ph), y, drift * Math.cos(0.028 * age + ph)],
     size, f: [apart * Math.cos(way), apart * Math.sin(way), smooth((y - FLOOR) / size)],
@@ -50,9 +50,9 @@ function orb(age, leave, ph, face) {
 // it would read as a plain column), leaning a little to and fro.
 // f[0]: how far it has unfurled (0.15 .. 1).
 function spiral(age, leave, ph, face) {
-  const size = 7.2, drift = 2.0;
+  const size = 5.8, drift = 2.0;
   return {
-    centre: [drift * Math.sin(0.025 * age + ph), -1.6 + 0.7 * Math.sin(0.02 * age + ph), drift * Math.cos(0.02 * age + ph)],
+    centre: [drift * Math.sin(0.025 * age + ph), -2.6 + 0.6 * Math.sin(0.02 * age + ph), drift * Math.cos(0.02 * age + ph)],
     size, turn: 0.1 * age + ph,
     yaw: face + 0.75 * Math.sin(0.031 * age + ph),
     tilt: 1.4 + 0.3 * Math.sin(0.023 * age + 2 * ph),
@@ -61,19 +61,20 @@ function spiral(age, leave, ph, face) {
   };
 }
 
-// A cloud of points: a few puffs over a flat base. It gathers as points fall
-// into place, drifts across the room, and now and then parts into two drifts
-// that come together again; it goes by rising away as points.
-// f: how far each drift has moved from the centre (x, z).
+// A cloud of points: round heads heaped over a flat base, its long side to
+// the room. It gathers as points fall into place, drifts across the room,
+// and now and then parts into two drifts that come together again; it goes
+// by rising away as points.
+// f[0]: how far each drift has moved from the centre, along the cloud.
 function cloud(age, leave, ph, face) {
-  const size = 3.0;           // about one puff's radius
-  const apart = 2.6 * swell(age, 24, 90, 50);
-  const way = -0.015 * age + ph;
+  const size = 2.9;           // about one head's radius
+  const apart = 2.2 * swell(age, 24, 90, 50);
   return {
-    centre: [3.2 * Math.sin(0.022 * age + ph), -3.3 + 0.5 * Math.sin(0.03 * age), 2.8 * Math.sin(0.017 * age + 2 * ph + 1)],
-    size, f: [apart * Math.cos(way), apart * Math.sin(way), 0],
+    centre: [2.6 * Math.sin(0.022 * age + ph), -4.0 + 0.4 * Math.sin(0.03 * age), 2.6 * Math.sin(0.017 * age + 2 * ph + 1)],
+    size, f: [apart, 0, 0],
+    yaw: face + 0.35 * Math.sin(0.019 * age + ph),
     dissolve: Math.max(0.85 * (1 - smooth(age / 14)), smooth(leave * 1.1)),
-    bound: size * 2.6 + apart,
+    bound: size * 3.2 + apart,
   };
 }
 
@@ -83,10 +84,10 @@ function cloud(age, leave, ph, face) {
 // and sinking into the floor.
 // f[0]: how far the two hoops lean apart (radians).
 function ring(age, leave, ph, face) {
-  const size = 3.7, drift = 1.8;
+  const size = 3.5, drift = 1.8;
   const up = smooth((age - 6) / 22) * (1 - smooth(leave * 1.2));   // 0 lying .. 1 standing
   const rise = smooth(age / 16) * (1 - smooth(leave * 1.1 - 0.2));
-  const y = mix(FLOOR - 0.9, -2.5 + 0.5 * Math.sin(0.025 * age + ph), rise);
+  const y = mix(FLOOR - 0.9, -3.0 + 0.4 * Math.sin(0.025 * age + ph), rise);
   return {
     centre: [drift * Math.sin(0.02 * age + ph), y, drift * Math.cos(0.017 * age + ph)],
     size, turn: 0.12 * age + ph,
@@ -97,17 +98,18 @@ function ring(age, leave, ph, face) {
   };
 }
 
-// A veil, like an aurora: a curtain of light across the room, hanging in
+// A veil, like an aurora: a curtain of light across the room, low over the
+// floor so that its rays stand in the middle of the view, hanging in
 // folds that slowly travel along it, its rays rising from a bright lower
 // hem; it unrolls from one end, sways slowly about the way it faces the
 // room, and goes by lifting away upward.
 // f[0]: how much of it has unrolled (0 .. 1); f[1]: how far it has lifted;
 // f[2]: half its length.
 function veil(age, leave, ph, face) {
-  const size = 5.2;                                 // the height of its longest rays
-  const half = 9.5, drift = 1.5;
+  const size = 4.6;                                 // the height of its longest rays
+  const half = 8, drift = 1.5;
   return {
-    centre: [drift * Math.sin(0.015 * age + ph), -3.2 + 0.35 * Math.sin(0.03 * age + ph), drift * Math.cos(0.012 * age + ph)],
+    centre: [drift * Math.sin(0.015 * age + ph), -4.5 + 0.35 * Math.sin(0.03 * age + ph), drift * Math.cos(0.012 * age + ph)],
     size, turn: 0.05 * age + ph * 3,
     yaw: face + 0.16 * Math.sin(0.017 * age + ph * 2),
     f: [smooth(age / 20), 6 * smooth(leave), half],
@@ -119,13 +121,15 @@ function veil(age, leave, ph, face) {
 export const MOTIONS = { orb, spiral, cloud, ring, veil };
 // How far beyond its own path each form keeps, as the eye sees it: the loose
 // and the wide ones read from a distance, and none flares right at the eye.
-const BACK = { orb: 1.5, ring: 1.5, cloud: 3.5, veil: 3 };
+const BACK = { orb: 2.5, spiral: 2.5, ring: 2.5, cloud: 3.5, veil: 3 };
 
 // The form's place at its age: the defaults filled in. anchor is the place
 // on its own path (the eye's way to it gives `face`); centre is where it shows.
-export function motion(name, age, leave, r, face) {
+// rise: how many times higher over the floor it floats (a tall view has the
+// room for it; see viewFit in main.js). What is in the floor stays there.
+export function motion(name, age, leave, r, face, rise = 1) {
   const m = MOTIONS[name](age, leave, r * TAU, face);
   const [x, y, z] = m.centre, back = BACK[name] || 0;
   return { turn: 0, tilt: 0, yaw: 0, f: [0, 0, 0], dissolve: 0, ...m,
-    anchor: m.centre, centre: [x + back * Math.sin(face), y, z + back * Math.cos(face)] };
+    anchor: m.centre, centre: [x + back * Math.sin(face), y > FLOOR ? FLOOR + (y - FLOOR) * rise : y, z + back * Math.cos(face)] };
 }

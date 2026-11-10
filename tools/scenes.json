@@ -8,7 +8,12 @@
     {
       "name": "rain",
       "seed": 1,
-      "q": "scene=rain&color=mono&palette=aurora&weather=shower&t=30&orbit=0.07&rainGain=8&tipGain=9&exposure=2.8"
+      "q": "scene=rain&color=cloud&weather=drizzle&flow=down&density=manual&strandShare=0.7&rowShare=0.85&seed=8&t=30&orbit=0.03&exposure=2.4&grid=72&rows=96"
+    },
+    {
+      "name": "storm",
+      "seed": 1,
+      "q": "scene=mix&form=orb&color=mono&weather=rain&flow=down&density=manual&seed=3&t=30&orbit=0.04&grid=72&rows=96"
     },
     {
       "name": "orb",
@@ -18,7 +23,7 @@
     {
       "name": "spiral",
       "seed": 1,
-      "q": "scene=crystal&form=spiral&layer=on&seed=3&t=30&orbit=0.07&grid=72&rows=96"
+      "q": "scene=crystal&form=spiral&layer=on&seed=5&t=96&orbit=0.05&grid=72&rows=96"
     },
     {
       "name": "cloud",
@@ -26,9 +31,9 @@
       "q": "scene=crystal&form=cloud&layer=on&seed=5&t=30&orbit=0.07&grid=72&rows=96"
     },
     {
-      "name": "storm",
+      "name": "veil",
       "seed": 1,
-      "q": "scene=mix&form=orb&seed=1&t=30&orbit=0.07&grid=72&rows=96"
+      "q": "scene=crystal&form=veil&layer=on&seed=3&t=30&orbit=0.05&grid=72&rows=96"
     }
   ]
 }

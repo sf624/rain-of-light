@@ -5,20 +5,19 @@
 // another (the rain, the form, the layer), so there is never a cut. The
 // timeline is made from hashes of one seed: a time (?t=) gives its picture.
 
-import { PALETTES, FORMS, LAYER, PASSAGES } from './config.js';
+import { PALETTES, PALE, FORMS, LAYER, PASSAGES } from './config.js';
+import { hash } from './director.js';
 import { motion } from './forms.js';
 
 const ROOM_TINT = [0.35, 0.5, 1.0];          // the room's colour while no form shows
 // The layer's palettes under a form of each palette: never the form's own,
 // never a pale one (a form over a grey sea reads as no colour), and deep
 // enough to stay the ground under it.
-const PALE = ['ice', 'candle'];
 const UNDER = {
   amber: ['deep sea', 'sakura'], candle: ['amber', 'deep sea'], sakura: ['deep sea', 'aurora'],
   ice: ['deep sea', 'sakura'], aurora: ['deep sea', 'sakura'], 'deep sea': ['aurora', 'sakura'],
 };
 const STORM_GAIN = 0.8;                       // a form among rain glows this much more, to hold its own
-const hash = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 const smooth = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 const between = (a, b, r) => a + (b - a) * r;
 
@@ -183,16 +182,16 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
     let m;
     if (form === LAYER) {                     // the layer: its surface height, its thickness
       m = { centre: [0, feet + between(0.5, 1.8, hash(r * 61 + 1)), 0], size: between(0.2, 0.45, hash(r * 61 + 2)),
-        turn: 0, tilt: 0, yaw: 0, f: [between(0.55, 1, hash(r * 61 + 3)), 0, 0], dissolve: 0, bound: 1e4 };
+        turn: 0, tilt: 0, yaw: 0, f: [between(0.55, 1, hash(r * 61 + 3)), s.alone, 0], dissolve: 0, bound: 1e4 };
     } else {
       const leave = out ? smooth(gone / e.outFade) : 0;
-      m = motion(form.name, age, leave, r, s.face ?? 0);
+      m = motion(form.name, age, leave, r, s.face ?? 0, view?.rise);
       if (eye) {
         const goal = Math.atan2(m.anchor[0] - eye[0], m.anchor[2] - eye[2]);
         const turn = s.face === undefined ? 1 : 1 - Math.exp(-dt / 5);
         const d = goal - (s.face ?? goal);
         s.face = (s.face ?? goal) + (d - Math.round(d / (2 * Math.PI)) * 2 * Math.PI) * turn;
-        m = motion(form.name, age, leave, r, s.face);
+        m = motion(form.name, age, leave, r, s.face, view.rise);
       }
     }
     A.set([form.type, w, m.size, m.turn], k * 4);
@@ -207,7 +206,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
     F.set([...m.f, m.bound], k * 4);
   }
 
-  // view: the camera ({ eye }): the forms turn towards the eye.
+  // view: the camera ({ eye, rise }): the forms turn towards the eye, and float higher in a tall view.
   function update(t, dt, view) {
     const want = wanted(t);
     const first = rainNow === null;
@@ -252,7 +251,8 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
       // While rain falls, or under a form, the layer thins out, LED by LED:
       // the rain shows through it, and the form stays the subject. It lies
       // too low to come from the top down: always LED by LED.
-      if (n === 2) place(n, { ...s, w: s.w * (1 - 0.45 * rainNow) * (1 - 0.5 * skyNow) }, 0, view, dt);
+      // With the room to itself (no rain, no form) it is the subject (alone).
+      if (n === 2) place(n, { ...s, w: s.w * (1 - 0.45 * rainNow) * (1 - 0.5 * skyNow), alone: (1 - rainNow) * (1 - skyNow) }, 0, view, dt);
       else {
         place(n, s, rainNow, view, dt);
         forms.push({ name: s.x.e.form.name, w: s.w, out: s.x.out, at: [B[n * 4], B[n * 4 + 1], B[n * 4 + 2]] });
