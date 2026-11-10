@@ -3,11 +3,25 @@
 // Web Audio only, no files. Browsers start sound only after a click or a key.
 // What changes slowly (the bells' pitch and strength, the pad's brightness,
 // the hush of rain) sways with 1/f fluctuation, see sway.js.
+//
+// The music follows the show (main.js hands its state in every frame, see
+// rain(), forms() and breath()): what the eye sees change, the ear hears
+// change at the same moment. The show's own fades are the clock; the music
+// only eases a little behind them.
+// - Each form of light has a voice that swells and fades with it: the orb a
+//   warm, low hum; the spiral a slow figure of notes that turns; the cloud a
+//   high, airy shimmer. As a form gathers, a chord of its own blooms; as it
+//   leaves, the harmony comes home to D.
+// - With a form the pad opens (brighter); in rain it is veiled.
+// - In a still room (no rain, no form) the pad thins out, and now and then a
+//   high, soft note falls, like the room's pale drops.
+// - The breath: a low tone under the pad swells as the light does.
 
 import { createSway } from './sway.js';
 
 const mtof = (m) => 440 * 2 ** ((m - 69) / 12);
 const rand = (a, b) => a + Math.random() * (b - a);
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 
 // Chords as MIDI notes, all within D major, so any one may follow any other.
 const CHORDS = [
@@ -17,17 +31,37 @@ const CHORDS = [
   [45, 52, 59, 61, 64], // A sus2
   [40, 47, 54, 57, 62], // Em9
 ];
+const HOME = 0;                                          // where the harmony rests as a form leaves
 const BELLS = [62, 64, 66, 69, 71, 74, 76, 78, 81]; // D major pentatonic
+// The forms' voices, and the chord each one brings when it gathers: the orb
+// (warm palettes) the low, warm G; the spiral the open, unresolved A sus2;
+// the cloud the soft Em9.
+const VOICES = ['orb', 'spiral', 'cloud'];
+const FORM_CHORD = { orb: 2, spiral: 3, cloud: 4 };
+const SETTLE = 6;    // s: a chord a form brought is not changed again sooner
 
 export function createAudio({ settings }) {
   let ctx = null, master = null, bus = null, verb = null, rainGain = null, clickBuf = null;
   let padBus = null;  // the pad, swelling with the breath
+  let swell = null;   // the low tone under the pad, swelling more
   let on = false, chord = -1, timers = [];
   let bright = null;                                    // the pad's brightness, shared by every voice
   const padSway = createSway({ fastest: 1, octaves: 6 });  // seconds: 1 s .. about a minute
   const bellPitch = createSway({ fastest: 1, octaves: 5 }); // per bell: which note (a 1/f melody)
   const bellLoud = createSway({ fastest: 1, octaves: 4 });  // per bell: how strong
   const TICK = 0.25;                                    // seconds between brightness updates
+
+  // What the show shows, as last handed in (kept while the sound is off, so
+  // it starts in step).
+  const heard = { falling: 1, breath: 1, w: { orb: 0, spiral: 0, cloud: 0 }, pan: { orb: 0, spiral: 0, cloud: 0 } };
+  const present = new Set();                            // forms whose voice has begun
+  const leaving = new Set();                            // forms that have begun to go
+  const voice = {};                                     // per form: its gain and pan
+  // The chord now: when it began, how long it holds, why it came, and the
+  // fades its voices sound through (to let it go early).
+  let now = { at: -Infinity, hold: 0, why: 'time', fades: [] };
+  let chordTimer = 0;
+  let arpAt = 0, arpStep = 0, arpPan = 0, dropAt = 0;
 
   function build() {
     ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -67,6 +101,8 @@ export function createAudio({ settings }) {
     padBus = ctx.createGain();
     padBus.connect(bus);
     padBus.connect(send(0.7));
+    swell = ctx.createGain();
+    swell.connect(padBus);
 
     rainGain = ctx.createGain();
     rainGain.gain.value = 0;
@@ -74,6 +110,26 @@ export function createAudio({ settings }) {
     rainGain.connect(bus);
     rainGain.connect(send(0.3));
     noise.start();
+
+    // The forms' voices: each through its own gain (the form's weight) and
+    // pan (where the form is seen).
+    for (const name of VOICES) {
+      const g = ctx.createGain();
+      g.gain.value = 0;
+      const p = ctx.createStereoPanner();
+      g.connect(p);
+      p.connect(bus);
+      p.connect(send(0.9));
+      voice[name] = { g, p };
+    }
+    // The cloud's air: the rain's noise, high and narrow, very soft.
+    const air = ctx.createBiquadFilter();
+    air.type = 'bandpass';
+    air.frequency.value = 3800;
+    air.Q.value = 0.9;
+    const airGain = ctx.createGain();
+    airGain.gain.value = 0.025;
+    noise.connect(air).connect(airGain).connect(voice.cloud.g);
   }
 
   function send(level) {
@@ -112,65 +168,216 @@ export function createAudio({ settings }) {
     return buf;
   }
 
+  // A gain the chord now sounds through to `dest`, so it can be let go early.
+  function fadeTo(dest) {
+    const g = ctx.createGain();
+    g.connect(dest);
+    now.fades.push(g);
+    return g;
+  }
+
+  // One sustained note: oscillator layers [type, semitones up, cents, gain]
+  // through a low-pass, faded in over `attack` and out after `hold`.
+  function sustain(m, layers, { t, hold, attack = 7, release = 10, peak, cutoff, pan, dest, follow = true }) {
+    const top = t + Math.max(attack, hold), end = top + release + 0.1;
+    const out = ctx.createGain();
+    out.gain.setValueAtTime(0, t);
+    out.gain.linearRampToValueAtTime(peak, t + attack);
+    out.gain.setValueAtTime(peak, top);
+    out.gain.linearRampToValueAtTime(0, top + release);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = cutoff;
+    filter.Q.value = 0.7;
+    if (follow) bright.connect(filter.frequency);
+    const p = ctx.createStereoPanner();
+    p.pan.value = pan;
+    filter.connect(out).connect(p).connect(dest);
+    let last = null;
+    for (const [type, up, cents, gain] of layers) {
+      const o = ctx.createOscillator();
+      o.type = type;
+      o.frequency.value = mtof(m + up);
+      o.detune.value = cents + rand(-2, 2);
+      const g = ctx.createGain();
+      g.gain.value = gain;
+      o.connect(g).connect(filter);
+      o.start(t);
+      o.stop(end);
+      last = o;
+    }
+    // Let go of the shared brightness when the voice ends (a timer would not
+    // survive the sound being turned off).
+    if (follow) last.onended = () => bright.disconnect(filter.frequency);
+  }
+
   // One chord of the pad: each note a sine, a triangle and a faint saw,
   // slightly apart in tune, through a slowly breathing low-pass filter; the
   // upper notes also sound softly an octave up. Faded in and out over seconds.
+  // Under it, the root an octave down swells with the breath; and each form
+  // that shows adds its voice.
   function padChord(notes, hold) {
-    const t = ctx.currentTime, attack = 7, release = 10;
+    const t = ctx.currentTime;
     const level = 0.048 * settings.music;
-    const end = t + hold + release + 0.1;
+    const dest = fadeTo(padBus);
     for (const [i, m] of notes.entries()) {
-      const peak = level * (i === 0 ? 1.3 : 1);
-      const out = ctx.createGain();
-      out.gain.setValueAtTime(0, t);
-      out.gain.linearRampToValueAtTime(peak, t + attack);
-      out.gain.setValueAtTime(peak, t + hold);
-      out.gain.linearRampToValueAtTime(0, t + hold + release);
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.value = rand(1100, 1600);
-      filter.Q.value = 0.7;
-      bright.connect(filter.frequency);
-      const pan = ctx.createStereoPanner();
-      pan.pan.value = rand(-0.6, 0.6);
-      filter.connect(out).connect(pan);
-      pan.connect(padBus);
       const layers = [['sine', 0, -4, 1], ['triangle', 0, 4, 0.8], ['sawtooth', 0, rand(-8, 8), 0.12]];
       if (i >= notes.length - 2) layers.push(['sine', 12, rand(-3, 3), 0.22]); // the airy top
-      let last = null;
-      for (const [type, up, cents, gain] of layers) {
-        const o = ctx.createOscillator();
-        o.type = type;
-        o.frequency.value = mtof(m + up);
-        o.detune.value = cents + rand(-2, 2);
-        const g = ctx.createGain();
-        g.gain.value = gain;
-        o.connect(g).connect(filter);
-        o.start(t);
-        o.stop(end);
-        last = o;
+      sustain(m, layers, { t, hold, peak: level * (i === 0 ? 1.3 : 1), cutoff: rand(1100, 1600), pan: rand(-0.6, 0.6), dest });
+    }
+    sustain(notes[0] - 12, [['sine', 0, 0, 1], ['triangle', 0, 3, 0.5]],
+      { t, hold, peak: level * 0.9, cutoff: 380, pan: 0, dest: fadeTo(swell), follow: false });
+    for (const name of VOICES) if (present.has(name)) formLayer(name, notes, t, hold);
+  }
+
+  // A form's voice on this chord. The spiral's is a figure of notes (see
+  // tick); the orb's and the cloud's are held, like the pad.
+  function formLayer(name, notes, t, hold) {
+    if (name === 'spiral' || settings.formSound <= 0) return;
+    const level = name === 'orb' ? 0.035 : 0.05;
+    const dest = fadeTo(voice[name].g);
+    if (name === 'orb') {
+      // Warm and low: the root, its fifth and its octave, soft and dark.
+      const r = notes[0];
+      sustain(r, [['triangle', 0, -3, 1], ['sine', 0, 3, 0.8]], { t, hold, attack: 6, peak: level, cutoff: 700, pan: -0.2, dest, follow: false });
+      sustain(r + 7, [['sine', 0, 0, 1], ['triangle', 0, 5, 0.4]], { t, hold, attack: 7, peak: level * 0.8, cutoff: 800, pan: 0.2, dest, follow: false });
+      sustain(r + 12, [['sine', 0, -2, 1], ['triangle', 0, 2, 0.5]], { t, hold, attack: 8, peak: level * 0.6, cutoff: 900, pan: 0, dest, follow: false });
+    } else if (name === 'cloud') {
+      // Airy and high: the top notes two octaves up, each a pair a little
+      // apart (a slow shimmer), with the air of the noise.
+      for (const [i, m] of notes.slice(-3).entries()) {
+        sustain(m + 24, [['sine', 0, -7, 1], ['sine', 0, 7, 1]],
+          { t, hold, attack: 8, peak: level * 0.22, cutoff: 6000, pan: (i - 1) * 0.6, dest, follow: false });
       }
-      // Let go of the shared brightness when the voice ends (a timer would not
-      // survive the sound being turned off).
-      last.onended = () => bright.disconnect(filter.frequency);
+      for (const [i, m] of notes.slice(-2).entries()) {
+        sustain(m + 12, [['sine', 0, -5, 1], ['triangle', 0, 5, 0.3]],
+          { t, hold, attack: 7, peak: level * 0.35, cutoff: 3000, pan: i ? 0.4 : -0.4, dest, follow: false });
+      }
     }
   }
 
-  // The pad opens and closes slowly, with 1/f fluctuation.
+  // A short, soft note: a sine and a glassy overtone, dying away. The
+  // spiral's figure and the still room's drops.
+  function ping(m, at, { peak, decay, pan, dest, verbSend = 1 }) {
+    const f = mtof(m);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, at);
+    g.gain.linearRampToValueAtTime(peak, at + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.00005, at + decay);
+    const p = ctx.createStereoPanner();
+    p.pan.value = clamp(pan, -1, 1);
+    g.connect(p).connect(dest);
+    if (verbSend) p.connect(send(verbSend));
+    for (const [ratio, gain] of [[1, 1], [2.76, 0.12]]) {
+      const o = ctx.createOscillator();
+      o.frequency.value = f * ratio;
+      const og = ctx.createGain();
+      og.gain.value = gain;
+      o.connect(og).connect(g);
+      o.start(at);
+      o.stop(at + decay + 0.05);
+    }
+  }
+
+  // How much of the room is still: no rain falls and no form shows.
+  const formsNow = () => Math.min(1, heard.w.orb + heard.w.spiral + heard.w.cloud);
+  const stillness = () => (1 - heard.falling) * (1 - formsNow());
+
+  // The pad opens and closes slowly, with 1/f fluctuation; and with the show.
+  // The spiral's figure and the still room's drops are scheduled here, a
+  // little ahead (a hidden tab runs this only once a second).
   function tick() {
     if (!on) return;
-    bright.offset.setTargetAtTime(650 * padSway(TICK), ctx.currentTime, 0.6);
+    const t = ctx.currentTime;
+    const F = formsNow(), R = heard.falling, still = stillness();
+    const breathe = swellOf(heard.breath);
+    const open = 500 * F - 250 * R * (1 - F) - 250 * still + 150 * (breathe - 0.5);
+    bright.offset.setTargetAtTime(650 * padSway(TICK) + open, t, 0.4);
+    const ahead = t + 1.2;
+    // The spiral: the chord's notes an octave up, climbing and turning back,
+    // turning from one side to the other.
+    if (heard.w.spiral > 0.02 && settings.formSound > 0 && chord >= 0) {
+      if (arpAt < t) arpAt = t + 0.05;
+      while (arpAt < ahead) {
+        const notes = CHORDS[chord];
+        const path = [0, 1, 2, 3, 4, 3, 2, 1];
+        const m = notes[path[arpStep % path.length]] + 12;
+        arpStep++;
+        arpPan += 0.55;
+        ping(m, arpAt, { peak: 0.06 * (arpStep % 4 === 1 ? 1 : 0.7), decay: 2.6, pan: 0.6 * Math.sin(arpPan), dest: voice.spiral.g, verbSend: 0 });
+        arpAt += 1.15 + 0.25 * Math.sin(arpStep * 0.7);
+      }
+    }
+    // The still room: now and then a high, soft note, like a pale drop.
+    if (still > 0.3 && settings.chimes > 0) {
+      if (dropAt < t) dropAt = t + rand(1, 4);
+      while (dropAt < ahead) {
+        const m = BELLS[Math.floor(rand(3, BELLS.length))] + 12;
+        ping(m, dropAt, { peak: 0.022 * settings.chimes * still, decay: 1.8, pan: rand(-0.8, 0.8), dest: bus, verbSend: 1.3 });
+        dropAt += rand(2.5, 7) / still;
+      }
+    } else dropAt = 0;
     later(tick, TICK * 1000);
   }
 
-  function nextChord() {
+  // The low tone's level with the breath: its rise, made deeper.
+  const swellOf = (k) => clamp((k - 0.6) / 0.4, 0, 1) ** 2;
+
+  // A new chord: one a form asks for, home as a form leaves, else any other.
+  function nextChord(prefer, why = 'time') {
     if (!on) return;
-    let i;
-    do i = Math.floor(Math.random() * CHORDS.length); while (i === chord);
+    clearTimeout(chordTimer);
+    timers = timers.filter((x) => x !== chordTimer);
+    const t = ctx.currentTime;
+    // A chord that comes early lets the one before go soon, while it swells
+    // (so the two together stay about as loud as one).
+    if (why !== 'time') for (const g of now.fades) g.gain.setTargetAtTime(0, t + 3, 3);
+    let i = prefer;
+    if (i === undefined && leaving.size && !present.size) i = HOME;
+    if (i === undefined || i === chord) {
+      do i = Math.floor(Math.random() * CHORDS.length); while (i === chord);
+    }
     chord = i;
     const hold = rand(14, 20);
+    now = { at: t, hold, why, fades: [] };
     padChord(CHORDS[chord], hold);
-    later(nextChord, (hold - 2) * 1000); // the next one swells as this one fades
+    chordTimer = later(() => nextChord(), (hold - 2) * 1000); // the next one swells as this one fades
+  }
+
+  // A form begins to show: its chord blooms (unless one just did), or its
+  // voice joins the chord now.
+  function arrive(name) {
+    const t = ctx.currentTime;
+    if (t - now.at > SETTLE || now.why === 'leave') nextChord(FORM_CHORD[name], 'arrive');
+    else formLayer(name, CHORDS[chord], t, Math.max(4, now.at + now.hold - t));
+  }
+
+  // A form begins to go and none other comes: the harmony goes home.
+  function depart() {
+    const t = ctx.currentTime;
+    if (!present.size && t - now.at > SETTLE && chord !== HOME) nextChord(HOME, 'leave');
+  }
+
+  // The pad's level: the breath, thinned in a still room, and making a little
+  // room for a form's voice; and the low tone under it.
+  function mixPad() {
+    if (!ctx || !on) return;
+    const t = ctx.currentTime;
+    padBus.gain.setTargetAtTime(heard.breath * (1 - 0.55 * stillness()) * (1 - 0.12 * formsNow()), t, 0.15);
+    swell.gain.setTargetAtTime(swellOf(heard.breath), t, 0.15);
+  }
+
+  // The forms' voices: each as strong as its form, from where it is seen.
+  // Rain through a form: fuller, not louder. Unchanged levels are left alone.
+  function mixVoices() {
+    if (!ctx || !on) return;
+    const t = ctx.currentTime;
+    for (const name of VOICES) {
+      const v = voice[name];
+      const level = heard.w[name] * settings.formSound * (1 - 0.3 * heard.falling);
+      if (Math.abs(level - (v.level ?? -1)) > 1e-4) v.g.gain.setTargetAtTime(v.level = level, t, 0.3);
+      if (level > 0) v.p.pan.setTargetAtTime(heard.pan[name], t, 0.5);
+    }
   }
 
   // A bell like a small singing bowl: a low hum, the note, and inharmonic
@@ -227,6 +434,7 @@ export function createAudio({ settings }) {
   function later(fn, ms) {
     const id = setTimeout(() => { timers = timers.filter((x) => x !== id); fn(); }, ms);
     timers.push(id);
+    return id;
   }
 
   function start() {
@@ -238,6 +446,13 @@ export function createAudio({ settings }) {
     master.gain.cancelScheduledValues(t);
     master.gain.setValueAtTime(master.gain.value, t);
     master.gain.linearRampToValueAtTime(settings.volume, t + 3);
+    // The forms showing now sound from the start, without a chord of their own.
+    present.clear();
+    leaving.clear();
+    for (const name of VOICES) if (heard.w[name] > 0.03) present.add(name);
+    for (const name of VOICES) voice[name].level = undefined;
+    mixPad();
+    mixVoices();
     nextChord();
     tick();
   }
@@ -263,8 +478,8 @@ export function createAudio({ settings }) {
     ripple(pan) { bell(pan, 0.65 + 0.3 * bellLoud(1)); },
     // The pad's level with the breath, 0 .. 1.
     breath(k) {
-      if (!ctx || !on) return;
-      padBus.gain.setTargetAtTime(k, ctx.currentTime, 0.1);
+      heard.breath = k;
+      mixPad();
     },
     // The overall volume, 0 .. 1, eased so a dragged slider does not crackle.
     volume() {
@@ -276,9 +491,34 @@ export function createAudio({ settings }) {
     // the light rain sways with (-1 .. 1), so sound and light swell together;
     // and how much rain falls at all (0 a still room .. 1 a rain passage).
     rain(amount, sway = 0, falling = 1) {
+      heard.falling = falling;
       if (!ctx || !on) return;
       const level = (0.15 + 0.85 * amount) * (1 + 0.4 * sway) * (0.06 + 0.94 * falling) * settings.rainSound * 0.5;
       rainGain.gain.setTargetAtTime(level, ctx.currentTime, 1.5);
     },
+    // The forms that show: [{ name, w (0 .. 1), out (it has begun to go),
+    // pan (-1 .. 1, where it is seen) }]. Each one's voice follows its weight.
+    forms(list) {
+      for (const name of VOICES) heard.w[name] = 0;
+      const going = new Set();
+      for (const f of list) {
+        if (!(f.name in heard.w)) continue;
+        heard.w[f.name] = Math.max(heard.w[f.name], f.w);
+        heard.pan[f.name] = clamp(f.pan || 0, -0.8, 0.8);
+        if (f.out) going.add(f.name);
+      }
+      if (!ctx || !on) return;
+      // Arrivals first: a form that turns into another does not go home first.
+      for (const name of VOICES) {
+        if (!present.has(name) && heard.w[name] > 0.03 && !going.has(name)) { present.add(name); leaving.delete(name); arrive(name); }
+      }
+      for (const name of VOICES) {
+        const w = heard.w[name];
+        if (present.has(name) && (going.has(name) || w < 0.01)) { present.delete(name); leaving.add(name); depart(); }
+        else if (w < 0.01) leaving.delete(name);
+      }
+      mixVoices();
+    },
   };
+
 }

@@ -5,8 +5,8 @@ through it; now and then the rain eases off and a large form of light gathers
 in the room (an orb, a spiral, a cloud), or glows while the rain falls through
 it. The show moves between these on its own, with slow cross-fades. The
 weather, the colours, the direction of the rain and the camera change on
-their own too. Calm generative music plays along, and every ripple of light
-rings a bell.
+their own too. Calm generative music plays along and follows the show, and
+every ripple of light rings a bell.
 
 ![A short clip of the piece: strands of amber light points, with drops of light falling through them as the camera walks among the strands](demo.gif)
 
@@ -61,8 +61,27 @@ whole show), `rain` (only the rain) or `crystal` (only the forms). It changes
 without a reload. `?form=orb` (spiral, cloud, none) and `?layer=on` (off)
 hold one form or the layer. `c` turns both the rain's colours and the forms'
 colours; `w` changes the weather, which also sets how many pale drops fall in
-a still room. The sound of rain follows how much rain falls: in a still room
-it is almost silent.
+a still room.
+
+## What you hear
+
+The music follows what you see, at the same moment and with the same slow
+fades:
+
+- **rain**: the hush of rain swells and eases with the rain, under a slow
+  pad in D major, a little veiled;
+- **a form**: as it gathers, a chord of its own blooms and the pad opens; each
+  form has a voice that swells and fades with it, from the side where it is
+  seen: the orb a warm, low hum, the spiral a slow figure of notes that
+  climbs and turns, the cloud a high, airy shimmer. As it leaves, the
+  harmony comes home to D;
+- **rain through a form**: both, fuller but not louder;
+- **a still room**: close to silence: the pad thins out, and now and then a
+  high, soft note falls, like the room's pale drops;
+- **the breath**: a low tone under the pad swells as the light does.
+
+Each ripple rings a bell. The panel's Sound settings set the volume, the pad,
+the bells (also the still room's notes), the rain and the forms' voices.
 
 Quality is automatic: if frames are slow, the canvas is drawn at a lower
 resolution (down to half), and raised again when the device keeps up. Set
@@ -105,6 +124,7 @@ work, because the scripts are ES modules.
 | `manifest.webmanifest`, `icons/` | the install information and the app icons |
 | `sw.js` | the service worker: network first, cached files when offline (add new files to its list) |
 | `test/smoke.mjs` | the smoke test (see Test) |
+| `test/render-audio.mjs` | renders the page's sound to a WAV file, for listening and measuring (see Test) |
 
 ## Test
 
@@ -118,7 +138,20 @@ software GL, and fails on any error, a shown fallback message, a stalled frame
 loop or a black canvas. It also clicks, presses the keys and tries every colour
 mode, the pinned scenes (`rain`, `crystal`) and a time part-way through the
 show, changes the scene in the panel (it must not reload) and checks that
-Reset brings back the mix. GitHub Actions runs it on every pull request and push to main.
+Reset brings back the mix. It also renders a few seconds of sound offline and
+checks that a held orb sounds, a still room is much quieter, and nothing
+clips. GitHub Actions runs it on every pull request and push to main.
+
+To hear (or measure) the sound without speakers:
+
+```sh
+node test/render-audio.mjs --query '?seed=4&t=118&weather=rain' --seconds 200 --out /tmp/sound
+```
+
+writes `/tmp/sound.wav` (and the samples as floats, and the show's state over
+time as JSON). It runs the real page in headless Chrome on a fake clock, with
+an OfflineAudioContext in place of the AudioContext, so the show drives the
+sound exactly as it does live; see the top of the file for its limits.
 
 ## Licence
 

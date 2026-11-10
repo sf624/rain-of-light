@@ -220,19 +220,24 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
     A.fill(0);
     let sum = 0;
     const mixed = [0, 0, 0];
+    const forms = [];
     slots.forEach((s, n) => {
       if (!s || s.w <= 0.001) return;
       // While rain falls the layer thins out, LED by LED, so the rain shows
       // through it. It lies too low to come from the top down: always LED by LED.
       if (n === 2) place(n, { ...s, w: s.w * (1 - 0.45 * rainNow) }, 0);
-      else place(n, s, rainNow);
+      else {
+        place(n, s, rainNow);
+        forms.push({ name: s.x.e.form.name, w: s.w, out: s.x.out, at: [B[n * 4], B[n * 4 + 1], B[n * 4 + 2]] });
+      }
       for (let i = 0; i < 3; i++) mixed[i] += s.col[0][i] * s.w;
       sum += s.w;
     });
     // The room takes the colour of what shows.
     const m = Math.min(1, sum);
     for (let i = 0; i < 3; i++) tint[i] = (sum > 0 ? mixed[i] / sum : 0) * m + ROOM_TINT[i] * (1 - m);
-    return { rain: rainNow, A, B, C, D, E, yaw, tint };
+    // forms: the sky forms that show, for the music (see audio.js forms()).
+    return { rain: rainNow, A, B, C, D, E, yaw, tint, forms };
   }
 
   // The colour key: every form, shown now or later, takes its next palette.
