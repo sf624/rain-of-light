@@ -17,6 +17,7 @@ import { createGL, sub, cross, dot, norm, perspective, lookAt } from './gl.js';
 import { createLattice, fillLattice } from './lattice.js';
 import { createControls } from './controls.js';
 import { keepAwake } from './wakelock.js';
+import { view, createRotation } from './rotate.js';
 
 // Errors show on the page (see the inline script in index.html), so a black screen is never silent.
 const showError = window.showError;
@@ -226,6 +227,7 @@ function addRipple(x, y, z, t) {
 // Left (-1) .. right (1): where a point in the room is seen, for the sound.
 const panOf = (p) => (camera ? dot(sub(p, camera.eye), camera.r) / 6 : 0);
 
+const rotation = createRotation();
 const sound = createAudio({ settings: S });
 const controls = createControls({
   sound, S,
@@ -249,21 +251,25 @@ wake();
 // view alone.
 let mouseDrag = null; // the last mouse position of a drag begun on the canvas
 const half = (v) => Math.max(-0.5, Math.min(0.5, v));
+// A drag of (dx, dy) screen pixels, in the picture's own directions (it may be turned).
+function dragBy(dx, dy) {
+  const d = view.delta(dx, dy);
+  pointer.x = half(pointer.x - d.x / view.w);
+  pointer.y = half(pointer.y - d.y / view.h);
+}
 addEventListener('pointermove', (e) => {
   wake();
   if (!e.isPrimary) return; // with two fingers the view follows the first
   if (e.pointerType === 'mouse') {
     if (!mouseDrag) return;
     // The drag pulls the picture along: the view turns the other way.
-    pointer.x = half(pointer.x - (e.clientX - mouseDrag.x) / innerWidth);
-    pointer.y = half(pointer.y - (e.clientY - mouseDrag.y) / innerHeight);
+    dragBy(e.clientX - mouseDrag.x, e.clientY - mouseDrag.y);
     mouseDrag = { x: e.clientX, y: e.clientY };
     return;
   }
   const d = touches.get(e.pointerId);
   if (!d) return;
-  pointer.x = half(pointer.x - (e.clientX - d.lx) / innerWidth);
-  pointer.y = half(pointer.y - (e.clientY - d.ly) / innerHeight);
+  dragBy(e.clientX - d.lx, e.clientY - d.ly);
   d.lx = e.clientX; d.ly = e.clientY;
 });
 addEventListener('pointerdown', wake);
@@ -284,8 +290,9 @@ function breathAt(dt) {
 // A ripple goes where the view is hit at screen point (x, y).
 function rippleAt(x, y) {
   if (!camera) return;
-  const nx = (x / innerWidth) * 2 - 1;
-  const ny = 1 - (y / innerHeight) * 2;
+  const p = view.point(x, y); // from the screen's point to the picture's
+  const nx = (p.x / view.w) * 2 - 1;
+  const ny = 1 - (p.y / view.h) * 2;
   const th = Math.tan(fovRad() / 2);
   const { eye, f, r, u, aspect } = camera;
   const dir = norm([
@@ -330,6 +337,7 @@ addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return; // browser shortcuts, and a held key
   if (e.key === 'p') tuner.toggle();             // settings panel
   if (e.key === 'f') controls.toggleFullscreen(); // full screen
+  if (e.key === 'r') rotation.toggle();         // landscape / portrait
   if (e.key === 'w') step('weather', WEATHER);   // next weather
   if (e.key === 'c') { step('color', COLOR_MODES); show.recolor(); } // next colour, of the rain and the forms
   if (e.key === 'd') step('flow', FLOWS);        // switch direction

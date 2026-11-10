@@ -212,6 +212,19 @@ async function visit(cdp, base, query, interact) {
     }
     await sleep(1000);
     check('after click and keys');
+    // The r key turns the picture a quarter (the rotate button does the same on a phone); the frame loop goes on; r again turns it back.
+    for (const want of [true, false]) {
+      await s('Input.dispatchKeyEvent', { type: 'keyDown', key: 'r', text: 'r', code: 'KeyR' });
+      await s('Input.dispatchKeyEvent', { type: 'keyUp', key: 'r', code: 'KeyR' });
+      let turned = null;
+      for (let i = 0; i < 20 && turned !== want; i++) { await sleep(250); turned = await evalJs(`document.body.classList.contains('turned')`); }
+      if (turned !== want) fail(`[${label}] key r left body.turned at ${turned}, not ${want}`);
+      const fr = await evalJs('window.__frames');
+      let moved2 = false;
+      for (let i = 0; i < 40 && !moved2; i++) { await sleep(500); moved2 = await evalJs('window.__frames') > fr; }
+      if (!moved2) fail(`[${label}] frame loop stopped after turning the picture (${want})`);
+    }
+    check('after turning the picture');
     // The scene changes in place (no reload), and Reset brings back the mix.
     await evalJs(`(() => { window.__stay = 1; const s = [...document.querySelectorAll('.tuner select')]
       .find((x) => [...x.options].some((o) => o.value === 'crystal')); s.value = 'crystal';

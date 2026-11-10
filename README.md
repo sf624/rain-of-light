@@ -31,7 +31,8 @@ Inspired by teamLab's *Light Sculpture - Point*.
 ## Use
 
 - **Click or tap**: a ripple of light (and a bell). **Drag** to look around: the picture follows the mouse or the finger.
-- **Buttons, bottom right**: settings ⚙, full screen, sound ♪, volume.
+- **Buttons, bottom right**: settings ⚙, full screen, a phone with an arrow (landscape / portrait; on touch screens only), sound ♪, volume.
+- **Landscape / portrait**: the rotate button (or `r`) shows the picture in the other shape, also when the phone's rotation lock is on. Where the browser can lock the orientation (Android Chrome, in full screen or as an installed app) it does that; where it cannot (iPhone and iPad Safari, desktop) the page turns its own picture a quarter, so turn the phone to match. Pressing again goes back; really turning the phone also ends it.
 - **Keys**:
 
   | Key | Does |
@@ -43,6 +44,7 @@ Inspired by teamLab's *Light Sculpture - Point*.
   | `v` | next camera move |
   | `m` | sound on / off |
   | `f` | full screen |
+  | `r` | landscape / portrait |
 
 The screen stays awake while the page is showing (where the browser allows it).
 
