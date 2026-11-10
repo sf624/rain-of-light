@@ -13,6 +13,7 @@ import { FLOW_WRAP, POINT_VS, POINT_FS, WIRE_FS, RAY_FS, QUAD_VS, DOWN_FS, BLUR_
 import { createGL, sub, cross, dot, norm, perspective, lookAt } from './gl.js';
 import { createLattice, fillLattice } from './lattice.js';
 import { createControls } from './controls.js';
+import { keepAwake } from './wakelock.js';
 
 // Errors show on the page (see the inline script in index.html), so a black screen is never silent.
 const showError = window.showError;
@@ -611,3 +612,5 @@ canvas.addEventListener('webglcontextlost', (e) => {
   cancelAnimationFrame(frameId);
 });
 canvas.addEventListener('webglcontextrestored', () => location.reload());
+
+keepAwake();

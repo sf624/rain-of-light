@@ -27,6 +27,8 @@ Inspired by teamLab's *Light Sculpture - Point*.
   | `m` | sound on / off |
   | `f` | full screen |
 
+The screen stays awake while the page is showing (where the browser allows it).
+
 Browsers start sound only after a click or a key, so the music begins with
 your first click. The settings panel keeps what you change in this browser
 (Reset brings back the defaults). Any setting can also be given in the URL,
@@ -56,6 +58,7 @@ work, because the scripts are ES modules.
 | `controls.js` | the sound, volume and full screen controls |
 | `audio.js` | the music: pad, bells, rain, reverb |
 | `sway.js` | 1/f fluctuation, used by the music and the rain |
+| `wakelock.js` | keeps the screen awake while the page is showing |
 | `tuner.js` | the settings panel |
 | `test/smoke.mjs` | the smoke test (see Test) |
 
