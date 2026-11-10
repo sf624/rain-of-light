@@ -57,6 +57,19 @@ work, because the scripts are ES modules.
 | `audio.js` | the music: pad, bells, rain, reverb |
 | `sway.js` | 1/f fluctuation, used by the music and the rain |
 | `tuner.js` | the settings panel |
+| `test/smoke.mjs` | the smoke test (see Test) |
+
+## Test
+
+```sh
+node test/smoke.mjs
+```
+
+Needs Node 22 and Chrome (`google-chrome` or `chromium` on PATH, or set
+`CHROME=/path/to/chrome`). It serves the repo, opens it in headless Chrome with
+software GL, and fails on any error, a shown fallback message, a stalled frame
+loop or a black canvas. It also clicks, presses the keys and tries every colour
+mode. GitHub Actions runs it on every pull request and push to main.
 
 ## Licence
 
