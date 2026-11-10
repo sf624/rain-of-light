@@ -701,6 +701,7 @@ function frame(now) {
   gl.uniform4fv(u.uRipples, ripples);
   gl.uniform1f(u.uRainShare, S.rainShare);
   gl.uniform1f(u.uScene, crystal ? 1 : 0);
+  gl.uniform1f(u.uSoft, crystal ? 1 : 0);
   if (crystal) {
     gl.uniform4fv(u.uFormA, shown.A);
     gl.uniform4fv(u.uFormB, shown.B);
