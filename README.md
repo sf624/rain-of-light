@@ -34,6 +34,12 @@ your first click. The settings panel keeps what you change in this browser
 (Reset brings back the defaults). Any setting can also be given in the URL,
 such as `?color=cloud&weather=drizzle`; `#tune` opens the panel.
 
+## Install and offline
+
+On a phone or in Chrome / Edge you can install it ("Add to Home Screen" /
+"Install app"): it opens full screen, and works offline after the first
+visit. Online, you always get the newest files; offline, the last ones seen.
+
 ## Run locally
 
 Any static file server will do, for example:
@@ -60,6 +66,8 @@ work, because the scripts are ES modules.
 | `sway.js` | 1/f fluctuation, used by the music and the rain |
 | `wakelock.js` | keeps the screen awake while the page is showing |
 | `tuner.js` | the settings panel |
+| `manifest.webmanifest`, `icons/` | the install information and the app icons |
+| `sw.js` | the service worker: network first, cached files when offline (add new files to its list) |
 | `test/smoke.mjs` | the smoke test (see Test) |
 
 ## Test
