@@ -37,9 +37,14 @@ process.on('SIGTERM', () => fail('terminated'));
 process.on('uncaughtException', (e) => fail(`test script error: ${e.stack || e}`));
 process.on('unhandledRejection', (e) => fail(`test script error: ${e?.stack || e}`));
 
+const FAKE_SHA = '0123456789abcdef0123456789abcdef01234567'; // what the Pages workflow would write
 function serve() {
   server = http.createServer((req, res) => {
     const p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+    if (p === '/version.json') {
+      res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+      res.end(JSON.stringify({ sha: FAKE_SHA, date: '2026-01-02T03:04:05+00:00' })); return;
+    }
     const file = path.join(ROOT, p.endsWith('/') ? p + 'index.html' : p);
     const rel = path.relative(ROOT, file);
     if (rel.startsWith('..') || rel.split(path.sep).some((s) => s.startsWith('.'))
@@ -179,6 +184,16 @@ async function visit(cdp, base, query, interact) {
   check('while loading');
   const state = await evalJs(`({ fb: !document.getElementById('fallback').hidden, text: document.getElementById('fallback').textContent, f: window.__frames })`);
   if (state.fb) fail(`[${label}] #fallback is visible: ${state.text}`);
+  if (query === '#tune') { // the panel's footer: the repository link, and the commit from version.json
+    let foot = null;
+    for (let i = 0; i < 40 && !foot?.sha; i++) {
+      foot = await evalJs(`(() => { const a = [...document.querySelectorAll('.tuner-foot a')];
+        return { gh: a[0]?.href, rel: a[0]?.rel, sha: a[1]?.textContent, href: a[1]?.href }; })()`);
+      if (!foot.sha) await sleep(500);
+    }
+    if (foot.gh !== 'https://github.com/sf624/rain-of-light' || !foot.rel.includes('noopener')) fail(`[${label}] no GitHub link in the panel: ${JSON.stringify(foot)}`);
+    if (foot.sha !== FAKE_SHA.slice(0, 7) || foot.href !== `https://github.com/sf624/rain-of-light/commit/${FAKE_SHA}`) fail(`[${label}] commit link wrong: ${JSON.stringify(foot)}`);
+  }
   let f2 = state.f; // wait up to 15 s for MIN_FRAMES frames, and for more frames after the check above
   for (let i = 0; i < 30 && (f2 < MIN_FRAMES || f2 - state.f < 3); i++) { await sleep(500); f2 = await evalJs('window.__frames'); }
   if (f2 < MIN_FRAMES || f2 - state.f < 3) fail(`[${label}] frame loop not advancing (${state.f} -> ${f2} frames in 15 s)`);

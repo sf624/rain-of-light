@@ -70,8 +70,11 @@ export function createTuner({ schema, settings, defaults, storageKey, onChange }
     root.append(section);
   }
 
+  const foot = footer();
+  root.append(foot);
   document.body.append(toggle, root);
   refresh();
+  let versionAsked = false;
 
   function button(text, title) {
     const b = document.createElement('button');
@@ -79,6 +82,36 @@ export function createTuner({ schema, settings, defaults, storageKey, onChange }
     b.textContent = text;
     b.title = title;
     return b;
+  }
+
+  // A quiet last line: the repository, and the commit that is being served.
+  // version.json is written by the Pages workflow; without it (a local server,
+  // the old branch deploy) only the link shows.
+  function footer() {
+    const el = document.createElement('p');
+    el.className = 'tuner-foot';
+    const repo = 'https://github.com/sf624/rain-of-light';
+    const gh = document.createElement('a');
+    gh.href = repo;
+    gh.target = '_blank';
+    gh.rel = 'noopener';
+    gh.textContent = 'GitHub';
+    el.append(gh);
+    el.loadVersion = () => fetch('version.json', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((v) => {
+        if (!v || typeof v.sha !== 'string' || !/^[0-9a-f]{7,40}$/.test(v.sha)) return;
+        const a = document.createElement('a');
+        a.href = `${repo}/commit/${v.sha}`;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.textContent = v.sha.slice(0, 7);
+        a.className = 'tuner-sha';
+        if (typeof v.date === 'string') a.title = v.date;
+        el.append(' \u00b7 ', a);
+      })
+      .catch(() => { /* offline or no file: the link alone is enough */ });
+    return el;
   }
 
   function format(item, v) {
@@ -111,6 +144,7 @@ export function createTuner({ schema, settings, defaults, storageKey, onChange }
 
   function show(visible) {
     root.hidden = !visible;
+    if (visible && !versionAsked) { versionAsked = true; foot.loadVersion(); }
     toggle.classList.toggle('active', visible);
   }
 
