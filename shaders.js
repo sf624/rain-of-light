@@ -50,6 +50,19 @@ uniform float uBandScale;
 uniform float uSat;
 uniform vec2 uDensity;  // share of strands, share of LEDs per strand, that are on
 uniform float uBowStyle; // rainbow: 0 bands, 1 a random hue per drop, 2 per LED
+uniform float uRainShare; // share of strands (or lanes across the flow) that carry rain
+// The crystal scene: forms of light in a mirrored room.
+uniform float uScene;     // 0 rain, 1 crystal
+uniform vec4 uFormA[2];   // per form: type (0 orb, 1 spiral, 2 layer, 3 cloud), weight 0..1, size, turn
+uniform vec4 uFormB[2];   // centre (the layer: its height in y), tilt
+uniform float uFormYaw[2]; // the way the tilt leans
+uniform vec3 uFormC[2];   // the form's colour
+uniform vec3 uFormD[2];   // its second colour
+uniform vec3 uTint;       // the colour of the room: of the forms shown now
+uniform float uTwinkle;
+uniform vec3 uMirror;     // floor height, reflection gain (> 0: drawing the reflection), its fade length
+uniform vec4 uCopy[9];    // wall mirrors, per instance: x sign, x offset, z sign, z offset
+uniform float uCopyGain[9];
 out vec3 vColor;
 out float vSize;
 out float vEnd;  // wires: 0 at one LED, 1 at the next, alternating along a strand
@@ -160,6 +173,8 @@ void gather(inout Lit L, vec4 r, float sd, float w) {
 // The rain on one strand: two drops at their own pace; in heavy rain two more
 // join, one by one across the field, and every trail grows longer.
 void strandRain(inout Lit L, float seed, float u, float trailK, float w) {
+  w *= step(hash(seed + 9.0), uRainShare);
+  if (w == 0.0) return;                              // no rain on this strand
   float g3 = hash(seed + 6.0) * 0.6;
   float g4 = 0.3 + hash(seed + 7.0) * 0.6;
   gather(L, drop(seed, u, trailK), seed, w);
@@ -182,9 +197,87 @@ float tiltedRain(inout Lit L, vec3 pos, float theta, float trailK, float w) {
   float len = abs(D.x) * uSpan + abs(D.y) * uHeight + abs(D.z) * uSpan;
   float along = dot(pos, D) / len + 0.5;
   float k = trailK * mix(1.0, 1.5, st);
+  w *= step(hash(lane + 9.0), uRainShare);
+  if (w == 0.0) return along;
   gather(L, drop(lane, along, k), lane, w);
   gather(L, drop(lane + 97.0, along, k), lane + 97.0, w * smoothstep(0.2, 0.8, uRain));
   return along;
+}
+
+// ---------- forms of light (crystal scene) ----------
+// Each returns (light, white-hot share, mix from the first colour to the second).
+const vec3 WHITE_HOT = vec3(1.0, 0.96, 0.9);
+
+// An orb: a soft edge and a core that burns white.
+vec3 orbLight(vec3 p, vec4 a, vec4 b) {
+  float d = length(p - b.xyz) / a.z;
+  float body = exp(-d * d * 2.2) * (1.0 - smoothstep(0.8, 1.25, d));
+  float core = exp(-d * d * 7.0);
+  float shimmer = 0.75 + 0.5 * noise3(p * 1.1 + vec3(0.0, uTime * 0.3, 0.0));
+  return vec3(body * 3.0 * shimmer + core * 10.0, core, smoothstep(0.15, 0.9, d));
+}
+
+// A spiral disc: tilted, two arms, a bright bulge at the centre, slowly turning.
+vec3 spiralLight(vec3 p, vec4 a, vec4 b, float yaw) {
+  vec3 q = p - b.xyz;
+  float cy = cos(yaw), sy = sin(yaw);
+  q = vec3(cy * q.x - sy * q.z, q.y, sy * q.x + cy * q.z);   // turn the tilt's axis
+  float ct = cos(b.w), st = sin(b.w);
+  q = vec3(q.x, ct * q.y - st * q.z, st * q.y + ct * q.z);   // tilt about it
+  float R = a.z;
+  float r = length(q.xz) / R;
+  float th = atan(q.z, q.x);
+  float thick = R * (0.12 + 0.14 * exp(-r * r * 8.0));
+  float disc = exp(-q.y * q.y / (thick * thick)) * (1.0 - smoothstep(0.75, 1.0, r));
+  float arm = pow(0.5 + 0.5 * cos(2.0 * (th - a.w) + 4.0 * log(r + 0.03)), 3.0);
+  float dust = 0.7 + 0.6 * noise3(p * 0.7);
+  float bulge = exp(-dot(q, q) / (R * R * 0.012));
+  return vec3(disc * (0.1 + 14.0 * arm * dust) * exp(-r * 0.6) + bulge * 8.0, bulge, smoothstep(0.1, 0.8, r));
+}
+
+// A layer: a sea of light near the floor, its surface in slow waves.
+vec3 layerLight(vec3 p, vec4 a, vec4 b) {
+  float s = b.y + 0.35 * sin(p.x * 0.42 + uTime * 0.45) + 0.25 * sin(p.z * 0.57 - uTime * 0.33)
+          + 0.12 * sin((p.x - p.z) * 1.1 + uTime * 0.8);
+  float dy = p.y - s;
+  float top = exp(-dy * dy / (a.z * a.z));
+  float below = dy < 0.0 ? exp(dy / 1.2) : 0.0;
+  float glint = 0.5 + noise3(vec3(p.x * 0.8, uTime * 0.25, p.z * 0.8));
+  return vec3(top * 2.5 * glint + below * 0.6, top * top * 0.2, clamp(-dy, 0.0, 1.0));
+}
+
+// A cloud: a few soft lobes, frayed by noise, with wisps inside; drifting.
+vec3 cloudLight(vec3 p, vec4 a, vec4 b) {
+  vec3 q = (p - b.xyz) / (a.z * vec3(1.0, 0.7, 0.8));
+  float t = uTime * 0.05;
+  float lobes = max(1.0 - length(q),
+                max(0.8 - length(q - vec3(0.55 * cos(t), 0.25, 0.3 * sin(t))) * 1.4,
+                    0.8 - length(q + vec3(0.5, 0.15 * sin(t * 1.3), -0.35)) * 1.5));
+  vec3 drift = vec3(uTime * 0.06, uTime * 0.02, -uTime * 0.04);
+  float n = noise3(p * 0.28 + drift) * 0.6 + noise3(p * 0.7 - drift * 1.5) * 0.4;
+  float dens = smoothstep(0.0, 0.55, lobes + (n - 0.5) * 1.4);
+  float wisp = 0.35 + 1.3 * smoothstep(0.3, 0.75, noise3(p * 0.55 + drift * 2.0));
+  float dense = dens * dens * dens * dens;
+  return vec3(dens * 2.2 * wisp + dense * 2.0, dense * 0.25, smoothstep(0.35, 0.65, n));
+}
+
+// The light of the forms at p. Each comes and goes LED by LED, in a random order.
+vec3 formsAt(vec3 p, float id) {
+  vec3 c = vec3(0.0);
+  for (int k = 0; k < 2; k++) {
+    vec4 a = uFormA[k];
+    if (a.y < 0.001) continue;
+    vec4 b = uFormB[k];
+    int type = int(a.x + 0.5);
+    vec3 f;
+    if (type == 0) f = orbLight(p, a, b);
+    else if (type == 1) f = spiralLight(p, a, b, uFormYaw[k]);
+    else if (type == 2) f = layerLight(p, a, b);
+    else f = cloudLight(p, a, b);
+    float on = clamp((a.y * 1.25 - hash(id + float(k) * 7.7)) / 0.25, 0.0, 1.0) * smoothstep(0.0, 0.4, a.y);
+    c += mix(mix(uFormC[k], uFormD[k], f.z), WHITE_HOT, clamp(f.y, 0.0, 1.0)) * f.x * on;
+  }
+  return c;
 }
 
 void main() {
@@ -195,6 +288,22 @@ void main() {
   float spatial = (pos.x + pos.z) * 0.012;           // bands lean a little across the field
   vec4 mv = uView * vec4(pos, 1.0);
   float dist = -mv.z;
+  if (uScene > 0.5) {
+    // Mirror images: the LED's light, seen where its image is (in the walls, the floor).
+    vec4 cp = uCopy[gl_InstanceID];
+    vec3 seen = vec3(cp.x * pos.x + cp.y, pos.y, cp.z * pos.z + cp.w);
+    if (uMirror.y > 0.0) seen.y = 2.0 * uMirror.x - pos.y;
+    mv = uView * vec4(seen, 1.0);
+    dist = -mv.z;
+    if (dist > uFogFar && uWire == 0.0) {            // lost in the fog: skip the work (wires never skip)
+      gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+      gl_PointSize = 0.0;
+      vColor = vec3(0.0);
+      vSize = 1.0;
+      vEnd = 0.0;
+      return;
+    }
+  }
   Lit L = Lit(0.0, 0.0, vec3(0.0), vec3(0.0));
 
   // The flow turns from straight down to sideways in uTurnSteps steps; each
@@ -218,7 +327,7 @@ void main() {
   }
   float rain = L.rain;
   float tip = L.tip;
-  col += placeColor(pos, u, dist);
+  if (uScene < 0.5) col += placeColor(pos, u, dist);
 
   // Colours that travel with each drop. An LED at rest shows one of its own.
   vec3 restDrop = dropColor(seed * 0.37 + u * 91.7, 0.0) + uColA * 1.2 * uW[5];
@@ -251,9 +360,30 @@ void main() {
          + mix(restCol, vec3(1.0), 0.35) * ring * 1.6;
   vec3 glint = tipCol * tip * uTipGain;  // the head's light in its own colour: the light rays
 
+  if (uScene > 0.5) {
+    // Crystal: the forms' light, a faint lattice in the room's colour with a
+    // sparse twinkle, a few pale drops, and waves that flare through the forms.
+    float id = seed * 0.37 + u * 91.7;
+    vec3 form = formsAt(pos, id);
+    vec3 pale = mix(uTint, vec3(1.0), 0.55);
+    float tw = hash(id + 3.0) < 0.2
+      ? pow(0.5 + 0.5 * sin(uTime * (0.3 + 1.2 * hash(id + 1.0)) + hash(id + 2.0) * 6.2832), 30.0) * uTwinkle : 0.0;
+    c = uTint * uRest + pale * tw + form
+      + pale * (rain * uRainGain * 0.5 + tip * uTipGain)
+      + (form * 1.5 + pale * 0.8) * ring;
+    glint = pale * tip * uTipGain;
+  }
+
   float fog = 1.0 - smoothstep(uFogFar * 0.3, uFogFar, dist);
   c *= fog;
   glint *= fog;
+  if (uScene > 0.5) {
+    // Each mirror dims its image a little; the floor's image fades with the height above it.
+    float g = uCopyGain[gl_InstanceID];
+    if (uMirror.y > 0.0) g *= uMirror.y * exp(-(pos.y - uMirror.x) / uMirror.z);
+    c *= g;
+    glint *= g;
+  }
 
   // Thinning: LEDs past the shown share fade out, in an order that leaves the
   // rest evenly spread, so density can change smoothly.
@@ -414,6 +544,8 @@ uniform sampler2D uBloom;
 uniform float uBloomK;
 uniform float uExposure;
 uniform float uFloor;  // black floor: glow fainter than about this (on screen, 0..1) is dropped
+uniform sampler2D uHaze; // a much wider glow, that fills the room (crystal)
+uniform float uHazeK;
 out vec4 outColor;
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 void main() {
@@ -423,6 +555,7 @@ void main() {
   vec3 b = texture(uBloom, vUv).rgb * uBloomK;
   float tb = uFloor / max(uExposure, 1e-3);             // the floor before tone mapping
   if (uFloor > 0.0) b *= smoothstep(tb, 3.0 * tb, max(b.r, max(b.g, b.b)));
+  if (uHazeK > 0.0) b += texture(uHaze, vUv).rgb * uHazeK;
   vec3 c = texture(uScene, vUv).rgb + b;
   c = vec3(1.0) - exp(-c * uExposure);                       // tone map
   float v = smoothstep(1.25, 0.35, length(vUv - 0.5) * 1.5);
