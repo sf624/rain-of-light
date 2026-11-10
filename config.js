@@ -90,7 +90,7 @@ export const SCENES = {
     eye: 2.5,      // the eye's height above the floor
     pitch: 0.06,   // and how far it looks up
     settings: {
-      grid: small ? 44 : 72, layout: 'grid', density: 'manual', size: 0.02, rest: 0.035, wire: 0.18,
+      grid: small ? 44 : 72, density: 'manual', size: 0.02, rest: 0.035, wire: 0.18,
       radius: 13, rainShare: 0.04, ripples: 16, fov: 76, fog: 34, bloom: 0.8, blackFloor: 0,
       exposure: 2.0, mirror: 0.6, walls: 0, haze: 1.5, twinkle: 0.4, rays: 'off',
     },
