@@ -199,9 +199,11 @@ async function visit(cdp, base, query, interact) {
       s.dispatchEvent(new Event('change')); })()`);
     await sleep(1500);
     const f = await evalJs('window.__frames');
-    await sleep(1000);
+    // A frame can take over a second on a slow software renderer: wait for one.
+    let moved = false;
+    for (let i = 0; i < 40 && !moved; i++) { await sleep(500); moved = await evalJs('window.__frames') > f; }
     if (await evalJs('window.__stay') !== 1) fail(`[${label}] changing the scene reloaded the page`);
-    if (await evalJs('window.__frames') <= f) fail(`[${label}] frame loop stopped after changing the scene`);
+    if (!moved) fail(`[${label}] frame loop stopped after changing the scene`);
     const scene = await evalJs(`(() => { [...document.querySelectorAll('.tuner-buttons button')]
       .find((b) => b.textContent === 'Reset').click(); return [...document.querySelectorAll('.tuner select')]
       .find((x) => [...x.options].some((o) => o.value === 'crystal')).value; })()`);
