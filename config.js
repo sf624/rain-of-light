@@ -81,8 +81,8 @@ export const FORMS = [
 ];
 export const LAYER = { name: 'layer', type: 2, palettes: ['deep sea', 'ice', 'aurora'] };
 
-// Scenes: the rain, or a mirrored room where forms of light appear in a
-// regular lattice. A scene changes the defaults below; what you set wins.
+// Scenes: the rain, or a mirrored room where forms of light appear among
+// the strands. A scene changes the defaults below; what you set wins.
 export const SCENES = {
   rain: { settings: {} },
   crystal: {
@@ -90,16 +90,16 @@ export const SCENES = {
     eye: 2.5,      // the eye's height above the floor
     pitch: 0.06,   // and how far it looks up
     settings: {
-      grid: small ? 44 : 72, density: 'manual', size: 0.02, rest: 0.035, wire: 0.18,
+      grid: small ? 44 : 72, density: 'manual', size: 0.02, rest: 0.035, wire: 0.2,
       radius: 13, rainShare: 0.04, ripples: 16, fov: 76, fog: 34, bloom: 0.8, blackFloor: 0,
-      exposure: 2.0, mirror: 0.6, walls: 0, haze: 1.5, twinkle: 0.4, rays: 'off',
+      exposure: 2.0, mirror: 0.6, walls: 0, haze: 2.0, burn: 0.8, twinkle: 0.4, rays: 'off',
     },
   },
 };
 
 // ---------- tunable settings (panel: p key or the gear button; also ?key=value) ----------
 export const DEFAULTS = {
-  scene: 'rain', form: 'auto', layer: 'auto', mirror: 0, walls: 0, haze: 0, twinkle: 0, rainShare: 1,
+  scene: 'rain', form: 'auto', layer: 'auto', mirror: 0, walls: 0, haze: 0, burn: 0, twinkle: 0, rainShare: 1,
   grid: small ? 36 : 60,  rows: small ? 72 : 96,
   layout: 'strands', density: 'auto', strandShare: 1.0, rowShare: 1.0, strandMin: 0.3, rowMin: 0.35,
   size: 0.013, maxPx: 4.5, rest: 0.025, wire: 0.1,
@@ -129,6 +129,8 @@ export const SCHEMA = [
       hint: 'Each copy draws the lattice again: costly' },
     { key: 'haze', label: 'Haze (0: off)', min: 0, max: 2, step: 0.05,
       hint: 'A wide, soft glow of the light that fills the room' },
+    { key: 'burn', label: 'Burn-out (0: off)', min: 0, max: 1, step: 0.05,
+      hint: 'The brightest light loses its colour and burns out to white' },
     { key: 'twinkle', label: 'Twinkle', min: 0, max: 2, step: 0.05 },
     { key: 'rainShare', label: 'Share of strands with rain', min: 0, max: 1, step: 0.01 },
   ] },

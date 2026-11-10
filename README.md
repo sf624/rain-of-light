@@ -37,9 +37,10 @@ your first click. The settings panel keeps what you change in this browser
 such as `?color=cloud&weather=drizzle`; `#tune` opens the panel.
 
 A second scene, still a prototype: `?scene=crystal` (or Scene in the panel).
-A regular lattice stands in a room with a mirror floor; large forms of light
+Strands of LEDs hang in a room with a mirror floor; large forms of light
 appear in it one after another (an orb, a spiral, a cloud), with now and then
-a layer of light near the floor. `?form=orb` (spiral, cloud, none) and
+a layer of light near the floor. The strands glow with the light they pass
+through, the air around a form is hazy, and its core burns out to white. `?form=orb` (spiral, cloud, none) and
 `?layer=on` (off) hold one.
 
 Quality is automatic: if frames are slow, the canvas is drawn at a lower
