@@ -5,6 +5,8 @@ The weather, the colours, the direction of the rain and the camera change on
 their own, slowly. Calm generative music plays along, and every ripple of
 light rings a bell.
 
+![A short clip of the piece: strands of amber light points, with drops of light falling through them as the camera walks among the strands](demo.gif)
+
 Plain WebGL2 and Web Audio: no build step, no dependencies, no media files.
 
 Live: <https://sf624.github.io/rain-of-light/>
