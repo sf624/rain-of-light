@@ -1,5 +1,5 @@
-// The page's sound and full screen controls: the note button, the volume bar,
-// the full screen button and the hint about them.
+// The page's sound and full screen controls: the note button, the volume bar
+// and the full screen button.
 
 // sound is the audio engine; S the settings; onVolume(v) hands a volume set
 // with the bar to the settings panel.
@@ -53,20 +53,6 @@ export function createControls({ sound, S, onVolume }) {
   document.addEventListener('fullscreenchange', () => {
     fullBtn.setAttribute('aria-pressed', String(!!document.fullscreenElement));
   });
-  // A note on the sound controls when the page opens; it goes after a while,
-  // or as soon as the controls are used.
-  const soundHint = document.createElement('p');
-  soundHint.className = 'sound-hint';
-  soundHint.textContent = '♪ sound on / off · slider: volume';
-  document.body.append(soundHint);
-  document.body.classList.add('hinting');
-  function hideSoundHint() {
-    soundHint.classList.add('hidden');
-    document.body.classList.remove('hinting');
-  }
-  setTimeout(hideSoundHint, 10000);
-  soundBtn.addEventListener('click', hideSoundHint);
-  volumeBar.addEventListener('input', hideSoundHint);
   function setSound(want) {
     if (want) sound.start(); else sound.stop();
     soundBtn.classList.toggle('active', sound.on);
@@ -90,7 +76,7 @@ export function createControls({ sound, S, onVolume }) {
   return {
     toggleFullscreen,
     // The m key: sound on and off.
-    toggleSound() { setSound(!sound.on); hideSoundHint(); },
+    toggleSound() { setSound(!sound.on); },
     // The panel changed the volume: move the bar.
     setVolume(v) { volumeBar.value = v; },
   };

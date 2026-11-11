@@ -76,7 +76,7 @@ const clock = (seed) => `(() => {
   window.__step = (n, ms) => { for (let i = 0; i < n; i++) { now += ms; for (const cb of cbs.splice(0)) cb(now); } return now; };
   try { localStorage.clear(); } catch {}
   addEventListener('DOMContentLoaded', () => { const st = document.createElement('style');
-    st.textContent = '.overlay,.tuner-toggle,.sound-toggle,.full-toggle,.volume-bar,.sound-hint,.tuner{display:none !important}'; document.head.appendChild(st); });
+    st.textContent = '.overlay,.tuner-toggle,.sound-toggle,.full-toggle,.volume-bar,.tuner{display:none !important}'; document.head.appendChild(st); });
 })()`;
 
 const { width: W, height: H, step, frames, preroll } = cfg;   // frames: how many PNGs per scene
