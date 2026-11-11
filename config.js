@@ -20,10 +20,11 @@ export const WEATHER = [
   { name: 'shower',   flow: 1.9, rain: 0.6,  hold: [8, 14],  weight: 0 },   // the two heavy ones never come on their own:
   { name: 'downpour', flow: 3.6, rain: 1.0,  hold: [6, 12],  weight: 0 },   // only by the w key or the Weather setting
 ];
-// Direction: rain falls from above, or now and then flows sideways for a while, each time a new way.
+// Direction: rain falls from above, or flows sideways. Which one belongs to the
+// passage (see PASSAGES, drift): a rain keeps its direction for its whole life.
 export const FLOWS = [
-  { name: 'down',   toward: 0, hold: [26, 44], weight: 3 },
-  { name: 'across', toward: 1, hold: [14, 24], weight: 1 },
+  { name: 'down',   toward: 0 },
+  { name: 'across', toward: 1 },
 ];
 // Colour modes. Their order is the order of the weights uW in the shader.
 // many: rain of many colours at once, whatever the mood (see director.js, the colour story).
@@ -104,6 +105,9 @@ export const PASSAGES = [
   { name: 'form',   rain: 0, sky: true,  layer: 0.75, hold: [40, 66], weight: 3 },   // a form in the still room
   { name: 'storm',  rain: 1, sky: true,  layer: 0.5,  hold: [30, 52], weight: 1.6 },   // rain falls through a form
   { name: 'still',  rain: 0, sky: false, layer: 1,    hold: [18, 32], weight: 1 },   // only the layer, and sparse drops
+  // Rain that flows sideways, each time a new way: an event of its own, only
+  // ever between two form passages, so it never reads as a rain that turned.
+  { name: 'drift',  rain: 1, sky: false, layer: 0.55, hold: [30, 48], weight: 1.3, across: true },
 ];
 // Scenes: the whole show, or only its rain, or only its forms.
 export const SCENES = ['mix', 'rain', 'crystal'];
@@ -116,7 +120,7 @@ export const DEFAULTS = {
   size: 0.018, maxPx: 4.5, rest: 0.03, wire: 0.2,
   rainGain: 4.0, tipGain: 5.0, exposure: 1.8, bloom: 0.8, fog: 34, blackFloor: 3,
   rays: '2', rayGain: 0.3, rayLength: 20, rayThreshold: 0.7,
-  speed: 1.0, trail: 1.0, weather: 'auto', turnTime: 8, turnSteps: 1,
+  speed: 1.0, trail: 1.0, weather: 'auto',
   color: 'auto', story: 'on', palette: 'auto', rainbow: 'drop', bandSpeed: 0.17, bandScale: 1.0, saturation: 1.0,
   set: 'auto', skyDay: 90,
   flow: 'auto',
@@ -193,9 +197,7 @@ export const SCHEMA = [
     { key: 'speed', label: 'Speed (x)', min: 0, max: 4, step: 0.05 },
     { key: 'trail', label: 'Trail length (x)', min: 0.2, max: 4, step: 0.05 },
     { key: 'flow', label: 'Direction', options: ['auto', 'down', 'across'],
-      hint: 'down: from above / across: sideways (a new way each time)' },
-    { key: 'turnTime', label: 'Turn time (s)', min: 1, max: 30, step: 0.5 },
-    { key: 'turnSteps', label: 'Turn steps (1: cross-fade)', min: 1, max: 18, step: 1 },
+      hint: 'auto: as the passage has it (now and then a passage of sideways rain) / down: from above / across: sideways' },
   ] },
   { title: 'Colour', items: [
     { key: 'color', label: 'Colour mode', options: ['auto', ...COLOR_MODES.map((m) => m.name)],

@@ -8,6 +8,7 @@
 import { PALETTES, PALE, FORMS, LAYER, PASSAGES } from './config.js';
 import { hash, weighted, createMood, leaning, leanTo, hueOf, apart, KIN } from './director.js';
 import { motion } from './forms.js';
+import { CHANGE } from './direction.js';
 
 const ROOM_TINT = [0.35, 0.5, 1.0];          // the room's colour while no form shows
 // The layer's palettes under a form of each palette: never the form's own,
@@ -55,7 +56,7 @@ const POOLS = {
 };
 
 function createTimeline(seed, pool, name, mood) {
-  const list = [];   // passages: { start, kind, sky, layer } (sky, layer: episodes or null)
+  const list = [];   // passages: { start, kind, sky, layer, r } (sky, layer: episodes or null; r: its random number)
   let next = 0, n = 0;
   const recent = [];  // the forms shown, the latest first
   const told = [];    // their palettes with the colour story ({ start, hue }), the latest first
@@ -65,9 +66,13 @@ function createTimeline(seed, pool, name, mood) {
     for (const o of told) { if (apart(o.hue, told[0].hue) > KIN) break; since = o.start; }
     return start - since < TIRE.after ? () => 1 : (n) => (apart(hueNamed(n), told[0].hue) <= KIN ? TIRE.by : 1);
   };
+  // Sideways rain (drift) comes only between two form passages: a form lasts
+  // long enough that the rain before has gone, and the direction changed,
+  // before the sideways rain comes, and the same after it (see flowAt).
+  const fits = (prev, p) => (!p.across && !prev.across) || (!prev.rain && prev.sky) || (!p.rain && p.sky);
   const pickKind = (prev, r) => {
     // The same kind again is rare; a still room never follows itself.
-    const w = pool.map((p) => (p === prev ? (p.sky ? 0.35 : p.rain ? 0.2 : 0) : 1) * p.weight);
+    const w = pool.map((p) => (p === prev ? (p.sky ? 0.35 : p.rain ? 0.2 : 0) : 1) * p.weight * (fits(prev, p) ? 1 : 0));
     let x = r * w.reduce((a, b) => a + b, 0);
     for (let i = 0; i < pool.length; i++) if ((x -= w[i]) <= 0 && w[i] > 0) return pool[i];
     return pool.find((p, i) => w[i] > 0);
@@ -113,7 +118,7 @@ function createTimeline(seed, pool, name, mood) {
       let layer = null;
       if (layerOn) layer = prev?.layer || episode(LAYER, r, T, LAYER_IN);
       if (prev?.layer && prev.layer !== layer) close(prev.layer, T, LAYER_OUT);
-      list.push({ start: T, kind, sky, layer });
+      list.push({ start: T, kind, sky, layer, r });
       const hold = k === 0 ? [30, 46] : kind.hold;   // the show opens with a short passage
       next = T + between(...hold, hash(r * 17 + 3));
     }
@@ -144,7 +149,26 @@ function createTimeline(seed, pool, name, mood) {
   }
   // The passage at time t.
   const passage = (t) => { extend(t); return list.findLast((p) => p.start <= t); };
-  return { at, passage };
+  // The rain's direction at t: sideways (toward 1, its way: angle) from so
+  // long before a sideways passage's rain comes that the change of direction
+  // (CHANGE, see direction.js) is done by then, until its rain has gone; else
+  // down. Two sideways passages close together stay sideways in between.
+  function flowAt(t) {
+    extend(t + 40);
+    let w = null;                             // the stretch of sideways rain so far: { from, end, angle }
+    for (let i = 0; i < list.length; i++) {
+      const p = list[i];
+      if (!p.kind.across) continue;
+      const from = p.start + RAIN_IN.at - CHANGE;
+      if (from > t + 2 * CHANGE) break;
+      const end = list[i + 1] ? list[i + 1].start + RAIN_OUT.at + RAIN_OUT.fade : Infinity;
+      if (w && from - w.end < 2 * CHANGE) w.end = end;   // close to the last: one stretch
+      else if (w && t < w.end) break;
+      else w = { from, end, angle: hash(p.r * 47 + 11) * Math.PI * 2 };
+    }
+    return w && w.from <= t && t < w.end ? { toward: 1, angle: w.angle } : { toward: 0, angle: 0 };
+  }
+  return { at, passage, flowAt };
 }
 
 export function createShow(S, { feet, seed = Math.random() * 1000 }) {
@@ -165,6 +189,8 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
     const scene = S.scene === 'rain' || S.scene === 'crystal' ? S.scene : 'mix';
     const now = scene === 'rain' ? { rain: 1, items: [] } : timeline(scene).at(t);
     const rain = scene === 'crystal' ? 0 : now.rain;
+    // (Rain alone never ends, so it never changes direction: it falls, unless the Direction setting says otherwise.)
+    const flow = scene === 'mix' ? timeline(scene).flowAt(t) : { toward: 0, angle: 0 };
     let items = now.items;
     if (S.form !== 'auto') {
       items = items.filter((x) => x.e.form === LAYER);
@@ -175,7 +201,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
       items = items.filter((x) => x.e.form !== LAYER);
       if (S.layer === 'on') items.push({ e: holdOf(LAYER), w: 1, age: t, out: false });
     }
-    return { rain, items };
+    return { rain, items, flow };
   }
 
   // The shown state eases to what is wanted, so a change of scene or of a
@@ -217,7 +243,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
   // Where a form is at its age, how large, how turned (see forms.js). The
   // forms follow the eye slowly as it moves (the way from the eye to a form: face).
   // Each layer has a height, a thickness and a brightness of its own.
-  function place(k, s, sweep, view, dt) {
+  function place(k, s, sweep, view, dt, down = 1) {
     const eye = view?.eye;
     const { x, w, col } = s;
     const { e, age, out, gone } = x;
@@ -244,8 +270,9 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
     C.set(col[0].map((v) => v * gain), k * 3);
     D.set(col[1].map((v) => v * gain), k * 3);
     // While rain falls, a form comes from the top down and goes from the top
-    // down, as if rain gathered into it or it ran off as rain; else LED by LED.
-    E.set([sweep, out ? -1 : 1, m.yaw, m.dissolve], k * 4);
+    // down, as if rain gathered into it or it ran off as rain; else LED by LED
+    // (also beside sideways rain, which falls from nowhere: down 0).
+    E.set([sweep * down, out ? -1 : 1, m.yaw, m.dissolve], k * 4);
     F.set([...m.f, m.bound], k * 4);
   }
 
@@ -297,7 +324,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
       // With the room to itself (no rain, no form) it is the subject (alone).
       if (n === 2) place(n, { ...s, w: s.w * (1 - 0.2 * rainNow) * (1 - 0.2 * skyNow), alone: (1 - rainNow) * (1 - skyNow) }, 0, view, dt);
       else {
-        place(n, s, rainNow, view, dt);
+        place(n, s, rainNow, view, dt, want.flow.toward ? 0 : 1);
         forms.push({ name: s.x.e.form.name, w: s.w, out: s.x.out, at: [B[n * 4], B[n * 4 + 1], B[n * 4 + 2]] });
       }
       // (Under a form the layer's colour is its ground, not the room's.)
@@ -310,7 +337,8 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
     for (let i = 0; i < 3; i++) tint[i] = (sum > 0 ? mixed[i] / sum : 0) * m + ROOM_TINT[i] * (1 - m);
     // forms: the sky forms that show, for the music (see audio.js forms()).
     // storm: how much rain falls through a form (0 .. 1).
-    return { rain: rainNow, storm: rainNow * skyNow, A, B, C, D, E, F, tint, forms };
+    // flow: which way the rain goes now (see flowAt).
+    return { rain: rainNow, storm: rainNow * skyNow, A, B, C, D, E, F, tint, forms, flow: want.flow };
   }
 
   // The colour key: every form, shown now or later, takes its next palette.
@@ -323,5 +351,8 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
     return { kind: tl.passage(t).kind.name, items: es.map((e) => ({ form: e.form.name, palette: shownIn(e, top) })) };
   }
 
-  return { update, recolor, cast };
+  // The rain's direction at t, as the show has it (for the start: update returns it too).
+  const flow = (t) => wanted(t).flow;
+
+  return { update, recolor, cast, flow };
 }

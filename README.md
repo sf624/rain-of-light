@@ -65,6 +65,10 @@ image, towards that line. The show passes through:
   while it falls the farthest strands fade into a mist. A new colour takes
   the rain over strand by strand, from the top down, so two colours never
   blend into grey;
+- **sideways rain**: now and then the rain flows sideways instead, each
+  time a new way, a field of drifting points. It is a passage of its own,
+  always between two forms: a rain keeps its direction for its whole life,
+  and falling and sideways rain never show at once;
 - **a form**: the rain stops, and a form of light glows in the still room,
   with a few pale drops and a sparse twinkle;
 - **rain through a form**: the rain takes the form's colours, thins, and
@@ -125,10 +129,13 @@ direction and density, and `?t=` (seconds) starts at that time in it.
 
 The weather of the rain (drizzle, rain) changes on its own too; the heavy
 ones, `shower` and `downpour`, never come by themselves: choose them with `w`
-or the Weather setting. The rain falls most of the time; now and then it
-flows sideways for a quarter of a minute, a field of drifting points. When
-it turns between falling and sideways, the two cross-fade (Turn steps in the
-panel makes it turn in steps instead).
+or the Weather setting. The rain falls most of the time; about one rain in
+eight flows sideways (a passage of half a minute or so). The few pale drops
+of a still room fall, and flow sideways only around a sideways passage.
+`d` or the Direction setting holds one direction instead: the drops of the
+old one stop coming and fade out, and only then do the new ones set out.
+Rain alone (`?scene=rain`) never ends, so it keeps falling unless the
+Direction setting says otherwise.
 
 A view narrower than 16:9 (a narrow window, a phone held upright) zooms out,
 smoothly with its shape: the field of view opens (up to 96 degrees) and the
@@ -199,9 +206,10 @@ work, because the scripts are ES modules.
 | --- | --- |
 | `index.html`, `style.css` | the page |
 | `main.js` | the frame loop: puts the directors' choices to work, the camera, the drawing |
-| `director.js` | the rain's director: which weather, colour mode, direction, density and camera move come when, from the seed; and the colour story's mood |
+| `director.js` | the rain's director: which weather, colour mode, density and camera move come when, from the seed; and the colour story's mood |
 | `config.js` | palettes, colour modes, weathers, camera moves, forms, passages, the room, default settings and the panel's layout |
-| `show.js` | the show's director: the timeline of passages, how much rain falls, which forms of light show, and how bright |
+| `show.js` | the show's director: the timeline of passages, how much rain falls and which way, which forms of light show, and how bright |
+| `direction.js` | a change of the rain's direction: the old drops stop coming and fade out before the new ones set out |
 | `forms.js` | how each form of light moves through its life: where it is, how large and how turned |
 | `shaders.js` | the GLSL shaders: the points of light, bloom and tone mapping |
 | `lattice.js` | the strands and LEDs, and the order in which they thin out |

@@ -1,12 +1,15 @@
 // Measures the colour story (see director.js) without rendering: over many
 // seeds, how often neighbouring passages differ in hue, how often each colour
 // mode and palette comes, and how far the mood wanders. With and without the story.
-// It also measures how long the picture stays in one colour family.
+// It also measures how long the picture stays in one colour family, and how
+// much of the rain flows sideways (see show.js, drift).
 //   node tools/story-stats.mjs [seeds=50] [hours=1]
 globalThis.innerWidth = globalThis.innerHeight = 1000;
 const { COLOR_MODES, PALETTES, SETS } = await import('../config.js');
 const { createDirector, hueOf, apart, KIN } = await import('../director.js');
 const { createShow } = await import('../show.js');
+const { createDirection } = await import('../direction.js');
+const { DEFAULTS } = await import('../config.js');
 
 // The hue of some colours together: their mean, each weighted by how much colour it has.
 const hueOfAll = (cs) => {
@@ -16,6 +19,8 @@ const hueOfAll = (cs) => {
 };
 const pal = (n) => PALETTES.find((p) => p.name === n);
 const ONE_PALETTE = ['mono', 'comet', 'accent'];
+// The passages of rain alone: falling, and sideways.
+const RAIN_ALONE = ['rain', 'drift'];
 // The rain's main hue in a colour episode (undefined: many colours at once).
 export function rainHue(e) {
   const name = e.item.name;
@@ -34,7 +39,7 @@ export function look(S, director, show, t) {
   const rain = name + (ONE_PALETTE.includes(name) ? ` ${e.p.name}` : name === 'gradient' ? ` ${e.p.name}>${e.q.name}`
     : name === 'palette' ? ` ${e.set.name}` : name === 'cloud' ? ` ${Math.round(((e.hue + 0.2) % 1) * 360)}` : '');
   // A form is the subject (rain through it takes its colour); else the rain; else the layer.
-  const hue = form ? hueOfAll([pal(form.palette).a]) : c.kind === 'rain' ? rainHue(e)
+  const hue = form ? hueOfAll([pal(form.palette).a]) : RAIN_ALONE.includes(c.kind) ? rainHue(e)
     : layer ? hueOfAll([pal(layer.palette).a]) : undefined;
   return { kind: c.kind, hue, rain, form, layer, e, mood: director.mood(t) % 360 };
 }
@@ -89,7 +94,7 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
         last.t1 = t;
         // Shares of time: the rain's mode while rain falls alone, the palettes of forms and layers.
         const e = director[story === 'on' ? 'story' : 'color'].at(t);
-        if (c.kind === 'rain') {
+        if (RAIN_ALONE.includes(c.kind)) {
           count(r.modes, e.item.name);
           if ([...ONE_PALETTE, 'gradient'].includes(e.item.name)) count(r.pals, e.p.name);
           if (e.item.name === 'palette') count(r.sets, e.set.name);
@@ -154,5 +159,31 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
   const q = (x) => ranges[Math.floor(x * (ranges.length - 1))].toFixed(0);
   out.push('', `The mood's range within 20 minutes (degrees of hue; its whole axis runs from aurora's hue to amber's), ${ranges.length} windows`,
     `  least ${q(0)}  10% ${q(0.1)}  median ${q(0.5)}  90% ${q(0.9)}  most ${q(1)}`);
+  // The rain's direction: the share of the rain (weighted by how much rain falls) that
+  // flows sideways, and that falls down, as main.js runs them (direction.js), each tenth of
+  // a second; and the sideways passages (drift): how many, how long, and what comes next to them.
+  let side = 0, down = 0, all = 0, drifts = 0, lengths = [], next = 0;
+  for (let seed = 1; seed <= SEEDS; seed++) {
+    const show = createShow({ ...DEFAULTS }, { feet: 0, seed });
+    const dir = createDirection(show.flow(0).toward);
+    for (let t = 0; t < SPAN; t += 0.1) {
+      const now = show.update(t, 0.1);
+      dir.update(0.1, now.flow.toward, t);
+      side += dir.weights[1] * now.rain; down += dir.weights[0] * now.rain; all += now.rain;
+    }
+    let from = null, kind = null;
+    for (let t = 0; t < SPAN; t++) {
+      const k = show.cast(t).kind;
+      if (k === kind) continue;
+      if (k === 'drift') { drifts++; from = t; if (['rain', 'storm'].includes(kind)) next++; }
+      if (kind === 'drift') { lengths.push(t - from); if (['rain', 'storm'].includes(k)) next++; }
+      kind = k;
+    }
+  }
+  lengths.sort((a, b) => a - b);
+  out.push('', "The rain's direction (share of the rain, weighted by how much falls)",
+    `  sideways ${pct(side, all)}  down ${pct(down, all)}  between the two ${pct(all - side - down, all)}`,
+    `  sideways passages: ${(drifts / SEEDS / (SPAN / 3600)).toFixed(1)} an hour, ${lengths[0]} .. ${lengths.at(-1)} s (median ${lengths[lengths.length >> 1]} s);`
+    + ` next to falling rain: ${next}`);
   console.log(out.join('\n'));
 }
