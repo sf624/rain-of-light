@@ -112,7 +112,7 @@ export const SCENES = ['mix', 'rain', 'crystal'];
 export const DEFAULTS = {
   scene: 'mix', form: 'auto', layer: 'auto', mirror: 0.6, walls: 0, haze: 1.5, burn: 0.7, twinkle: 0.4, rainShare: 1,
   grid: small ? 44 : 72,  rows: small ? 72 : 96,
-  layout: 'strands', density: 'auto', strandShare: 1.0, rowShare: 1.0, strandMin: 0.66, rowMin: 0.68,
+  layout: 'strands', jitter: 'off', density: 'auto', strandShare: 1.0, rowShare: 1.0, strandMin: 0.66, rowMin: 0.68,
   size: 0.018, maxPx: 4.5, rest: 0.03, wire: 0.2,
   rainGain: 4.0, tipGain: 5.0, exposure: 1.8, bloom: 0.8, fog: 34, blackFloor: 3,
   rays: '2', rayGain: 0.3, rayLength: 20, rayThreshold: 0.7,
@@ -155,6 +155,8 @@ export const SCHEMA = [
     { key: 'rows', label: 'LEDs per strand (max)', min: 8, max: 256, step: 1 },
     { key: 'layout', label: 'Layout', options: ['strands', 'scatter', 'grid'],
       hint: 'strands: in lines along each strand / scatter: at random within one strand\'s width / grid: a regular lattice' },
+    { key: 'jitter', label: 'Spacing along a strand', options: ['off', '0.25', '0.5', 'pitch', 'cluster'],
+      hint: 'off: even / 0.25, 0.5: each LED moved by up to that share of the gap / pitch: each strand its own gap / cluster: bunches and gaps' },
     { key: 'density', label: 'Density change', options: ['auto', 'manual'],
       hint: 'auto: drifts slowly between the lower limits and full / manual: held at the shares below' },
     { key: 'strandShare', label: 'Share of strands (manual)', min: 0.02, max: 1, step: 0.01 },

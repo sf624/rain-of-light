@@ -7,7 +7,7 @@ export const FLOW_WRAP = 1000;
 export const POINT_VS = `#version 300 es
 precision highp float;
 layout(location = 0) in vec4 aData; // x, u (0 top .. 1 bottom), z, seed
-layout(location = 1) in vec2 aRank; // order in which strands and LEDs go dark when thinning
+layout(location = 1) in vec3 aRank; // order in which strands and LEDs go dark when thinning; the LED's gain
 uniform mat4 uProj;
 uniform mat4 uView;
 uniform float uTime;
@@ -580,7 +580,7 @@ void main() {
 
   // Thinning: LEDs past the shown share fade out, in an order that leaves the
   // rest evenly spread, so density can change smoothly.
-  vec2 on = clamp((uDensity * 1.04 - aRank) / 0.04, 0.0, 1.0);
+  vec2 on = clamp((uDensity * 1.04 - aRank.xy) / 0.04, 0.0, 1.0);
 
   // The wires: a whole thread of light along each strand, as bright between
   // the LEDs as at them, running on past LEDs that are thinned out.
@@ -591,8 +591,8 @@ void main() {
     vColor = wireCol * on.x * uWire;
     return;
   }
-  c *= on.x * on.y;
-  glint *= on.x * on.y;
+  c *= on.x * on.y * aRank.z;
+  glint *= on.x * on.y * aRank.z;
 
   // LEDs right at the eye are skipped: they would only be a blur over the view.
   if (dist <= 1.2 || max(c.r, max(c.g, c.b)) < 0.002) {
