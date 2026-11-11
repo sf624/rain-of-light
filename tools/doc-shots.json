@@ -1,0 +1,236 @@
+{
+  "w": 1280, "h": 720,
+  "base": "dpr=1&quality=full&ripples=0&breath=off&seed=1",
+  "figures": [
+    { "name": "glossary", "cols": 5, "base": "", "cells": [
+      {"q": "scene=rain&weather=drizzle&color=mono&palette=ice&flow=down&t=30&fov=30&radius=16&grid=24&rows=48&wire=1&rest=0.1", "label": "strand"},
+      {"q": "scene=rain&weather=drizzle&color=mono&palette=ice&flow=down&t=30&fov=30&radius=16&grid=24&rows=48&wire=0&rest=0.1&size=0.03", "label": "LED", "crop": [0.3, 0.3, 0.6, 0.6]},
+      {"q": "scene=rain&weather=drizzle&color=mono&palette=ice&flow=down&t=30&fov=30&radius=16&grid=24&rows=48&wire=2", "label": "wire", "crop": [0.3, 0.2, 0.7, 0.6]},
+      {"q": "scene=rain&flow=down&t=30", "label": "rain"},
+      {"q": "seed=1&t=60", "label": "passage (storm)"},
+      {"q": "scene=crystal&form=orb&layer=off&t=30", "label": "form (orb)"},
+      {"q": "scene=crystal&form=none&layer=on&t=30", "label": "layer of light"},
+      {"q": "scene=crystal&form=cloud&layer=off&t=30", "label": "cloud (a form)"},
+      {"q": "scene=crystal&form=none&layer=off&t=30", "label": "ripple", "click": [0.5, 0.55], "after": 24},
+      {"q": "scene=crystal&form=orb&layer=off&t=30&mirror=1", "label": "mirror image", "crop": [0.1, 0.45, 0.9, 1.0]}
+    ] },
+    { "name": "buttons", "cols": 1, "width": 640, "cells": [
+      {"q": "seed=1&t=110", "label": "", "ui": true, "keys": ["x"], "after": 4, "crop": [0.5, 0.8, 1, 1]}
+    ] },
+    { "name": "panel", "cols": 3, "base": "", "cells": [
+      {"q": "seed=1&t=110", "label": "", "ui": true, "keys": ["p"], "after": 10}
+    ] },
+    { "name": "scenes", "cols": 3, "base": "", "cells": [
+      {"q": "seed=1&t=60&scene=mix", "label": "scene=mix"},
+      {"q": "seed=1&t=60&scene=rain", "label": "scene=rain"},
+      {"q": "seed=1&t=60&scene=crystal", "label": "scene=crystal"}
+    ] },
+    { "name": "forms", "cols": 3, "base": "scene=crystal&layer=off&t=30", "pre": 100, "cells": [
+      {"q": "form=orb", "label": "form=orb"},
+      {"q": "form=spiral", "label": "form=spiral"},
+      {"q": "form=cloud", "label": "form=cloud"},
+      {"q": "form=ring", "label": "form=ring"},
+      {"q": "form=veil", "label": "form=veil"},
+      {"q": "form=none", "label": "form=none"}
+    ] },
+    { "name": "layer", "cols": 3, "base": "scene=crystal&t=30", "cells": [
+      {"q": "form=orb&layer=off", "label": "form=orb&layer=off"},
+      {"q": "form=orb&layer=on", "label": "form=orb&layer=on"},
+      {"q": "form=none&layer=on", "label": "form=none&layer=on"}
+    ] },
+    { "name": "mirrors", "cols": 3, "base": "scene=crystal&form=orb&layer=on&t=30", "cells": [
+      {"q": "mirror=0", "label": "mirror=0"},
+      {"q": "mirror=0.6", "label": "mirror=0.6"},
+      {"q": "mirror=1", "label": "mirror=1"}
+    ] },
+    { "name": "walls", "cols": 2, "width": 1200, "base": "scene=crystal&form=orb&layer=on&t=30&camera=spin&radius=16&fov=100&fog=40", "cells": [
+      {"q": "walls=0", "label": "walls=0"},
+      {"q": "walls=1", "label": "walls=1"}
+    ] },
+    { "name": "twinkle", "cols": 3, "base": "scene=crystal&form=none&layer=off&t=30", "cells": [
+      {"q": "twinkle=0", "label": "twinkle=0"},
+      {"q": "twinkle=0.4", "label": "twinkle=0.4"},
+      {"q": "twinkle=2", "label": "twinkle=2"}
+    ] },
+    { "name": "rain-share", "cols": 3, "base": "scene=rain&flow=down&t=30", "cells": [
+      {"q": "rainShare=0.2", "label": "rainShare=0.2"},
+      {"q": "rainShare=0.6", "label": "rainShare=0.6"},
+      {"q": "rainShare=1", "label": "rainShare=1"}
+    ] },
+    { "name": "grid", "cols": 3, "base": "scene=rain&flow=down&t=30", "cells": [
+      {"q": "grid=24", "label": "grid=24"},
+      {"q": "grid=72", "label": "grid=72"},
+      {"q": "grid=140", "label": "grid=140"}
+    ] },
+    { "name": "rows", "cols": 3, "base": "scene=rain&flow=down&t=30", "cells": [
+      {"q": "rows=24", "label": "rows=24"},
+      {"q": "rows=96", "label": "rows=96"},
+      {"q": "rows=220", "label": "rows=220"}
+    ] },
+    { "name": "layout", "cols": 3, "base": "scene=rain&flow=down&weather=downpour&trail=4&t=30&fov=30&radius=16&grid=24&rows=48&wire=0&exposure=3", "cells": [
+      {"q": "layout=strands", "label": "layout=strands", "crop": [0.3, 0.2, 0.7, 0.6]},
+      {"q": "layout=scatter", "label": "layout=scatter", "crop": [0.3, 0.2, 0.7, 0.6]},
+      {"q": "layout=grid", "label": "layout=grid", "crop": [0.3, 0.2, 0.7, 0.6]}
+    ] },
+    { "name": "led-spacing", "cols": 3, "base": "scene=rain&flow=down&weather=downpour&trail=4&t=30&fov=30&radius=16&grid=24&rows=48&wire=0&exposure=3", "cells": [
+      {"q": "jitter=off", "label": "jitter=off", "crop": [0.3, 0.2, 0.7, 0.6]},
+      {"q": "jitter=0.25", "label": "jitter=0.25", "crop": [0.3, 0.2, 0.7, 0.6]},
+      {"q": "jitter=0.5", "label": "jitter=0.5", "crop": [0.3, 0.2, 0.7, 0.6]},
+      {"q": "jitter=pitch", "label": "jitter=pitch", "crop": [0.3, 0.2, 0.7, 0.6]},
+      {"q": "jitter=cluster", "label": "jitter=cluster", "crop": [0.3, 0.2, 0.7, 0.6]}
+    ] },
+    { "name": "density", "cols": 3, "base": "scene=rain&flow=down&t=30", "cells": [
+      {"q": "density=manual&strandShare=0.3", "label": "density=manual&strandShare=0.3"},
+      {"q": "density=manual&rowShare=0.3", "label": "density=manual&rowShare=0.3"},
+      {"q": "density=manual&strandShare=1&rowShare=1", "label": "density=manual&strandShare=1&rowShare=1"}
+    ] },
+    { "name": "led-size", "cols": 3, "base": "scene=rain&flow=down&t=30", "cells": [
+      {"q": "size=0.008", "label": "size=0.008"},
+      {"q": "size=0.018", "label": "size=0.018"},
+      {"q": "size=0.04", "label": "size=0.04"},
+      {"q": "size=0.04&maxPx=1.5", "label": "size=0.04&maxPx=1.5"},
+      {"q": "size=0.04&maxPx=4.5", "label": "size=0.04&maxPx=4.5"},
+      {"q": "size=0.04&maxPx=12", "label": "size=0.04&maxPx=12"}
+    ] },
+    { "name": "rest", "cols": 3, "base": "scene=crystal&form=none&layer=off&t=30", "cells": [
+      {"q": "rest=0", "label": "rest=0"},
+      {"q": "rest=0.03", "label": "rest=0.03"},
+      {"q": "rest=0.15", "label": "rest=0.15"}
+    ] },
+    { "name": "wire", "cols": 3, "base": "scene=rain&weather=rain&color=mono&palette=ice&flow=down&t=30&fov=30&radius=16&grid=24&rows=48", "cells": [
+      {"q": "wire=0", "label": "wire=0"},
+      {"q": "wire=0.2", "label": "wire=0.2"},
+      {"q": "wire=2", "label": "wire=2"}
+    ] },
+    { "name": "rain-light", "cols": 2, "base": "scene=rain&flow=down&t=30&color=mono&palette=aurora", "width": 1200, "cells": [
+      {"q": "rainGain=4&tipGain=5", "label": "defaults"},
+      {"q": "rainGain=0", "label": "rainGain=0"},
+      {"q": "tipGain=0", "label": "tipGain=0"},
+      {"q": "rainGain=10&tipGain=12", "label": "rainGain=10&tipGain=12"}
+    ] },
+    { "name": "exposure", "cols": 3, "base": "seed=1&t=110", "cells": [
+      {"q": "exposure=0.8", "label": "exposure=0.8"},
+      {"q": "exposure=1.8", "label": "exposure=1.8"},
+      {"q": "exposure=3.5", "label": "exposure=3.5"}
+    ] },
+    { "name": "glow", "cols": 3, "base": "scene=crystal&form=orb&layer=off&t=30", "cells": [
+      {"q": "bloom=0", "label": "bloom=0"},
+      {"q": "bloom=0.8", "label": "bloom=0.8"},
+      {"q": "bloom=2", "label": "bloom=2"}
+    ] },
+    { "name": "fog", "cols": 3, "base": "scene=rain&flow=down&t=30", "cells": [
+      {"q": "fog=8", "label": "fog=8"},
+      {"q": "fog=20", "label": "fog=20"},
+      {"q": "fog=34", "label": "fog=34"}
+    ] },
+    { "name": "rays", "cols": 3, "base": "scene=rain&flow=down&color=comet&weather=drizzle&t=30&fov=30&radius=16&grid=24&rows=48&tipGain=12", "cells": [
+      {"q": "rays=off", "label": "rays=off", "crop": [0.3, 0.2, 0.7, 0.6]},
+      {"q": "rays=2&rayGain=1.5&rayLength=50", "label": "rays=2&rayGain=1.5&rayLength=50", "crop": [0.3, 0.2, 0.7, 0.6]},
+      {"q": "rays=4&rayGain=1.5&rayLength=50", "label": "rays=4&rayGain=1.5&rayLength=50", "crop": [0.3, 0.2, 0.7, 0.6]},
+      {"q": "rays=8&rayGain=1.5&rayLength=50", "label": "rays=8&rayGain=1.5&rayLength=50", "crop": [0.3, 0.2, 0.7, 0.6]},
+      {"q": "rays=8", "label": "rays=8", "crop": [0.3, 0.2, 0.7, 0.6]},
+      {"q": "rays=8&rayGain=1.5&rayLength=50&rayThreshold=3", "label": "rays=8&rayGain=1.5&rayLength=50&rayThreshold=3", "crop": [0.3, 0.2, 0.7, 0.6]}
+    ] },
+    { "name": "weather", "cols": 2, "base": "scene=rain&flow=down&t=30&color=mono&palette=deep sea", "width": 1200, "cells": [
+      {"q": "weather=drizzle", "label": "weather=drizzle"},
+      {"q": "weather=rain", "label": "weather=rain"},
+      {"q": "weather=shower", "label": "weather=shower"},
+      {"q": "weather=downpour", "label": "weather=downpour"}
+    ] },
+    { "name": "trail", "cols": 3, "base": "scene=rain&flow=down&t=30&color=mono&palette=deep sea", "cells": [
+      {"q": "trail=0.3", "label": "trail=0.3"},
+      {"q": "trail=1", "label": "trail=1"},
+      {"q": "trail=3", "label": "trail=3"}
+    ] },
+    { "name": "direction", "cols": 3, "base": "t=30", "cells": [
+      {"q": "scene=rain&flow=down", "label": "scene=rain&flow=down"},
+      {"q": "scene=rain&flow=across", "label": "scene=rain&flow=across"},
+      {"q": "seed=4&t=225", "label": "seed=4&t=225 (a drift passage)"}
+    ] },
+    { "name": "colour-modes", "cols": 4, "base": "scene=rain&flow=down&t=30&weather=rain", "cells": [
+      {"q": "color=mono", "label": "color=mono"},
+      {"q": "color=gradient", "label": "color=gradient"},
+      {"q": "color=rainbow", "label": "color=rainbow"},
+      {"q": "color=palette", "label": "color=palette"},
+      {"q": "color=accent", "label": "color=accent"},
+      {"q": "color=comet", "label": "color=comet"},
+      {"q": "color=speed", "label": "color=speed"},
+      {"q": "color=cloud", "label": "color=cloud"},
+      {"q": "color=depth", "label": "color=depth"},
+      {"q": "color=repaint", "label": "color=repaint"},
+      {"q": "color=sky", "label": "color=sky"}
+    ] },
+    { "name": "story", "cols": 5, "base": "seed=1", "cells": [
+      {"q": "story=on&t=60", "label": "story=on&t=60"},
+      {"q": "story=on&t=180", "label": "story=on&t=180"},
+      {"q": "story=on&t=360", "label": "story=on&t=360"},
+      {"q": "story=on&t=480", "label": "story=on&t=480"},
+      {"q": "story=on&t=840", "label": "story=on&t=840"},
+      {"q": "story=off&t=60", "label": "story=off&t=60"},
+      {"q": "story=off&t=180", "label": "story=off&t=180"},
+      {"q": "story=off&t=360", "label": "story=off&t=360"},
+      {"q": "story=off&t=480", "label": "story=off&t=480"},
+      {"q": "story=off&t=840", "label": "story=off&t=840"}
+    ] },
+    { "name": "rainbow", "cols": 3, "base": "scene=rain&flow=down&t=30&color=rainbow", "cells": [
+      {"q": "rainbow=drop", "label": "rainbow=drop"},
+      {"q": "rainbow=led", "label": "rainbow=led"},
+      {"q": "rainbow=bands", "label": "rainbow=bands"}
+    ] },
+    { "name": "palettes", "cols": 3, "base": "scene=rain&flow=down&t=30&color=mono", "cells": [
+      {"q": "palette=ice", "label": "palette=ice"},
+      {"q": "palette=amber", "label": "palette=amber"},
+      {"q": "palette=sakura", "label": "palette=sakura"},
+      {"q": "palette=aurora", "label": "palette=aurora"},
+      {"q": "palette=deep sea", "label": "palette=deep sea"},
+      {"q": "palette=candle", "label": "palette=candle"}
+    ] },
+    { "name": "bands", "cols": 3, "base": "scene=rain&flow=down&t=30&color=rainbow&rainbow=bands", "cells": [
+      {"q": "bandScale=0.3", "label": "bandScale=0.3"},
+      {"q": "bandScale=1", "label": "bandScale=1"},
+      {"q": "bandScale=3", "label": "bandScale=3"}
+    ] },
+    { "name": "saturation", "cols": 2, "base": "scene=rain&flow=down&t=30&color=rainbow", "width": 1200, "cells": [
+      {"q": "saturation=0.3", "label": "saturation=0.3"},
+      {"q": "saturation=1", "label": "saturation=1"}
+    ] },
+    { "name": "sets", "cols": 3, "base": "scene=rain&flow=down&t=30&color=palette", "cells": [
+      {"q": "set=pastel", "label": "set=pastel"},
+      {"q": "set=neon", "label": "set=neon"},
+      {"q": "set=wa", "label": "set=wa"},
+      {"q": "set=sunset", "label": "set=sunset"},
+      {"q": "set=ocean", "label": "set=ocean"}
+    ] },
+    { "name": "sky", "cols": 2, "base": "scene=rain&flow=down&color=sky", "width": 1200, "cells": [
+      {"q": "skyDay=80&t=0", "label": "skyDay=80&t=0"},
+      {"q": "skyDay=80&t=20", "label": "skyDay=80&t=20"},
+      {"q": "skyDay=80&t=40", "label": "skyDay=80&t=40"},
+      {"q": "skyDay=80&t=60", "label": "skyDay=80&t=60"}
+    ] },
+    { "name": "camera", "cols": 3, "base": "seed=1&t=110", "cells": [
+      {"q": "camera=orbit", "label": "camera=orbit"},
+      {"q": "camera=walk", "label": "camera=walk"},
+      {"q": "camera=spin", "label": "camera=spin"},
+      {"q": "camera=gaze", "label": "camera=gaze"},
+      {"q": "camera=rise", "label": "camera=rise"}
+    ] },
+    { "name": "view", "cols": 3, "base": "scene=crystal&form=orb&layer=on&t=30", "cells": [
+      {"q": "fov=40", "label": "fov=40"},
+      {"q": "fov=76", "label": "fov=76"},
+      {"q": "fov=100", "label": "fov=100"},
+      {"q": "radius=2", "label": "radius=2"},
+      {"q": "radius=10", "label": "radius=10"},
+      {"q": "radius=16", "label": "radius=16"}
+    ] },
+    { "name": "ripple", "cols": 2, "width": 1200, "cells": [
+      {"q": "scene=rain&flow=down&weather=drizzle&color=mono&palette=deep sea&rainShare=0.3&t=30", "label": "rain, 0.4 s after a click", "click": [0.5, 0.55], "after": 8},
+      {"q": "scene=rain&flow=down&weather=drizzle&color=mono&palette=deep sea&rainShare=0.3&t=30", "label": "rain, 0.8 s after", "click": [0.5, 0.55], "after": 16},
+      {"q": "scene=crystal&form=none&layer=off&t=30", "label": "still room, 0.6 s after a click", "click": [0.5, 0.55], "after": 12},
+      {"q": "scene=crystal&form=none&layer=off&t=30", "label": "still room, 1.2 s after", "click": [0.5, 0.55], "after": 24}
+    ] },
+    { "name": "breath", "cols": 2, "base": "scene=crystal&form=orb&layer=on&t=30", "width": 1200, "cells": [
+      {"q": "breath=on&breathDepth=0.8", "label": "breathed in (4 s)", "pre": 40, "frames": 40},
+      {"q": "breath=on&breathDepth=0.8", "label": "breathed out (10 s)", "pre": 160, "frames": 40}
+    ] }
+  ]
+}
