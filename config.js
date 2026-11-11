@@ -77,13 +77,20 @@ export const CAMERAS = [
 
 // Forms of light. Sky forms come one at a time (two while one turns into the
 // next); the layer (a sea of light near the floor) comes and goes beside
-// them. Each form picks its colours from a few of the palettes.
+// them. Each form picks its colours from a few of the palettes. type is the
+// form's number in the shader (see formsAt in shaders.js); weight is how
+// often it comes (see the casting in show.js): the forms of nature come more
+// often than the forms of mathematics.
 export const FORMS = [
-  { name: 'orb',    type: 0, palettes: ['amber', 'candle', 'sakura', 'deep sea'] },
-  { name: 'spiral', type: 1, palettes: ['deep sea', 'sakura', 'ice', 'aurora'] },
-  { name: 'cloud',  type: 3, palettes: ['sakura', 'aurora', 'amber', 'deep sea'] },
-  { name: 'ring',   type: 4, palettes: ['amber', 'aurora', 'sakura', 'deep sea'] },
-  { name: 'veil',   type: 5, palettes: ['aurora', 'sakura', 'deep sea', 'amber'] },
+  { name: 'orb',       type: 0, weight: 1,   palettes: ['amber', 'candle', 'sakura', 'deep sea'] },
+  { name: 'spiral',    type: 1, weight: 1,   palettes: ['deep sea', 'sakura', 'ice', 'aurora'] },
+  { name: 'cloud',     type: 3, weight: 1,   palettes: ['sakura', 'aurora', 'amber', 'deep sea'] },
+  { name: 'ring',      type: 4, weight: 1,   palettes: ['amber', 'aurora', 'sakura', 'deep sea'] },
+  { name: 'veil',      type: 5, weight: 1,   palettes: ['aurora', 'sakura', 'deep sea', 'amber'] },
+  { name: 'solid',     type: 6, weight: 0.4, palettes: ['ice', 'amber', 'aurora', 'sakura'] },
+  { name: 'attractor', type: 7, weight: 0.4, palettes: ['sakura', 'deep sea', 'amber', 'aurora'] },
+  { name: 'knot',      type: 8, weight: 0.4, palettes: ['aurora', 'amber', 'sakura', 'deep sea'] },
+  { name: 'fractal',   type: 9, weight: 0.4, palettes: ['amber', 'deep sea', 'sakura', 'aurora'] },
 ];
 export const LAYER = { name: 'layer', type: 2, palettes: ['deep sea', 'ice', 'aurora', 'sakura', 'amber'] };
 
@@ -240,6 +247,6 @@ export const SCHEMA = [
     { key: 'chimes', label: 'Bells', min: 0, max: 1, step: 0.05, viewer: 6 },
     { key: 'rainSound', label: 'Rain', min: 0, max: 1, step: 0.05, viewer: 7 },
     { key: 'formSound', label: 'Forms', min: 0, max: 1, step: 0.05, viewer: 8,
-      hint: 'The voice each form of light brings: the orb a low hum, the spiral a turning figure, the cloud a high shimmer, the ring a glassy tone, the veil a soft air' },
+      hint: 'The voice each form of light brings: the orb a low hum, the spiral a turning figure, the cloud a high shimmer, the ring a glassy tone, the veil a soft air, the solid a chord of pure fifths, the attractor a wandering figure, the knot two beating tones, the fractal one fifth in every octave' },
   ] },
 ];

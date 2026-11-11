@@ -102,13 +102,12 @@ function createTimeline(seed, pool, name, mood) {
       if (kind.sky) {
         if (prev?.sky && prev.kind !== kind && hash(r * 37 + 5) < 0.6) sky = prev.sky;
         else {
-          // Never one of the last two forms again, and more likely the one
-          // unseen the longest (of those never seen, any one).
+          // Never one of the last two forms again; of the others, each as
+          // likely as its weight, and the likelier the longer it is unseen
+          // (those never seen: as if all the others had come since).
           const options = FORMS.filter((f) => !recent.slice(0, Math.min(2, FORMS.length - 1)).includes(f));
-          const since = (f, i) => (recent.includes(f) ? recent.indexOf(f) : FORMS.length + hash(r * 13 + i));
-          const order = options.map((f, i) => [since(f, i), f]).sort((x, y) => y[0] - x[0]).map(([, f]) => f);
-          const x = hash(r * 41 + 6);
-          const form = x < 0.6 ? order[0] : order[Math.floor((x - 0.6) / 0.4 * order.length) % order.length];
+          const since = (f) => (recent.includes(f) ? recent.indexOf(f) : FORMS.length);
+          const form = weighted(options, hash(r * 41 + 6), (f) => f.weight * since(f) ** 2);
           sky = episode(form, r, T, SKY_IN);
           recent.unshift(form);
         }

@@ -14,6 +14,7 @@
 // keep beyond their path as the eye sees it (see BACK).
 
 import { ROOM } from './config.js';
+import { LORENZ } from './lorenz.js';
 
 const FLOOR = -ROOM.height / 2 - ROOM.foot;        // the mirror floor
 const TAU = Math.PI * 2;
@@ -118,10 +119,85 @@ function veil(age, leave, ph, face) {
   };
 }
 
-export const MOTIONS = { orb, spiral, cloud, ring, veil };
+// A solid: stars come first, the corners of a regular solid; its edges are
+// drawn out from them until they meet. It tumbles slowly. It goes as its
+// edges draw back into the corners. Each time it is one of two, for its
+// whole life: a tetrahedron or an octahedron (SOLID in shaders.js).
+// f[0]: which solid; f[1]: how far the edges are drawn (0 .. 1).
+const SOLIDS = [4.4, 3.8];                     // how far its corners are from its centre, per solid
+function solid(age, leave, ph) {
+  const which = Math.floor(ph / TAU * 7 * SOLIDS.length) % SOLIDS.length;
+  const size = SOLIDS[which], drift = 1.5;
+  return {
+    centre: [drift * Math.sin(0.024 * age + ph), -2.9 + 0.4 * Math.sin(0.027 * age + ph), drift * Math.cos(0.019 * age + ph)],
+    size, turn: 0.085 * age + ph,
+    yaw: 0.05 * age + 2 * ph,
+    tilt: 0.037 * age + 3 * ph,
+    f: [which, smooth((age - 5) / 17) * (1 - smooth(leave * 1.25)), 0],
+    bound: size + 1.2,
+  };
+}
+
+// An attractor: the path of the Lorenz equations (see lorenz.js). It is
+// drawn along its course as it comes, its two wings to the room, swaying;
+// lights travel along it, a turn round a wing in LOOP seconds. It goes as
+// the path fades from its start to its end.
+// turn: where the lights are along the path (0 .. 1); f[0] .. f[1]: the part
+// of the path that shows.
+const LOOP = 5.5;
+function attractor(age, leave, ph, face) {
+  const size = 5.0, drift = 1.4;
+  return {
+    centre: [drift * Math.sin(0.02 * age + ph), -3.1 + 0.3 * Math.sin(0.026 * age + ph), drift * Math.cos(0.016 * age + ph)],
+    size, turn: (age / (LOOP * LORENZ.loops) + ph) % 1,
+    yaw: face + 0.55 * Math.sin(0.023 * age + ph),
+    tilt: 0.14 * Math.sin(0.031 * age + 2 * ph),
+    f: [-0.1 + 1.2 * smooth(leave * 1.1), -0.05 + 1.15 * smooth(age / 20), 0],
+    bound: size * (LORENZ.half + 0.1),
+  };
+}
+
+// A knot: a Lissajous curve, drawn once round as it comes, its broad side
+// to the room, swaying. Its phases drift, so the figure keeps changing and
+// is never knotted the same way for long. It goes as the curve is undone
+// from where it began.
+// turn: its phase; f[0] .. f[1]: the part of the curve that shows; f[2]:
+// which of its sets of frequencies (KNOT in shaders.js), one for its whole life.
+const KNOTS = 2;
+function knot(age, leave, ph, face) {
+  const size = 4.0, drift = 1.5;
+  return {
+    centre: [drift * Math.sin(0.022 * age + ph), -3.2 + 0.3 * Math.sin(0.03 * age + ph), drift * Math.cos(0.018 * age + ph)],
+    size, turn: 0.045 * age + ph,
+    yaw: face + 0.6 * Math.sin(0.027 * age + 2 * ph),
+    f: [-0.1 + 1.2 * smooth(leave * 1.1), -0.05 + 1.15 * smooth(age / 18), Math.floor(ph / TAU * 7 * KNOTS) % KNOTS],
+    bound: size * 1.4 + 0.8,
+  };
+}
+
+// A fractal: a pyramid rises out of the floor, whole; then it is divided,
+// into four pyramids, and each of those into four, more and less finely as
+// it breathes, turning slowly about the vertical. It goes as it is divided
+// on and on, into dust that rises away.
+// f[0]: how many times it is divided.
+function fractal(age, leave, ph) {
+  const size = 5.0, drift = 1.2;
+  const rest = FLOOR + 2.0 + size / 3;              // standing a little over the floor, point to point with its image
+  const y = mix(FLOOR - size * 1.05, rest, smooth(age / 20));
+  const divided = smooth((age - 14) / 22) * (1.5 + 0.6 * Math.sin(0.07 * (age - 36)));
+  return {
+    centre: [drift * Math.sin(0.018 * age + ph), y, drift * Math.cos(0.015 * age + ph)],
+    size, yaw: 0.045 * age + ph,
+    f: [divided + 2.2 * smooth(leave * 1.2), 0, 0],
+    dissolve: 0.8 * smooth(leave * 1.1),
+    bound: size * 1.05,
+  };
+}
+
+export const MOTIONS = { orb, spiral, cloud, ring, veil, solid, attractor, knot, fractal };
 // How far beyond its own path each form keeps, as the eye sees it: the loose
 // and the wide ones read from a distance, and none flares right at the eye.
-const BACK = { orb: 2.5, spiral: 2.5, ring: 2.5, cloud: 3.5, veil: 3 };
+const BACK = { orb: 2.5, spiral: 2.5, ring: 2.5, cloud: 3.5, veil: 3, solid: 2.5, attractor: 3, knot: 3.5, fractal: 3 };
 
 // The form's place at its age: the defaults filled in. anchor is the place
 // on its own path (the eye's way to it gives `face`); centre is where it shows.

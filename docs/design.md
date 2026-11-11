@@ -14,7 +14,8 @@ testing and capturing, see [development.md](development.md).
 You stand in a dark room full of hanging strands of tiny LEDs, over a floor
 of black glass. Light falls down the strands like rain. Now and then the rain
 stops, and a large form of light gathers among the same LEDs: an orb, a
-spiral, a cloud, a ring or a veil. A low sea of light (the layer) glows near
+spiral, a cloud, a ring or a veil, or one of four forms of mathematics (a
+solid, an attractor, a knot, a fractal). A low sea of light (the layer) glows near
 the floor. The colours drift slowly together, and calm music follows what is
 shown. A click sends a wave of light through the room and rings a bell.
 
@@ -383,7 +384,7 @@ look that no strand shows.
 
 ### Forms of light
 
-![The five forms alone: orb, spiral, cloud, ring and veil](img/forms.jpg)
+![The nine forms alone: orb, spiral, cloud, ring, veil, solid, attractor, knot and fractal](img/forms.jpg)
 
 `shaders.js: formsAt` adds the light of up to three forms: two sky forms
 (one coming, one going) and the layer. For each it calls a function that
@@ -401,17 +402,54 @@ the form's first colour to its second:
   arcs. It may part into two crossing hoops.
 - `veilLight`: a curtain like an aurora, in travelling folds, with a bright
   lower hem and rays rising from it.
+- `solidLight`: the edges of a tetrahedron or an octahedron (`SOLID`,
+  `CORNER`, `EDGE`). The distance to each edge is that from a point to a
+  straight piece of line, worked out exactly, 6 or 12 times. Each edge
+  shows from its two corners inward, as far as it is drawn. An edge that
+  runs level glows more (as the ring's level parts do), and each corner is
+  a white-hot point.
+- `attractorLight`: the path of the Lorenz equations. The path is long (16
+  turns, twice), so the shader does not measure a distance to it.
+  `lorenz.js: lorenzField` works the two paths out once on the CPU (fourth
+  order Runge-Kutta from a fixed start, plain arithmetic, so every machine
+  gets the same path) and writes them into a field of 48 cells a side
+  (`LORENZ`): per cell and per path, how near the path comes and how far
+  along the path that place is. `main.js: pathField` makes it a 3D texture
+  (`gl.js: field`) when an attractor first comes. The shader reads the
+  nearness smoothly (`texture`) and the place along the path of the LED's
+  own cell (`texelFetch`: places along two different turns must not be
+  blended). The cells are finer than the gaps between strands. Three lights
+  travel along each path, each a head with a trail (`runner`), from the
+  place along the path alone. The two paths set out 0.012 apart (in the
+  equations' units) and stay together for about the first third of their
+  length, so each pair of lights sets out as one and then parts.
+- `knotLight`: a Lissajous curve, `x = sin(u t + p)`, `y = sin(v t)`,
+  `z = sin(w t + q)` with whole numbers `u, v, w` (`KNOT`) and drifting
+  phases. The LEDs are dense along a strand, so the shader starts from the
+  LED's height: the curve passes that height at `2 v` values of `t` (4 or
+  6). From each it takes one step along the curve's tangent towards the
+  LED, and keeps the nearest place found. The cost does not grow with the
+  curve's length. Two lights run round the curve (`runner`).
+- `fractalLight`: a Sierpinski tetrahedron, by folding. At each division
+  the point is mirrored across three planes onto the pyramid of one corner,
+  and that pyramid is scaled to the size of the whole; one distance to a
+  tetrahedron then serves all the small pyramids (4, 16, 64). LEDs inside
+  are lit, those near a face more. Between two whole numbers of divisions
+  the two results are blended, so the hollows of the next division fade
+  out.
 - `layerLight`: the layer of light, a sea near the floor in slow waves, its
   points glinting.
 
-Each is a distance field: a function of the LED's position relative to the
+Each is a field: a function of the LED's position relative to the
 form's centre, size and turn. Where the form is moves in `forms.js` (see
 section 5). Each form also has a reach (`uFormF[k].w`, the `bound` from
 `forms.js`). LEDs beyond it skip the form, so a form costs little where it
-is not.
+is not. The attractor, the knot and the fractal also stop early outside
+their own box or pyramid.
 
-The thin forms (ring, veil) are about one strand gap thick
-(`shaders.js: fineness`), so a coarse lattice still catches them.
+The thin forms (ring, veil, solid, knot) are about one strand gap thick
+(`shaders.js: fineness`; `lineGlow` for the solid and the knot), so a
+coarse lattice still catches them.
 
 **Coming and going.** A form does not fade evenly. Each LED has an order
 from 0 to 1. The LED is on while the form's weight is far enough past its
@@ -514,8 +552,12 @@ another, from hashes of the seed and the passage's number:
 - A sky passage next to one of the other kind (a storm after a form, or a
   form after a storm) may keep the form that already shows (60%), so rain
   gathers on it or runs off it.
-- Otherwise the new form is never one of the last two, and is most likely
-  the one unseen the longest.
+- Otherwise the new form is never one of the last two. Each of the others
+  is as likely as its weight (`config.js: FORMS`: 1 for the orb, spiral,
+  cloud, ring and veil, 0.4 for the solid, attractor, knot and fractal)
+  times the square of how many forms have come since it last did. Over an
+  hour a form comes about 36 times: each of the first five 4.6 times, each
+  of the other four 3.3 times (`tools/story-stats.mjs`).
 
 The scene setting chooses a pool (`show.js: POOLS`): `mix` uses all
 passages; `crystal` uses only `form` and `still` (and `still` half as
@@ -546,7 +588,8 @@ centre, tilt, how it comes and goes, its own measures and its reach.
 
 Where a form is comes from `forms.js: motion`, as a function of its age and
 of how far it has gone on its way out. Each form has a life of its own
-(`forms.js: orb`, `spiral`, `cloud`, `ring`, `veil`). For example, the orb
+(`forms.js: orb`, `spiral`, `cloud`, `ring`, `veil`, `solid`, `attractor`,
+`knot`, `fractal`). For example, the orb
 rises out of the floor to meet its image, drifts, parts in two now and then,
 and sinks back as it leaves. The ring rises lying flat, stands up, and lies
 down into the floor as it goes. The forms slowly turn to face the eye (eased
@@ -674,7 +717,12 @@ The layers:
 - **Form voices.** Each form has a voice that swells and fades with its
   weight, panned to where it is seen (`mixVoices`): the orb a warm low hum,
   the spiral a slow figure of notes (scheduled in `tick`), the cloud a high
-  shimmer, the ring a glassy tone, the veil a soft air. The cloud and the
+  shimmer, the ring a glassy tone, the veil a soft air, the solid a chord
+  of three pure fifths, the knot two tones that beat at different paces,
+  the fractal a root and fifth in three octaves, each half as loud. The
+  attractor's is a figure too (`tick`): its notes follow a path of its own
+  through the Lorenz equations (`lorenz.js: lorenzStep`), low notes on one
+  wing and high ones on the other. The cloud and the
   veil also get a little high noise (`AIRY`).
 - **Pale drops.** In a still room a high, soft note falls now and then.
 - **Reverb.** A 6 s convolution reverb (`impulse`), then a compressor.
@@ -859,6 +907,7 @@ GitHub link shows.
 | `lattice.js` | The point and wire buffers, and their build: strand places, LED spacing, thinning ranks. |
 | `show.js` | The show's timeline of passages, fades, casting into slots, form colours, the rain's direction over time. |
 | `forms.js` | How each form moves through its life: centre, size, turn, tilt, its own measures, reach. |
+| `lorenz.js` | The path of the Lorenz equations: one step, the two paths, and the field the attractor form reads. |
 | `director.js` | Seeded tracks (weather, colour, density, camera), the colour story's mood, the shared `hash`. |
 | `direction.js` | The change of the rain's direction: weights and gates per direction. |
 | `audio.js` | The generative music: pad, bells, rain, form voices, reverb. |
@@ -895,6 +944,10 @@ flowchart TD
   show --> forms["forms.js"]
   show --> direction
   forms --> config
+  forms --> lorenz["lorenz.js"]
+  main --> lorenz
+  shaders --> lorenz
+  audio --> lorenz
   director --> config
   direction --> shaders
 ```
@@ -916,7 +969,7 @@ Details and commands are in [development.md](development.md).
   fake `version.json`, the sliders' `touch-action`, which settings each
   shows, the link to the other page, and the shared saved settings that
   the viewer page's Reset clears), the rain scene in the lab and the
-  crystal scene (with the same click, keys and Reset), a seeded time with and without the story, the ring and the veil
+  crystal scene (with the same click, keys and Reset), a seeded time with and without the story, six of the forms
   held, and `?jitter=pitch`. It then renders the sound: a held orb must be
   audible, a still room at least 3 dB quieter, and neither may clip. The
   `test` workflow runs it on every pull request and push to main.

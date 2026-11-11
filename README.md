@@ -3,7 +3,8 @@
 A room of small points of light over a mirror floor. Rain of light falls
 through it. Now and then the rain eases off, and a large form of light
 gathers in the room: an orb, a spiral, a cloud of points, a ring, or a veil
-like an aurora. Sometimes the rain falls through the form. The show moves
+like an aurora; or a form of mathematics: a regular solid, the butterfly of
+the Lorenz equations, a Lissajous knot, or a fractal pyramid. Sometimes the rain falls through the form. The show moves
 between these on its own, with slow cross-fades. The weather, the colours
 and the direction of the rain change on their own too, and the camera
 circles the room slowly. Calm generative music follows the show, and every
@@ -61,7 +62,7 @@ also go in the URL, on either page. A few that people use:
 | --- | --- |
 | `?scene=rain` | only the rain |
 | `?scene=crystal` | only the forms of light |
-| `?form=orb` | always the orb (also `spiral`, `cloud`, `ring`, `veil`, `none`) |
+| `?form=orb` | always the orb (also `spiral`, `cloud`, `ring`, `veil`, `solid`, `attractor`, `knot`, `fractal`, `none`) |
 | `?color=cloud&weather=drizzle` | a colour mode and a weather |
 | `?seed=7&t=120` | one order of the show, from 2 minutes in |
 | `?breath=off` | no breathing swell of the light |

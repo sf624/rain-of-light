@@ -11,14 +11,19 @@
 // - Each form of light has a voice that swells and fades with it: the orb a
 //   warm, low hum; the spiral a slow figure of notes that turns; the cloud a
 //   high, airy shimmer; the ring a clear, glassy tone; the veil a soft, open
-//   air. As a form gathers, a chord of its own blooms; as it leaves, the
-//   harmony comes home to D. Each voice comes from where its form is seen.
+//   air; the solid a still chord of pure fifths; the attractor a figure that
+//   wanders between a low and a high wing, never the same way twice; the
+//   knot two tones that beat against each other, each at its own pace; the
+//   fractal one fifth in every octave, each softer. As a form gathers, a
+//   chord of its own blooms; as it leaves, the harmony comes home to D. Each
+//   voice comes from where its form is seen.
 // - With a form the pad opens (brighter); in rain it is veiled.
 // - In a still room (no rain, no form) the pad thins out, and now and then a
 //   high, soft note falls, like the room's pale drops.
 // - The breath: a low tone under the pad swells as the light does.
 
 import { createSway } from './sway.js';
+import { lorenzStep } from './lorenz.js';
 
 const mtof = (m) => 440 * 2 ** ((m - 69) / 12);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -36,8 +41,10 @@ const HOME = 0;                                          // where the harmony re
 const BELLS = [62, 64, 66, 69, 71, 74, 76, 78, 81]; // D major pentatonic
 // The forms' voices, and the chord each one brings when it gathers: the orb
 // (warm palettes) the low, warm G; the spiral the open, unresolved A sus2;
-// the cloud and the veil the soft Em9; the ring the still B minor.
-const FORM_CHORD = { orb: 2, spiral: 3, cloud: 4, ring: 1, veil: 4 };
+// the cloud and the veil the soft Em9; the ring the still B minor; the solid
+// the A sus2 (it is made of fifths); the attractor the restless B minor; the
+// knot the G; the fractal D itself.
+const FORM_CHORD = { orb: 2, spiral: 3, cloud: 4, ring: 1, veil: 4, solid: 3, attractor: 1, knot: 2, fractal: 0 };
 const VOICES = Object.keys(FORM_CHORD);
 const AIRY = { cloud: 0.012, veil: 0.007 };              // the forms with the air of the noise, and how much
 const SETTLE = 6;    // s: a chord a form brought is not changed again sooner
@@ -65,6 +72,7 @@ export function createAudio({ settings }) {
   let now = { at: -Infinity, hold: 0, why: 'time', fades: [] };
   let chordTimer = 0;
   let arpAt = 0, arpStep = 0, arpPan = 0, dropAt = 0;
+  let wingAt = 0, wing = [2, 3, 20];                    // the attractor's figure: its next note, and where its own path is
 
   function build() {
     ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -236,11 +244,11 @@ export function createAudio({ settings }) {
     for (const name of VOICES) if (present.has(name)) formLayer(name, notes, t, hold);
   }
 
-  // A form's voice on this chord. The spiral's is a figure of notes (see
-  // tick); the others are held, like the pad.
+  // A form's voice on this chord. The spiral's and the attractor's are
+  // figures of notes (see tick); the others are held, like the pad.
   function formLayer(name, notes, t, hold) {
-    if (name === 'spiral' || settings.formSound <= 0) return;
-    const level = { orb: 0.035, cloud: 0.025, ring: 0.02, veil: 0.022 }[name];
+    if (name === 'spiral' || name === 'attractor' || settings.formSound <= 0) return;
+    const level = { orb: 0.035, cloud: 0.025, ring: 0.02, veil: 0.022, solid: 0.022, knot: 0.024, fractal: 0.022 }[name];
     const dest = fadeTo(voice[name].g);
     if (name === 'orb') {
       // Warm and low: the root, its fifth and its octave, soft and dark.
@@ -271,6 +279,28 @@ export function createAudio({ settings }) {
       for (const [i, m] of notes.slice(-2).entries()) {
         sustain(m + 12, [['sine', 0, -6, 1], ['sine', 0, 6, 0.8]],
           { t, hold, attack: 10, peak: level * 0.3, cutoff: 2500, pan: i ? 0.35 : -0.35, dest, follow: false });
+      }
+    } else if (name === 'solid') {
+      // Still and pure: three fifths, one on the other, from the root an
+      // octave up; plain sines, hardly beating.
+      const r = notes[0] + 12;
+      for (const [i, up] of [0, 7, 14].entries()) {
+        sustain(r + up, [['sine', 0, -1.5, 1], ['sine', 0, 1.5, 1]],
+          { t, hold, attack: 8 + i, peak: level * [0.5, 0.36, 0.24][i], cutoff: 4000, pan: (i - 1) * 0.3, dest, follow: false });
+      }
+    } else if (name === 'knot') {
+      // Two lines that cross: two notes of the chord an octave up, each a
+      // pair a little apart in tune, the one beating half again as fast as
+      // the other.
+      sustain(notes[2] + 12, [['sine', 0, -6, 1], ['triangle', 0, 6, 0.6]], { t, hold, attack: 8, peak: level * 0.42, cutoff: 2200, pan: -0.4, dest, follow: false });
+      sustain(notes[3] + 12, [['sine', 0, -9, 1], ['triangle', 0, 9, 0.6]], { t, hold, attack: 9, peak: level * 0.36, cutoff: 2200, pan: 0.4, dest, follow: false });
+    } else if (name === 'fractal') {
+      // The same in every octave: the root and its fifth, an octave up, two
+      // and three, each half as loud as the one below.
+      const r = notes[0];
+      for (const [i, up] of [12, 24, 36].entries()) {
+        sustain(r + up, [['triangle', 0, -3, 1], ['sine', 0, 3, 0.8]], { t, hold, attack: 7 + i, peak: level * 0.5 / 2 ** i, cutoff: 1400 * 2 ** i, pan: -0.25, dest, follow: false });
+        sustain(r + up + 7, [['sine', 0, 2, 1], ['triangle', 0, -2, 0.5]], { t, hold, attack: 8 + i, peak: level * 0.36 / 2 ** i, cutoff: 1400 * 2 ** i, pan: 0.25, dest, follow: false });
       }
     }
   }
@@ -325,6 +355,21 @@ export function createAudio({ settings }) {
         arpPan += 0.9;
         ping(m, arpAt, { peak: 0.05 * (arpStep % 4 === 1 ? 1 : 0.7), decay: 4.5, pan: 0.6 * Math.sin(arpPan), dest: voice.spiral.g, verbSend: 0 });
         arpAt += 3.2 + 0.7 * Math.sin(arpStep * 0.7);   // unhurried: a note, and room after it
+      }
+    }
+    // The attractor: a note for each stretch of a path of its own through
+    // the Lorenz equations: from the chord's low notes while the path is on
+    // one wing, from its high notes an octave up on the other, from the side
+    // that wing is on; the higher the path, the longer until the next.
+    if (heard.w.attractor > 0.02 && settings.formSound > 0 && chord >= 0) {
+      if (wingAt < t) wingAt = t + 0.05;
+      while (wingAt < ahead) {
+        for (let i = 0; i < 70; i++) wing = lorenzStep(wing);
+        const notes = CHORDS[chord], right = wing[0] > 0;
+        const n = Math.min(2, Math.floor(wing[2] / 16));
+        ping(right ? notes[2 + n] + 12 : notes[n] + 12, wingAt,
+          { peak: right ? 0.04 : 0.05, decay: 5, pan: clamp(wing[0] / 18, -0.7, 0.7), dest: voice.attractor.g, verbSend: 0 });
+        wingAt += 2.0 + 1.6 * clamp(wing[2] / 45, 0, 1);
       }
     }
     // The still room: now and then a high, soft note, like a pale drop.

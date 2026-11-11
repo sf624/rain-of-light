@@ -5,7 +5,7 @@
 // much of the rain flows sideways (see show.js, drift).
 //   node tools/story-stats.mjs [seeds=50] [hours=1]
 globalThis.innerWidth = globalThis.innerHeight = 1000;
-const { COLOR_MODES, PALETTES, SETS } = await import('../config.js');
+const { COLOR_MODES, PALETTES, SETS, FORMS } = await import('../config.js');
 const { createDirector, hueOf, apart, KIN } = await import('../director.js');
 const { createShow } = await import('../show.js');
 const { createDirection } = await import('../direction.js');
@@ -162,18 +162,24 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
   // The rain's direction: the share of the rain (weighted by how much rain falls) that
   // flows sideways, and that falls down, as main.js runs them (direction.js), each tenth of
   // a second; and the sideways passages (drift): how many, how long, and what comes next to them.
-  let side = 0, down = 0, all = 0, drifts = 0, lengths = [], next = 0;
+  let side = 0, down = 0, all = 0, steps = 0, drifts = 0, lengths = [], next = 0;
+  const came = {}, stayed = {};       // per form: how many times it came, and for how many seconds it showed
   for (let seed = 1; seed <= SEEDS; seed++) {
     const show = createShow({ ...DEFAULTS }, { feet: 0, seed });
     const dir = createDirection(show.flow(0).toward);
     for (let t = 0; t < SPAN; t += 0.1) {
       const now = show.update(t, 0.1);
       dir.update(0.1, now.flow.toward, t);
-      side += dir.weights[1] * now.rain; down += dir.weights[0] * now.rain; all += now.rain;
+      side += dir.weights[1] * now.rain; down += dir.weights[0] * now.rain; all += now.rain; steps++;
     }
     let from = null, kind = null;
+    let form = null;
     for (let t = 0; t < SPAN; t++) {
-      const k = show.cast(t).kind;
+      const c = show.cast(t), k = c.kind;
+      const f = c.items.find((i) => i.form !== 'layer')?.form;
+      if (f) count(stayed, f);
+      if (f && f !== form) count(came, f);
+      form = f;
       if (k === kind) continue;
       if (k === 'drift') { drifts++; from = t; if (['rain', 'storm'].includes(kind)) next++; }
       if (kind === 'drift') { lengths.push(t - from); if (['rain', 'storm'].includes(k)) next++; }
@@ -185,5 +191,11 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
     `  sideways ${pct(side, all)}  down ${pct(down, all)}  between the two ${pct(all - side - down, all)}`,
     `  sideways passages: ${(drifts / SEEDS / (SPAN / 3600)).toFixed(1)} an hour, ${lengths[0]} .. ${lengths.at(-1)} s (median ${lengths[lengths.length >> 1]} s);`
     + ` next to falling rain: ${next}`);
+  const hours = SEEDS * SPAN / 3600;
+  out.push('', `Rain: ${pct(all, steps)} of the full rain, over the whole show`,
+    '', 'Forms (times each comes in an hour; share of the show it is there)');
+  for (const f of FORMS) out.push(`  ${f.name.padEnd(10)} ${((came[f.name] || 0) / hours).toFixed(1).padStart(5)}  ${pct(stayed[f.name] || 0, SEEDS * SPAN)}`);
+  const sum = (k) => Object.values(k).reduce((a, b) => a + b, 0);
+  out.push(`  ${'all'.padEnd(10)} ${(sum(came) / hours).toFixed(1).padStart(5)}  ${pct(sum(stayed), SEEDS * SPAN)}`);
   console.log(out.join('\n'));
 }
