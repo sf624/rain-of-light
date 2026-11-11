@@ -87,6 +87,8 @@ uniform float uFallLight;
 uniform vec3 uEye;        // where the eye is
 out vec3 vColor;
 out float vSize;
+out float vSprite;        // the sprite's size: the LED's, or its rays' if longer
+out vec4 vRay;            // the rays' colour, and their length in px (0: none)
 
 // Light rays: how long a ray is, in Ray lengths, for a head seen this bright.
 // It grows from nothing in step with the light, so a ray grows in and out with
@@ -515,17 +517,6 @@ void main() {
   if (uDirW.y > 0.001 || uTurn > 0.001) col += flowColor(sidewaysRain(L, pos, trailK, uDirW.y), spatial, h) * uTurn;
   float rain = L.rain;
   float tip = L.tip;
-  // Rays come only from a drop's head, and few LEDs are near one: the rest
-  // stop here (no colour of a head comes to 4 times its light, and the light
-  // only dims from here on; the falling rain's light (phys) at most 3.6 times it).
-  if (uRayLen > 0.0 && uRayLen * rayK(tip * uTipGain * uRainMix * 4.0 * (1.0 + 2.6 * uFallLight)) < RAY_MIN) {
-    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
-    gl_PointSize = 0.0;
-    vColor = vec3(0.0);
-    vSize = 1.0;
-    return;
-  }
-
   // Spherical waves of light.
   float ring = 0.0;
   for (int i = 0; i < 8; i++) {
@@ -553,7 +544,9 @@ void main() {
   float inForm = clamp(fm, 0.0, 1.0);                // drops in a form take its colour
 
   vec3 c = form + flare * 2.5 * ring;
-  vec3 glint = vec3(0.0);
+  // The light that casts rays: all of the LED's light but the rain's trails
+  // and the LEDs' light at rest (a drop's head, a form, a wave, a twinkle).
+  vec3 glint = c;
   vec3 wireCol = thread + flare * ring;
   float near = 1.0 - smoothstep(3.0, 12.0, dist);
   // The falling rain's light falls off with distance as in a real room,
@@ -613,7 +606,7 @@ void main() {
     for (int i = 0; i < 11; i++) white += WHITE[i] * W[i];
     c += (restCol * uRest + rainCol * rain * uRainGain + mix(tipCol, vec3(1.0), white) * tip * uTipGain
         + mix(restCol, vec3(1.0), 0.35) * ring * 4.0) * rk * (1.0 - 0.25 * uStorm) * (1.0 - 0.75 * around * (1.0 - inForm)) * phys;
-    glint = tipCol * tip * uTipGain * rk * phys;     // the head's light in its own colour: the light rays
+    glint += (tipCol * tip * uTipGain + mix(restCol, vec3(1.0), 0.35) * ring * 4.0) * rk * phys; // a head's light in its own colour
     wireCol += (rainCol * rain * uRainGain * 0.2 + restCol * uRest * 1.5 * near + restCol * ring * 1.2) * rk * physWire;
   }
   if (rk < 0.999) {
@@ -624,6 +617,7 @@ void main() {
     float tw = hash(id + 3.0) < 0.2
       ? pow(0.5 + 0.5 * sin(uTime * (0.3 + 1.2 * hash(id + 1.0)) + hash(id + 2.0) * 6.2832), 30.0) * uTwinkle : 0.0;
     c += (uTint * uRest + pale * tw + drop * (rain * uRainGain * 0.5 + tip * uTipGain) + pale * 5.0 * ring) * (1.0 - rk);
+    glint += (pale * tw + drop * tip * uTipGain + pale * 5.0 * ring) * (1.0 - rk);
     // The strands catch the light of the forms they run through, and a faint
     // sheen of the room's: thin lit threads, never dark bars.
     wireCol += (drop * rain * uRainGain * 0.2 + uTint * uRest * 1.5 * near + pale * ring * 1.2) * (1.0 - rk);
@@ -679,24 +673,22 @@ void main() {
   vSize = shown;
   vColor = c;
   // A pixel wider each side, so the LED's light is spread by area (see POINT_FS).
-  gl_PointSize = shown + 2.0;
-  // Light rays: only LEDs near a drop's head, drawn as a larger sprite of
-  // thin rays around the LED, in the head's colour, as long as its light makes them.
+  vSprite = shown + 2.0;
+  vRay = vec4(0.0);
+  // Light rays, drawn in the same sprite (made larger if they are longer
+  // than the LED): as long as the LED's light makes them (rayK), at most what
+  // the GPU draws, in its colour; none under RAY_MIN.
   if (uRayLen > 0.0) {
-    // The ray's length goes by the head's light (rayK), at most what the GPU draws.
     float k = rayK(seenLight);
     float len = min(uRayLen * k, uRayView.y);
-    if (len < RAY_MIN) {
-      gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
-      gl_PointSize = 0.0;
-      return;
+    if (len >= RAY_MIN) {
+      // A short ray is faint, so one that grows from nothing never pops in; a
+      // long one is a little dimmer along its length, so a near head does not flare.
+      vRay = vec4(glint * smoothstep(RAY_MIN, 3.0, len) * pow(max(k, 1.0), -0.35), len);
+      vSprite = max(vSprite, 2.0 * len + 1.0);
     }
-    gl_PointSize = 2.0 * len + 1.0;
-    vSize = gl_PointSize;
-    // A short ray is faint, so one that grows from nothing never pops in; a
-    // long one is a little dimmer along its length, so a near head does not flare.
-    vColor = glint * smoothstep(RAY_MIN, 3.0, len) * pow(max(k, 1.0), -0.35);
   }
+  gl_PointSize = vSprite;
 }`;
 
 // The wires between the LEDs: a thread of light, as bright between the LEDs
@@ -714,47 +706,52 @@ export const POINT_FS = `#version 300 es
 precision mediump float;
 in vec3 vColor;
 in float vSize;
+in float vSprite;
+in vec4 vRay;
 uniform float uGain; // 1 with float buffers (the composite pass applies exposure); else exposure and breath
-out vec4 outColor;
+uniform float uRays; // light rays: how many lines (2: up and down)
+const float RAY_GAIN = 0.3;  // the rays' light, over the LED's
+// The light all the rays on one pixel may add up to, about. The rays go to
+// a buffer of their own (outRay), blended ONE, ONE_MINUS_SRC_ALPHA with the
+// ray's alpha s / RAY_BUDGET: a ray of light s over rays already there (d)
+// gives s + d * (1 - s / RAY_BUDGET). A ray alone, or among faint ones, keeps
+// all its light (a rain head's ray), but the rays of a form's thousands of
+// LEDs side by side stay a soft sparkle near this light, not a white sheet.
+// (It is continuous in every ray's light, so nothing pops; the draw order
+// only weighs which ray of two bright ones shows more.) The LED's own light
+// has alpha 0 there, so it simply adds.
+const float RAY_BUDGET = 0.12;
+layout(location = 0) out vec4 outColor;
+layout(location = 1) out vec4 outRay;
 void main() {
+  vec2 o = (gl_PointCoord - 0.5) * vSprite;     // from the LED's centre, in pixels
   // Added light: each pixel gets the part of the LED's square that falls
   // on it, so an LED gives the same light wherever it sits between pixels
   // (a plain sprite of 1.5 px covers 1 to 4 whole pixels, and its light
   // jumps as the view moves). Large LEDs are rounded.
-  vec2 o = (gl_PointCoord - 0.5) * (vSize + 2.0); // from the LED's centre, in pixels
   vec2 h = vec2(vSize * 0.5);
   vec2 cov = clamp(min(o + 0.5, h) - max(o - 0.5, -h), 0.0, 1.0);
   float r = length(o) / h.x;
   float a = cov.x * cov.y * (0.85 + 0.15 * (1.0 - min(r * r, 1.0)));
   if (vSize >= 3.5) a *= 1.0 - smoothstep(1.0 - 2.0 / vSize, 1.0, r);
-  if (a <= 0.0) discard;
-  outColor = vec4(vColor * a * uGain, 1.0);
-}`;
-
-// Light rays around one bright LED: uRays thin lines through its centre (2:
-// up and down), about a pixel wide, fading towards their tips.
-export const RAY_FS = `#version 300 es
-precision mediump float;
-in vec3 vColor;
-in float vSize;
-uniform float uGain;
-uniform float uRays;
-const float RAY_GAIN = 0.3;  // the rays' light, over the head's
-out vec4 outColor;
-void main() {
-  vec2 p = (gl_PointCoord - 0.5) * vSize;       // pixels from the LED
-  float half_ = vSize * 0.5;
+  // The rays: uRays thin lines through the centre, about a pixel wide, fading towards their tips.
   float light = 0.0;
-  for (int k = 0; k < 4; k++) {
-    if (float(k) >= uRays * 0.5) break;
-    float a = float(k) * 3.14159265 / (uRays * 0.5);
-    vec2 dir = vec2(sin(a), cos(a));
-    float along = abs(dot(p, dir)) / half_;      // 0 at the LED, 1 at the tip
-    float across = abs(dot(p, vec2(dir.y, -dir.x)));
-    float fade = 1.0 - smoothstep(0.0, 1.0, along);
-    light += exp(-across * across * 1.5) * fade * fade;
+  if (vRay.w > 0.0) {
+    float half_ = vRay.w + 0.5;
+    for (int k = 0; k < 4; k++) {
+      if (float(k) >= uRays * 0.5) break;
+      float t = float(k) * 3.14159265 / (uRays * 0.5);
+      vec2 dir = vec2(sin(t), cos(t));
+      float along = abs(dot(o, dir)) / half_;    // 0 at the LED, 1 at the tip
+      float across = abs(dot(o, vec2(dir.y, -dir.x)));
+      float fade = 1.0 - smoothstep(0.0, 1.0, along);
+      light += exp(-across * across * 1.5) * fade * fade;
+    }
   }
-  outColor = vec4(vColor * light * RAY_GAIN * uGain, 1.0);
+  if (a <= 0.0 && light <= 0.0) discard;
+  outColor = vec4(vColor * max(a, 0.0) * uGain, 0.0);
+  vec3 ray = vRay.rgb * light * RAY_GAIN * uGain;
+  outRay = vec4(ray, min(1.0, max(ray.r, max(ray.g, ray.b)) / RAY_BUDGET));
 }`;
 
 export const QUAD_VS = `#version 300 es
@@ -769,14 +766,19 @@ export const DOWN_FS = `#version 300 es
 precision mediump float;
 in vec2 vUv;
 uniform sampler2D uTex;
+uniform sampler2D uRayTex; // the light rays, added to the scene (uRayK 1) in the first step
+uniform float uRayK;
 uniform vec2 uTexel;
 uniform float uKnee; // > 0: only light brighter than this passes, less the knee (only bright cores glow)
 out vec4 outColor;
+vec3 at(vec2 d) {
+  vec2 uv = vUv + uTexel * d;
+  vec3 c = texture(uTex, uv).rgb;
+  if (uRayK > 0.0) c += texture(uRayTex, uv).rgb;
+  return c;
+}
 void main() {
-  vec3 c = texture(uTex, vUv + uTexel * vec2(-1.0, -1.0)).rgb
-         + texture(uTex, vUv + uTexel * vec2( 1.0, -1.0)).rgb
-         + texture(uTex, vUv + uTexel * vec2(-1.0,  1.0)).rgb
-         + texture(uTex, vUv + uTexel * vec2( 1.0,  1.0)).rgb;
+  vec3 c = at(vec2(-1.0, -1.0)) + at(vec2(1.0, -1.0)) + at(vec2(-1.0, 1.0)) + at(vec2(1.0, 1.0));
   c *= 0.25;
   // The knee is taken off the brightest channel and the colour kept: dim light
   // (most LEDs, the threads) gives no glow at all, so the dark between stays black.
@@ -806,6 +808,7 @@ export const COMPOSITE_FS = `#version 300 es
 precision highp float;
 in vec2 vUv;
 uniform sampler2D uScene;
+uniform sampler2D uRayTex;   // the light rays (see POINT_FS)
 uniform sampler2D uBloom;
 uniform float uBloomK;
 uniform float uExposure;
@@ -838,7 +841,7 @@ void main() {
   float tb = uFloor / max(uExposure, 1e-3);             // the floor before tone mapping
   if (uFloor > 0.0) b *= smoothstep(tb, 3.0 * tb, max(b.r, max(b.g, b.b)));
   if (uHazeK > 0.0) b += (smoothRead(uHaze, vUv) * 0.6 + smoothRead(uHazeWide, vUv)) * uHazeK;
-  vec3 c = texture(uScene, vUv).rgb + b;
+  vec3 c = texture(uScene, vUv).rgb + texture(uRayTex, vUv).rgb + b;
   if (uBurn > 0.0) {
     // Light far past white loses its colour, as on film: the cores burn out.
     float m = max(c.r, max(c.g, c.b));

@@ -14,7 +14,7 @@ import {
 import { createShow } from './show.js';
 import { createDirector, hash } from './director.js';
 import { createDirection } from './direction.js';
-import { FLOW_WRAP, RAY_CAP, POINT_VS, POINT_FS, WIRE_FS, RAY_FS, QUAD_VS, DOWN_FS, BLUR_FS, COMPOSITE_FS } from './shaders.js';
+import { FLOW_WRAP, RAY_CAP, POINT_VS, POINT_FS, WIRE_FS, QUAD_VS, DOWN_FS, BLUR_FS, COMPOSITE_FS } from './shaders.js';
 import { createGL, sub, cross, dot, norm, perspective, lookAt } from './gl.js';
 import { createLattice, fillLattice } from './lattice.js';
 import { createControls } from './controls.js';
@@ -40,6 +40,8 @@ if (!gl) {
 
 // Either extension makes RGBA16F targets renderable.
 const hasFloat = !!(gl.getExtension('EXT_color_buffer_float') || gl.getExtension('EXT_color_buffer_half_float'));
+// The scene's two buffers: the light, and the light rays (see POINT_FS).
+const BOTH = [gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1], FIRST = [gl.COLOR_ATTACHMENT0, gl.NONE];
 
 // ---------- fixed settings (also ?dpr=1.5) ----------
 const params = new URLSearchParams(location.search);
@@ -102,7 +104,6 @@ const wireProg = program(POINT_VS, WIRE_FS);
 const downProg = program(QUAD_VS, DOWN_FS);
 const blurProg = program(QUAD_VS, BLUR_FS);
 const compProg = program(QUAD_VS, COMPOSITE_FS);
-const rayProg = program(POINT_VS, RAY_FS);
 const MAX_POINT = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1]; // the largest sprite this GPU draws
 
 const lattice = createLattice(gl);
@@ -143,7 +144,7 @@ function resize() {
   if (hasFloat) {
     freeTarget(scene); freeTarget(bloomA); freeTarget(bloomB); freeTarget(hazeA); freeTarget(hazeB);
     freeTarget(wideA); freeTarget(wideB);
-    scene = target(W, H);
+    scene = target(W, H, true); // and the light rays beside it (see POINT_FS)
     const bw = Math.max(1, W >> 2), bh = Math.max(1, H >> 2);
     bloomA = target(bw, bh);
     bloomB = target(bw, bh);
@@ -687,26 +688,26 @@ function frame(now) {
 
   // Points.
   gl.bindFramebuffer(gl.FRAMEBUFFER, hasFloat ? scene.fb : null);
+  if (hasFloat) gl.drawBuffers(BOTH);
   gl.viewport(0, 0, W, H);
   gl.clearColor(0, 0, 0, 1);
   gl.clear(gl.COLOR_BUFFER_BIT);
   // The LEDs and their wires share one vertex shader, so both get the same uniforms.
   const wiresOn = S.wire > 0 && wireCount > 0;
-  // Rays belong to the rain's heads: drawn only while rain falls.
-  const rays = S.rays === 'off' || rk < 0.01 ? 0 : Number(S.rays);
+  // Every LED's light casts rays (see POINT_VS: rayK), drawn with the LED into
+  // the second buffer. Without float buffers there are none.
+  const rays = S.rays === 'off' || !hasFloat ? 0 : Number(S.rays);
   const progs = [pointProg];
   if (wiresOn) progs.push(wireProg);
-  if (rays) progs.push(rayProg);
   const rayScale = H / 1080;   // rays scale with the view like the lattice: their length is set for a 1080 px tall view
-  const rayLen = S.rayLength * rayScale;
+  const rayLen = rays ? S.rayLength * rayScale : 0;
   for (const prog of progs) {
   gl.useProgram(prog.p);
   const u = prog.u;
   gl.uniform1f(u.uWire, prog === wireProg ? S.wire : 0);
-  gl.uniform1f(u.uRayLen, prog === rayProg ? rayLen : 0);
   // Points this far past the edge are not lit (clip units): their sprite's half
-  // size and a little more. A wire's segment is short, so a wide margin is safe.
-  const margin = prog === rayProg ? Math.min(rayLen * RAY_CAP, MAX_POINT / 2) + 2 : S.maxPx + 4;
+  // size (the LED's, or its rays') and a little more. A wire's segment is short, so a wide margin is safe.
+  const margin = Math.max(S.maxPx + 4, rays ? Math.min(rayLen * RAY_CAP, MAX_POINT / 2) + 2 : 0);
   if (prog === wireProg) gl.uniform2f(u.uCull, 1.5, 1.5);
   else gl.uniform2f(u.uCull, 1 + 2 * margin / W, 1 + 2 * margin / H);
   gl.uniform1f(u.uRays, rays);
@@ -788,11 +789,17 @@ function frame(now) {
   gl.blendFunc(gl.ONE, gl.ONE);
   for (const mirror of passes) {
     for (const prog of progs) {
-      // The rays are a glint in the eye, not light in the room: the heads'
-      // images in the floor, dimmer, cast none (and the lattice is drawn once less).
-      if (mirror > 0 && prog === rayProg) continue;
       gl.useProgram(prog.p);
       gl.uniform3f(prog.u.uMirror, FLOOR, mirror, MIRROR_FADE);
+      // The rays are a glint in the eye, not light in the room: the images in
+      // the floor cast none. Only the LEDs themselves write the rays' buffer.
+      const withRays = prog === pointProg && mirror === 0 && rays > 0;
+      if (prog === pointProg) gl.uniform1f(prog.u.uRayLen, withRays ? rayLen : 0);
+      if (hasFloat) gl.drawBuffers(withRays ? BOTH : FIRST);
+      // The LED's light has alpha 0, so it adds; a ray over earlier rays takes
+      // their place as far as it is bright (its alpha), so crowded rays never sum to a sheet.
+      if (withRays) gl.blendFuncSeparate(gl.ONE, gl.ONE_MINUS_SRC_ALPHA, gl.ZERO, gl.ONE);
+      else gl.blendFunc(gl.ONE, gl.ONE);
       if (images > 1 && prog !== wireProg) gl.drawArraysInstanced(gl.POINTS, 0, count, images);
       else if (prog !== wireProg) gl.drawArrays(gl.POINTS, 0, count);
       else if (images > 1) gl.drawElementsInstanced(gl.LINE_STRIP, wireCount, gl.UNSIGNED_INT, 0, images);
@@ -809,10 +816,16 @@ function frame(now) {
     gl.useProgram(downProg.p);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, scene.tex);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, scene.tex2);
+    gl.activeTexture(gl.TEXTURE0);
     gl.uniform1i(downProg.u.uTex, 0);
+    gl.uniform1i(downProg.u.uRayTex, 1);
+    gl.uniform1f(downProg.u.uRayK, 1);   // the rays glow with the rest
     gl.uniform2f(downProg.u.uTexel, 1 / W, 1 / H);
     gl.uniform1f(downProg.u.uKnee, BLOOM_KNEE);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.uniform1f(downProg.u.uRayK, 0);
     // Blur once in each direction: a faint glow that keeps the LEDs crisp.
     gl.useProgram(blurProg.p);
     gl.uniform1i(blurProg.u.uTex, 0);
@@ -876,8 +889,11 @@ function frame(now) {
     gl.bindTexture(gl.TEXTURE_2D, hazeA.tex);
     gl.activeTexture(gl.TEXTURE3);
     gl.bindTexture(gl.TEXTURE_2D, wideA.tex);
+    gl.activeTexture(gl.TEXTURE4);
+    gl.bindTexture(gl.TEXTURE_2D, scene.tex2);
     gl.activeTexture(gl.TEXTURE0);
     gl.uniform1i(compProg.u.uScene, 0);
+    gl.uniform1i(compProg.u.uRayTex, 4);
     gl.uniform1i(compProg.u.uBloom, 1);
     gl.uniform1i(compProg.u.uHaze, 2);
     gl.uniform1i(compProg.u.uHazeWide, 3);

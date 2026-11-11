@@ -159,11 +159,12 @@ times higher. At 16:9 and wider, nothing changes.
 6. **The show.** `show.update` says how much rain falls, which forms show,
    where, how bright, and in which colours.
 7. **Sound.** The rain level, the breath and the forms go to `audio.js`.
-8. **Uniforms.** The same uniforms are set on the LED, wire and ray
-   programs. They all share `POINT_VS`.
+8. **Uniforms.** The same uniforms are set on the LED and wire
+   programs. Both share `POINT_VS`.
 9. **Points.** With additive blending (`ONE, ONE`) and no depth test, the
-   LEDs, then the wires, then the rays are drawn into a half-float buffer.
-   Then the floor's image is drawn the same way (without rays).
+   LEDs, then the wires are drawn into a half-float buffer; each LED draws
+   its light rays into a second buffer beside it (see "The draws"). Then the
+   floor's image is drawn the same way (without rays).
 10. **Glow.** The buffer is downsampled to a quarter (only light past a knee),
     blurred, and, for the haze, downsampled and blurred twice more.
 11. **Composite.** Glow and haze are added to the scene, then tone-mapped,
@@ -180,7 +181,7 @@ flowchart LR
   A --> S["audio.js"]
   C --> S
   E --> F["POINT_VS per LED"]
-  F --> G["LEDs, wires, rays, additive"]
+  F --> G["LEDs and wires, additive; rays beside"]
   G --> H["scene buffer RGBA16F"]
   H --> I["bloom quarter size"]
   I --> J["haze sixteenth and wide haze"]
@@ -192,8 +193,8 @@ flowchart LR
 
 ### The draws
 
-`main.js: frame` draws up to five times per frame: LEDs, wires and rays, then
-LEDs and wires again for the floor's image. Each is one call over the whole
+`main.js: frame` draws up to four times per frame: LEDs (with their rays) and
+wires, then LEDs and wires again for the floor's image. Each is one call over the whole
 buffer (`drawArrays`, or `drawArraysInstanced` with 9 wall images). The wires
 use `drawElements` with `LINE_STRIP`.
 
@@ -205,8 +206,10 @@ use `drawElements` with `LINE_STRIP`.
   LED gives the same light wherever it sits between pixels.
 - **Wires** (`WIRE_FS`). One pixel wide, lit with the light of the LEDs
   along them. Thinned strands lose their wire; thinned LEDs do not.
-- **Rays** (`RAY_FS`). Only for LEDs near a drop's head, only while rain
-  falls, and never in the floor's image. A ray's length follows the head's
+- **Rays** (in `POINT_FS`, in the LED's own sprite, made larger when its
+  rays are longer). Every bright point casts them: a drop's head, a form,
+  the layer, a wave, a twinkle (not the rain's trails, nor the light at
+  rest), never in the floor's image. A ray's length follows that
   light as seen (after the fog, the mirror, thinning and the fade near the
   eye, with far LEDs dimmed as in a 1080 px tall view):
   `rayLength · light / RAY_LIGHT` (`shaders.js: rayK`, `RAY_LIGHT` 3), at
@@ -216,7 +219,16 @@ use `drawElements` with `LINE_STRIP`.
   lines through it. A ray under 0.75 px (`RAY_MIN`) is not drawn, and a
   short ray is faint, so none appears at once. A longer ray is a little
   dimmer along its length, so a near head does not flare. The rays' light is
-  0.3 of the head's (`RAY_GAIN`).
+  0.3 of the LED's (`RAY_GAIN`).
+  The rays go to a second buffer of the scene (`COLOR_ATTACHMENT1`), where
+  they share a budget of light: a ray of light s over the rays already
+  there (d) gives `s + d · (1 − s / RAY_BUDGET)` (blend
+  `ONE, ONE_MINUS_SRC_ALPHA`, the ray's alpha `s / RAY_BUDGET`, at most 1;
+  `RAY_BUDGET` 0.12). The LED's own light, in the first buffer, has alpha 0,
+  so it simply adds. A ray alone keeps all its light; the rays of a form's
+  crowded LEDs stay near the budget, a soft sparkle, not a white sheet. The
+  first step of the glow and the composite add the two buffers. Without
+  float buffers there are no rays.
 
 ### Glow and tone mapping
 
@@ -239,7 +251,7 @@ at a sixty-fourth.
 
 Without float render targets (no `EXT_color_buffer_float` or
 `EXT_color_buffer_half_float`), the points draw straight to the screen with
-the exposure in `uGain`, and there is no glow.
+the exposure in `uGain`, and there is no glow and there are no light rays.
 
 ## 4. How one LED's light is decided
 
@@ -842,7 +854,7 @@ GitHub link shows.
 | `boot.js` | The error script (`showError`) and the service worker registration, before the module. |
 | `style.css` | The page, the buttons, both panels (`.tuner.basic`: the viewer page's), the turned picture (`body.turned`), the idle state. |
 | `main.js` | The entry point: settings check, render targets, adaptive quality, input, the camera, the director's episodes, easing, uniforms, draws and post passes. |
-| `shaders.js` | All GLSL: `POINT_VS` (every LED's light), `POINT_FS`, `WIRE_FS`, `RAY_FS`, and the full-screen passes `QUAD_VS`, `DOWN_FS`, `BLUR_FS`, `COMPOSITE_FS`. |
+| `shaders.js` | All GLSL: `POINT_VS` (every LED's light), `POINT_FS` (an LED and its light rays), `WIRE_FS`, and the full-screen passes `QUAD_VS`, `DOWN_FS`, `BLUR_FS`, `COMPOSITE_FS`. |
 | `config.js` | Static data: palettes, weather, colour modes, sets, sky, cameras, forms, room, passages; `DEFAULTS` and `SCHEMA` (with the viewer panel's marks). |
 | `lattice.js` | The point and wire buffers, and their build: strand places, LED spacing, thinning ranks. |
 | `show.js` | The show's timeline of passages, fades, casting into slots, form colours, the rain's direction over time. |
@@ -927,9 +939,10 @@ Details and commands are in [development.md](development.md).
 
 ## 11. Decisions and trade-offs
 
-**Light adds up; nothing hides anything.** The LEDs, wires and rays are drawn
+**Light adds up; nothing hides anything.** The LEDs and wires are drawn
 with additive blending and no depth buffer, so near strands never stand dark
-in front of a form. The strands are fine threads, so additive light reads
+in front of a form. The rays add to them too; among themselves they share a
+budget, so crowded bright points keep a soft sparkle instead of a sheet. The strands are fine threads, so additive light reads
 right.
 
 **Points, not a full-screen effect.** The picture is made of real points,

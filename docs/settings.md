@@ -382,8 +382,8 @@ with `wire=0`, `wire=0.2`, `wire=2`.
 | **Exposure** (viewer page: Brightness) | `exposure` | 0.2 to 4 | `1.8` | The brightness of the whole picture. |
 | Glow | `bloom` | 0 to 2 | `0.8` | The soft glow around bright light. |
 | Visible distance | `fog` | 6 to 40 | `34` | How far into the room you see before light fades out. While rain falls, the room closes in a little, and the falling rain's light fades all along the way. |
-| Light rays | `rays` | `off`, `2`, `4`, `6`, `8` | `2` | Star-like rays from drop heads, while rain falls (forms cast none). `2` is up and down only. |
-| Ray length (px at 1080 tall, bright head) | `rayLength` | 2 to 60 | `20` | How long the rays of a bright head are. A ray grows with its head's light: a dimmer or farther head casts a shorter ray, down to none. It scales with the view, like the LEDs and their spacing. |
+| Light rays | `rays` | `off`, `2`, `4`, `6`, `8` | `2` | Star-like rays from every bright point: drop heads, forms, the layer, waves and twinkles. `2` is up and down only. |
+| Ray length (px at 1080 tall, bright point) | `rayLength` | 2 to 60 | `20` | How long the rays of a bright point are. A ray grows with its point's light: a dimmer or farther point casts a shorter ray, down to none. It scales with the view, like the LEDs and their spacing. |
 | Black floor (/255, 0: off) | `blackFloor` | 0 to 16 | `3` | Glow fainter than this is dropped, so the space between the points is true black (most visible on OLED screens). |
 
 ### Trail and head brightness
@@ -423,9 +423,12 @@ Query (close view, centre cut out):
 with `rays=off`; `rays=2`, `rays=4`, `rays=8`, each with `rayLength=50`;
 `rays=8` and `rays=4` (default length).
 
-A ray's length follows its head's light: the Ray length is the length for a
-bright head, and a head half as bright casts a ray half as long. So far heads,
-dimmed by distance, cast short rays, and a ray grows in and out with its head.
+A ray's length follows its point's light: the Ray length is the length for
+a bright point, and a point half as bright casts a ray half as long. So far
+heads, dimmed by distance, cast short rays, and a ray grows in and out with
+its light. Forms, the layer, waves and twinkles cast rays by the same rule.
+Where many bright points stand close together, as in a form, their rays
+share a limit of light, so the form keeps its points with a soft sparkle.
 
 ## Rain
 
