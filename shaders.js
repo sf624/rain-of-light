@@ -81,7 +81,11 @@ out vec3 vColor;
 out float vSize;
 
 float hash(float n) { return fract(sin(n * 127.1 + 311.7) * 43758.5453); }
-float hash3(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+// (No sine here: the sine of a large number, times a large one, turns a last-bit
+// difference in rounding into another number altogether, and the GPU rounds the
+// same corner a little differently from one cell of the noise to the next. Then
+// noise that moves in time jumped all at once each time it crossed a cell.)
+float hash3(vec3 p) { p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
 float noise3(vec3 p) {
   vec3 i = floor(p), f = fract(p);
   f = f * f * (3.0 - 2.0 * f);
@@ -166,7 +170,8 @@ vec4 drop(float sd, float u, float trailK) {
   float cycle = floor(c);
   float d = fract(c) * period - u;                   // > 0: the LED is behind the head
   float rain = d >= 0.0 ? exp(-d / trail) : exp(d * 120.0);
-  return vec4(rain, exp(-(d + period) / trail), exp(-abs(d) * 90.0), mod(cycle, k));
+  float now = smoothstep(0.0, 0.05, fract(c) * period);   // a drop fades in over its first few LEDs, never lit at once
+  return vec4(rain * now, exp(-(d + period) / trail), exp(-abs(d) * 90.0) * now, mod(cycle, k));
 }
 
 // Light gathered from several drops, with each drop's own random hue.
@@ -186,8 +191,20 @@ void gather(inout Lit L, vec4 r, float sd, float w) {
 
 // The rain on one strand: two drops at their own pace; in heavy rain two more
 // join, one by one across the field, and every trail grows longer.
+// How much rain a strand (or a lane across the flow) of number n carries: all
+// of it while its hash is under the share, none well over it. In between it
+// fades (over SHARE_FADE of the share, about a second at the share's fastest
+// change), so no strand's rain comes or goes at once. The share is stretched a
+// little near 1 so that a full share still lights every strand fully, and the
+// mean share is the one asked for.
+const float SHARE_FADE = 0.3;
+float rainOn(float n) {
+  float s = uRainShare * (1.0 + (1.0 / (1.0 - 0.5 * SHARE_FADE) - 1.0) * pow(uRainShare, 8.0));
+  return clamp((s - hash(n + 9.0)) / (SHARE_FADE * max(s, 1e-4)) + 0.5, 0.0, 1.0);
+}
+
 void strandRain(inout Lit L, float seed, float u, float trailK, float w) {
-  w *= step(hash(seed + 9.0), uRainShare);
+  w *= rainOn(seed);
   if (w == 0.0) return;                              // no rain on this strand
   float g3 = hash(seed + 6.0) * 0.6;
   float g4 = 0.3 + hash(seed + 7.0) * 0.6;
@@ -211,7 +228,7 @@ float tiltedRain(inout Lit L, vec3 pos, float theta, float trailK, float w) {
   float len = abs(D.x) * uSpan + abs(D.y) * uHeight + abs(D.z) * uSpan;
   float along = dot(pos, D) / len + 0.5;
   float k = trailK * mix(1.0, 2.0, st);
-  w *= step(hash(lane + 9.0), uRainShare);
+  w *= rainOn(lane);
   if (w == 0.0) return along;
   gather(L, drop(lane, along, k), lane, w);
   gather(L, drop(lane + 97.0, along, k), lane + 97.0, w * smoothstep(0.2, 0.8, uRain));
@@ -400,7 +417,8 @@ vec3 formsAt(vec3 p, float id, float v, out vec3 thread, out float around) {
     if (e.w > 0.001) {
       float h = hash(id + float(k) * 3.1 + 0.5);
       q.y -= e.w * (0.5 + 6.5 * h * h);
-      keep = (1.0 - e.w * 0.7) * step(e.w * 0.6, hash(id + float(k) * 5.3 + 0.9));
+      // (each LED fades out as its turn comes, over a second or so, never at once)
+      keep = (1.0 - e.w * 0.7) * clamp((hash(id + float(k) * 5.3 + 0.9) - e.w * 0.6) / 0.08 + 1.0, 0.0, 1.0);
     }
     float far = length(q - b.xyz);
     if (k < 2) around = max(around, a.y * (1.0 - smoothstep(ff.w * 0.8, ff.w * 2.2, far)));
@@ -501,7 +519,7 @@ void main() {
     float age = uTime - r.w;
     if (age < 0.0 || age > 7.0) continue;
     float x = length(pos - r.xyz) - age * 3.6;
-    float fade = 1.0 - age / 7.0;
+    float fade = (1.0 - age / 7.0) * smoothstep(0.0, 0.3, age);   // it swells in over its first moment, never lit at once
     // In the still room a wave is a ring that spreads level, like one on water:
     // a band of light as tall as a hand's reach, running out along the strands.
     float dy = pos.y - r.y;
@@ -595,6 +613,10 @@ void main() {
   glint *= on.x * on.y * aRank.z;
 
   // LEDs right at the eye are skipped: they would only be a blur over the view.
+  // They fade out on the way there, so none goes out at once as the eye passes.
+  float closeBy = smoothstep(1.2, 2.2, dist);
+  c *= closeBy;
+  glint *= closeBy;
   if (dist <= 1.2 || max(c.r, max(c.g, c.b)) < 0.002) {
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0); // outside the clip volume: skipped
     gl_PointSize = 0.0;
