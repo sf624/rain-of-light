@@ -90,9 +90,8 @@ function spacing(mode, s, ROWS, shift, at) {
 }
 
 // Fills the buffers from the settings S and returns the sizes drawn.
-export function fillLattice(gl, { pointVao, pointBuf, rankBuf, wireBuf }, S, SPAN) {
-  const GRID = Math.max(2, Math.round(S.grid));
-  const ROWS = Math.max(2, Math.round(S.rows));
+export function fillLattice(gl, { pointVao, pointBuf, rankBuf, wireBuf }, S, SPAN, HEIGHT) {
+  const { GRID, ROWS } = latticeSize(S, SPAN, HEIGHT);
   const count = GRID * GRID * ROWS;
   const data = new Float32Array(count * 4);
   const rank = new Float32Array(count * 3);
@@ -154,4 +153,58 @@ export function fillLattice(gl, { pointVao, pointBuf, rankBuf, wireBuf }, S, SPA
   gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, wires, gl.STATIC_DRAW);
   gl.bindVertexArray(null);
   return { count, GRID, ROWS, wireCount: wires.length };
+}
+
+// The size of the lattice from the settings: strands a side and LEDs a strand.
+// Each is set (grid, rows), or, at 0, follows from the number of LEDs (leds,
+// in thousands) and the spacing along a strand over the spacing between
+// strands (aspect). One that is set is kept, and the other one follows it at
+// that aspect; with both at 0, the two are chosen so that the room holds about
+// that many LEDs (up to MAX_GRID strands a side).
+const MAX_GRID = 160, MAX_ROWS = 256;
+export function latticeSize(S, SPAN, HEIGHT) {
+  const aspect = Math.max(0.05, Number(S.aspect) || 1);
+  const rowsFor = (g) => Math.min(MAX_ROWS, Math.max(8, Math.round(HEIGHT * (g - 1) / (SPAN * aspect))));
+  const gridFor = (r) => Math.min(MAX_GRID, Math.max(8, Math.round(SPAN * aspect * r / HEIGHT + 1)));
+  const set = (v, max) => (v >= 1 ? Math.min(max, Math.max(8, Math.round(v))) : 0);
+  let GRID = set(S.grid, MAX_GRID), ROWS = set(S.rows, MAX_ROWS);
+  if (GRID && !ROWS) ROWS = rowsFor(GRID);
+  else if (ROWS && !GRID) GRID = gridFor(ROWS);
+  else if (!GRID) {
+    const want = Math.max(1, Number(S.leds) || 0) * 1000;
+    GRID = 8;
+    while (GRID < MAX_GRID && (GRID + 1) * (GRID + 1) * rowsFor(GRID + 1) <= want) GRID++;
+    const up = Math.min(MAX_GRID, GRID + 1);              // the nearer of the two sizes around it
+    if (Math.abs(up * up * rowsFor(up) - want) < Math.abs(GRID * GRID * rowsFor(GRID) - want)) GRID = up;
+    ROWS = rowsFor(GRID);
+  }
+  return { GRID, ROWS };
+}
+
+// The light is set for a lattice of LIGHT_LATTICE (strands a side, LEDs a
+// strand). A denser lattice spreads the same light over more LEDs: the room is
+// as bright. On a sparser one each LED keeps its light (the LEDs stand apart
+// there, seen one by one), so the room is as much darker as it has fewer LEDs.
+//   room     the light of the forms, waves and rest per LED
+//   wire     the light per wire: by the floor area each strand stands for, only less
+//   fall, side  along a strand, and along a lane of sideways rain: how many times
+//            as many LEDs per length (a head stays about one LED long), and each
+//            LED's light: a drop is as bright on fewer LEDs, but no LED more than
+//            DROP_MAX times as bright as there
+//   share    the share of strands, and of lanes, that carry rain: so that the
+//            rain gives as much light per volume as the room does
+//   twinkle  the share of LEDs that twinkle: one in five, fewer on a denser lattice
+export const LIGHT_LATTICE = { grid: 72, rows: 96 };
+const DROP_MAX = 2;
+export function latticeLight(GRID, ROWS, SPAN, HEIGHT) {
+  const h0 = SPAN / (LIGHT_LATTICE.grid - 1), v0 = HEIGHT / LIGHT_LATTICE.rows;
+  const h = SPAN / (GRID - 1), v = HEIGHT / ROWS;
+  const volume = (h * h * v) / (h0 * h0 * v0);          // the volume per LED, over that there
+  const room = Math.min(1, volume);
+  const fall = [v0 / v, Math.min(DROP_MAX, v / v0)], side = [h0 / h, Math.min(DROP_MAX, h / h0)];
+  return {
+    room, wire: Math.min(1, (h * h) / (h0 * h0)), fall, side,
+    share: [Math.min(1, room / fall[1]), Math.min(1, room / side[1])],
+    twinkle: 0.2 * room,
+  };
 }

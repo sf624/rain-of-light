@@ -57,9 +57,15 @@ and looks a little up (`pitch`).
 
 `lattice.js: fillLattice` builds the buffers:
 
-- `GRID × GRID` strands (setting `grid`: 72, or 44 on a small screen) and
-  `ROWS` LEDs per strand (setting `rows`: 96, or 72). That is 497,664 LEDs
-  by default on a desktop.
+- `GRID × GRID` strands and `ROWS` LEDs per strand (`lattice.js:
+  latticeSize`). By default they come from the setting `leds`, the number
+  of LEDs in thousands (1000, or 210 on a small screen), and `aspect`, the
+  spacing along a strand over the spacing between strands (1). So the
+  LEDs are as far apart up and down as across, and a form is drawn as finely
+  both ways. On a desktop that is 134 × 134 strands of 55 LEDs: 987,580
+  LEDs, about 0.27 units apart. On a small screen, 80 × 80 strands of 33
+  LEDs. The settings `grid` and `rows`, when not 0, set either number
+  outright; the other follows at the spacing.
 - Each strand is moved by up to half a step in x and z. Its LEDs are shifted
   by up to one row. The `grid` layout turns this off; `scatter` puts each
   LED anywhere in its strand's cell.
@@ -84,8 +90,32 @@ ranks. One order shared by all strands (or a Bayer matrix across them)
 would leave dark rows at the same heights, which show as straight dark
 lines.
 
-Changing `grid`, `rows`, `layout` or `jitter` rebuilds the buffers, 250 ms
-after the slider stops (`main.js: apply`).
+Changing `leds`, `aspect`, `grid`, `rows`, `layout` or `jitter` rebuilds
+the buffers, 250 ms after the slider stops (`main.js: apply`).
+
+**Light on any lattice.** The gains are set for a lattice of 72 strands a
+side with 96 LEDs each (`lattice.js: LIGHT_LATTICE`). On another lattice,
+`lattice.js: latticeLight` scales the light so that the room shows as much
+of it per volume, whatever the number of LEDs:
+
+- The forms, the waves and the light at rest: per LED, by the volume each
+  LED stands for (`uLight.x`), and per wire by the floor area each strand
+  stands for (`uLight.y`). On a denser lattice each LED is dimmer. On a
+  sparser one each LED keeps its light, so that room is darker: there the
+  LEDs stand apart and are seen one by one, and brighter ones would glare.
+- The rain: a drop is as long and as bright as there. Its head stays
+  about one LED long, and its light is shared among the LEDs it passes
+  (`uRainK[1]`, `uRainK[2]`), up to twice an LED's light where the LEDs lie
+  farther apart (`DROP_MAX`). The share of strands that carry rain
+  (`uRainK[0]`) then gives the rain as much light per volume as the room:
+  as many rainy strands per area as there. Example: on the desktop lattice
+  only 28% of the strands carry rain at a share of 1, and on 55 LEDs a
+  strand each LED of a drop has 1.75 times the light.
+- The twinkle: one LED in five there, fewer on a denser lattice
+  (`uLight.z`), so as many twinkle per volume.
+
+A frame costs about as much per LED, whatever the light: the vertex shader
+runs once per LED (and again for its image and its wire).
 
 ### The mirrors
 
@@ -428,9 +458,11 @@ section 5). Each form also has a reach (`uFormF[k].w`, the `bound` from
 `forms.js`). LEDs beyond it skip the form, so a form costs little where it
 is not. The knot also stops early outside its own box.
 
-The thin forms (ring, veil, solid, knot) are about one strand gap thick
-(`shaders.js: fineness`; `rod` for the solid and the knot), so a
-coarse lattice still catches them.
+The thin forms (ring, veil, solid, knot) are about as thick as the gap
+between strands on a lattice of 72 a side (half a unit), or as one strand
+gap on a coarser lattice (`shaders.js: fineness`; `rod` for the solid and
+the knot), so a coarse lattice still catches them. A denser lattice leaves
+them as thick, and draws them with more strands.
 
 **Coming and going.** A form does not fade evenly. Each LED has an order
 from 0 to 1. The LED is on while the form's weight is far enough past its
@@ -470,7 +502,8 @@ image it is.
 
 ### Twinkle
 
-In the still room's look, one LED in five blinks now and then, sharply
+In the still room's look, one LED in five (fewer on a lattice denser than
+72 strands a side; see section 2) blinks now and then, sharply
 (a sine raised to the power 30), each at its own pace. The setting
 `twinkle` scales it.
 
@@ -497,6 +530,9 @@ stillLook = room tint · rest + pale · twinkle
 - `around` is how near the LED is to a sky form. Rain gives way there.
 - `inForm`: a drop that runs through a form takes the form's colour.
 - A wave lifts a form's light at most to white (`flare`).
+- `form`, `ring` and `rest` are scaled by `uLight.x`, and `rain` and `tip`
+  carry each LED's share of a drop's light, so the room is as bright on any
+  lattice (see [the lattice](#the-lattice)).
 
 The result is then scaled by the fog, by the mirror's gain, by thinning
 (`aRank` against `uDensity`), and by the size dimming. The rain's look is
@@ -880,7 +916,7 @@ GitHub link shows.
 | `main.js` | The entry point: settings check, render targets, adaptive quality, input, the camera, the director's episodes, easing, uniforms, draws and post passes. |
 | `shaders.js` | All GLSL: `POINT_VS` (every LED's light), `POINT_FS` (an LED and its light rays), `WIRE_FS`, and the full-screen passes `QUAD_VS`, `DOWN_FS`, `BLUR_FS`, `COMPOSITE_FS`. |
 | `config.js` | Static data: palettes, weather, colour modes, sets, sky, cameras, forms, room, passages; `DEFAULTS` and `SCHEMA` (with the viewer panel's marks). |
-| `lattice.js` | The point and wire buffers, and their build: strand places, LED spacing, thinning ranks. |
+| `lattice.js` | The size of the lattice from the settings, the point and wire buffers and their build (strand places, LED spacing, thinning ranks), and the light per LED on that lattice. |
 | `show.js` | The show's timeline of passages, fades, casting into slots, form colours, the rain's direction over time. |
 | `forms.js` | How each form moves through its life: centre, size, turn, tilt, its own measures, reach. |
 | `director.js` | Seeded tracks (weather, colour, density, camera), the colour story's mood, the shared `hash`. |
@@ -982,9 +1018,23 @@ of its sprite. The fragment shaders only spread that colour. The costs are
 held down by skipping early: LEDs out of view or in the fog, LEDs far from a
 form, strands without rain, and LEDs whose light is nearly nothing. Wire
 strips use the restart index for the same reason. The cost is that the
-shader runs for every LED of every pass, visible or not: about half a
-million on a desktop by default, and nine times that with wall mirrors
-("Each copy draws the lattice again: costly", says the setting's hint).
+shader runs for every LED of every pass, visible or not: about a million
+on a desktop by default, and nine times that with wall mirrors ("Each copy
+draws the lattice again: costly", says the setting's hint).
+
+**The LEDs as far apart up and down as across.** A form is a shape in space,
+and the lattice draws it only as finely as its coarsest spacing. Strands
+much farther apart than the LEDs on them draw a form as a row of vertical
+bars, and a thin ring or veil breaks into separate strands. So the number
+of LEDs is set in all (`leds`), and the strands and rows follow at an equal
+spacing (`aspect` 1). The cost is fewer LEDs on each strand: a drop's trail
+crosses fewer of them, and its head steps from one to the next less often.
+
+**The light is set per volume, not per LED.** A denser lattice would
+otherwise be brighter, and its rain a haze: every strand carrying drops. So
+the light per LED goes down as the LEDs get closer, and the rain falls on as
+many strands per area as on the lattice the light is set for. A sparser
+lattice keeps each LED's light rather than making its few LEDs glare.
 
 **Only the falling rain fades as in a real room.** The falling rain's light
 falls off with distance more steeply than the rest, and the floor mirrors it

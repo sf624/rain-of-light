@@ -174,8 +174,8 @@ things that are not in the panel:
 | Wall mirrors (copies per side) | `walls` | 0 or 1 | `0` | `1`: the room repeats beyond its walls, one copy on each side. Each copy draws the lattice again, so it is costly. |
 | Haze (0: off) | `haze` | 0 to 2 | `1.5` | A wide, soft glow around the brightest light. |
 | Burn-out (0: off) | `burn` | 0 to 1 | `0.7` | The brightest light loses its colour and burns out to white. |
-| Twinkle | `twinkle` | 0 to 2 | `0.4` | In a still room, one LED in five flashes now and then. It fades out as a rain passage comes. |
-| Share of strands with rain | `rainShare` | 0 to 1 | `1` | The share of strands that carry rain. |
+| Twinkle | `twinkle` | 0 to 2 | `0.4` | In a still room, some LEDs flash now and then: as many per volume of the room whatever the density (one in five on a lattice of 72 strands a side). It fades out as a rain passage comes. |
+| Share of strands with rain | `rainShare` | 0 to 1 | `1` | The share of strands that carry rain. At 1, rain falls on every strand of a lattice of up to 72 strands a side; a denser one carries it on as many strands per area, not on all. |
 
 ### Scenes
 
@@ -306,8 +306,10 @@ No picture: a fast machine draws both the same.
 
 | Panel | URL key | Values | Default | What you see |
 | --- | --- | --- | --- | --- |
-| Strands per side (max) | `grid` | 8 to 160 | `72` (`44` on a small screen) | How many strands stand along each side of the room. |
-| LEDs per strand (max) | `rows` | 8 to 256 | `96` (`72` on a small screen) | How many LEDs hang on each strand. |
+| LEDs in all (thousands) | `leds` | 20 to 1700 | `1000` (`210` on a small screen) | How many LEDs the room holds. The strands and the LEDs on each follow, spaced as the next setting says. More LEDs draw the forms finer, and cost more. |
+| Spacing along / between strands | `aspect` | 0.25 to 4 | `1` | How far apart the LEDs on a strand are, over how far apart the strands are. `1`: as far, so the forms are as fine across as up and down. Under 1: closer along the strands (longer, finer drops; coarser forms across). |
+| Strands per side (0: auto) | `grid` | 0, or 8 to 160 | `0` | Set: this many strands stand along each side of the room. `0`: as many as LEDs in all and the spacing give. |
+| LEDs per strand (0: auto) | `rows` | 0, or 8 to 256 | `0` | Set: this many LEDs hang on each strand. `0`: as many as the spacing gives. |
 | Layout | `layout` | `strands`, `scatter`, `grid` | `strands` | `strands`: LEDs in lines along each strand. `scatter`: at random within one strand's width. `grid`: a regular lattice. |
 | LED spacing | `jitter` | `off` (even), `0.25` (a little uneven), `0.5` (uneven), `pitch` (per strand), `cluster` (clustered) | `off` | How the LEDs sit along each strand. `0.25` and `0.5` move each LED by up to that share of the gap. `pitch` gives each strand its own even gap. `cluster` gathers them in bunches and gaps. With Layout `strands` only. |
 | Density change | `density` | `auto`, `manual` | `auto` | `auto`: the share of strands and LEDs that show drifts slowly between the lower limits below and full. `manual`: held at the two shares below. |
@@ -316,20 +318,46 @@ No picture: a fast machine draws both the same.
 | Lowest share of strands (auto) | `strandMin` | 0.02 to 1 | `0.66` | With `auto`: the lowest share of strands it drifts to. |
 | Lowest share of LEDs (auto) | `rowMin` | 0.02 to 1 | `0.68` | With `auto`: the lowest share of LEDs it drifts to. |
 
-A small screen is one whose shorter side is under 700 CSS pixels. The two
-maximums are what the room is built with; the shares then thin it out.
+A small screen is one whose shorter side is under 700 CSS pixels.
+
+The room is built with the number of strands and LEDs; the shares then thin
+it out. By default both come from LEDs in all, at Spacing 1: 1000 thousand
+LEDs are 134 strands a side with 55 LEDs each, the LEDs about 0.27 units
+apart every way. On a small screen 210 thousand are 80 strands of 33 LEDs. When
+Strands per side is set, the LEDs per strand follow it at the spacing (and
+LEDs in all is left aside), and the other way round; with both set, both
+are used.
+
+The light does not grow with the number of LEDs: on a denser lattice each
+LED is dimmer, so the room is as bright; a sparser one is darker (see
+[design.md](design.md#the-lattice)). The rain falls on as many strands per
+area whatever the lattice, with drops as long.
+
+### LEDs in all
+
+![A ring with 250, 1000 and 1700 thousand LEDs](img/leds.jpg)
+
+Query: `scene=crystal&layer=off&form=ring&t=30` with `leds=250`,
+`leds=1000`, `leds=1700`.
+
+### Spacing along and between strands
+
+![A ring with the LEDs on a strand at half, once and twice the spacing of the strands](img/aspect.jpg)
+
+Query: `scene=crystal&layer=off&form=ring&t=30` with `aspect=0.5`,
+`aspect=1`, `aspect=2`.
 
 ### Strands per side
 
-![Rain on a sparse lattice of strands, the default one, and a dense one](img/grid.jpg)
+![Rain on a sparse lattice of strands, the default one, and a dense one, with 55 LEDs on each](img/grid.jpg)
 
-Query: `scene=rain&flow=down&t=30` with `grid=24`, `grid=72`, `grid=140`.
+Query: `scene=rain&flow=down&t=30&rows=55` with `grid=40`, `grid=134`, `grid=160`.
 
 ### LEDs per strand
 
-![Rain with few LEDs per strand, the default number, and many](img/rows.jpg)
+![Rain on 134 strands a side with few LEDs on each, the default number, and many](img/rows.jpg)
 
-Query: `scene=rain&flow=down&t=30` with `rows=24`, `rows=96`, `rows=220`.
+Query: `scene=rain&flow=down&t=30&grid=134` with `rows=20`, `rows=55`, `rows=160`.
 
 ### Layout
 
