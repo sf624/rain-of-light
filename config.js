@@ -96,11 +96,12 @@ export const ROOM = {
 
 // The show moves between passages (see show.js). A passage sets how much
 // rain falls, which form of light shows, and whether the layer glows.
-// Durations are in seconds; weight is how often a kind comes.
+// Durations are in seconds; weight is how often a kind comes; layer is the
+// chance that the layer glows (it shows for about 70% of the show).
 export const PASSAGES = [
-  { name: 'rain',   rain: 1, sky: false, layer: 0.25, hold: [36, 70], weight: 2.2 },   // rain of light
-  { name: 'form',   rain: 0, sky: true,  layer: 0.45, hold: [40, 66], weight: 3 },   // a form in the still room
-  { name: 'storm',  rain: 1, sky: true,  layer: 0.3,  hold: [30, 52], weight: 1.6 },   // rain falls through a form
+  { name: 'rain',   rain: 1, sky: false, layer: 0.55, hold: [36, 70], weight: 2.2 },   // rain of light
+  { name: 'form',   rain: 0, sky: true,  layer: 0.75, hold: [40, 66], weight: 3 },   // a form in the still room
+  { name: 'storm',  rain: 1, sky: true,  layer: 0.5,  hold: [30, 52], weight: 1.6 },   // rain falls through a form
   { name: 'still',  rain: 0, sky: false, layer: 1,    hold: [18, 32], weight: 1 },   // only the layer, and sparse drops
 ];
 // Scenes: the whole show, or only its rain, or only its forms.
