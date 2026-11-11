@@ -128,11 +128,11 @@
     ] },
     { "name": "rays", "cols": 3, "base": "scene=rain&flow=down&color=comet&weather=drizzle&t=30&fov=30&radius=16&grid=24&rows=48&tipGain=12", "cells": [
       {"q": "rays=off", "label": "rays=off", "crop": [0.3, 0.2, 0.7, 0.6]},
-      {"q": "rays=2&rayGain=1.5&rayLength=50", "label": "rays=2&rayGain=1.5&rayLength=50", "crop": [0.3, 0.2, 0.7, 0.6]},
-      {"q": "rays=4&rayGain=1.5&rayLength=50", "label": "rays=4&rayGain=1.5&rayLength=50", "crop": [0.3, 0.2, 0.7, 0.6]},
-      {"q": "rays=8&rayGain=1.5&rayLength=50", "label": "rays=8&rayGain=1.5&rayLength=50", "crop": [0.3, 0.2, 0.7, 0.6]},
+      {"q": "rays=2&rayLength=50", "label": "rays=2&rayLength=50", "crop": [0.3, 0.2, 0.7, 0.6]},
+      {"q": "rays=4&rayLength=50", "label": "rays=4&rayLength=50", "crop": [0.3, 0.2, 0.7, 0.6]},
+      {"q": "rays=8&rayLength=50", "label": "rays=8&rayLength=50", "crop": [0.3, 0.2, 0.7, 0.6]},
       {"q": "rays=8", "label": "rays=8", "crop": [0.3, 0.2, 0.7, 0.6]},
-      {"q": "rays=8&rayGain=1.5&rayLength=50&rayThreshold=3", "label": "rays=8&rayGain=1.5&rayLength=50&rayThreshold=3", "crop": [0.3, 0.2, 0.7, 0.6]}
+      {"q": "rays=8&rayLength=30", "label": "rays=8&rayLength=30", "crop": [0.3, 0.2, 0.7, 0.6]}
     ] },
     { "name": "weather", "cols": 2, "base": "scene=rain&flow=down&t=30&color=mono&palette=deep sea", "width": 1200, "cells": [
       {"q": "weather=drizzle", "label": "weather=drizzle"},

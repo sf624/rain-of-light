@@ -14,7 +14,7 @@ import {
 import { createShow } from './show.js';
 import { createDirector, hash } from './director.js';
 import { createDirection } from './direction.js';
-import { FLOW_WRAP, POINT_VS, POINT_FS, WIRE_FS, RAY_FS, QUAD_VS, DOWN_FS, BLUR_FS, COMPOSITE_FS } from './shaders.js';
+import { FLOW_WRAP, RAY_CAP, POINT_VS, POINT_FS, WIRE_FS, RAY_FS, QUAD_VS, DOWN_FS, BLUR_FS, COMPOSITE_FS } from './shaders.js';
 import { createGL, sub, cross, dot, norm, perspective, lookAt } from './gl.js';
 import { createLattice, fillLattice } from './lattice.js';
 import { createControls } from './controls.js';
@@ -482,6 +482,28 @@ const camW = CAMERAS.map((c) => (c === camMode ? 1 : 0));
 let camFrom = [...camW];
 let lastDir = [0, 0, -1];
 
+// (Temporary, ?depth=0|r|a|b|c|d: candidate treatments that give the falling
+// rain depth, to compare live; the default is today's look.) Per candidate, the
+// weights of: curtains, aerial perspective, bold near strands and fine far ones,
+// near heads' sideways glints, rays whose length goes by distance rather than
+// by the head's light, and how much
+// faster the camera moves (only while rain falls). See POINT_VS: deepAt.
+// Then: physical light (see uDepth2 in POINT_VS), and narrower drop speeds.
+const DEPTHS = {
+  0: [0, 0, 0, 0, 0, 0, 0, 0],
+  r: [0, 0, 0, 0, 1, 0, 0, 0],
+  a: [1, 0, 0, 0, 0, 0, 0, 0],
+  b: [0, 1, 1, 0, 0, 0, 0, 0],
+  c: [0, 0, 1, 1, 0, 1.5, 0, 0],
+  d: [0.6, 0, 0, 0, 0, 0.8, 1, 0],
+  e: [0, 0, 0, 0, 0, 0, 1, 0],
+  f: [0, 0, 0, 0, 0, 0, 1, 1],
+};
+const DEPTH = DEPTHS[params.get('depth')] || DEPTHS[0];
+const windAngle = hash(SEED * 3.7 + 1.3) * Math.PI * 2;  // the curtains drift this way
+const curtain = [time * 0.22 * Math.cos(windAngle), time * 0.22 * Math.sin(windAngle), time * 0.015]; // integrated: from ?t= too
+let falling = 0;   // how much falling rain shows (last frame): the depth treatments' weight
+
 // Where one move puts the eye at clock t, and which way it looks. On a floor
 // (ground: the eye's height there) the rise goes up from it and back.
 function cameraPose(name, t, R, bob, ground) {
@@ -624,7 +646,7 @@ function frame(now) {
   // Camera: one of several moves, blended while one turns into the next.
   pointer.sx += (pointer.x - pointer.sx) * 0.03;
   pointer.sy += (pointer.y - pointer.sy) * 0.03;
-  camClock += dt * SPEED * (S.orbit / DEFAULTS.orbit); // integrated: a new speed never jumps
+  camClock += dt * SPEED * (S.orbit / DEFAULTS.orbit) * (1 + DEPTH[5] * falling); // integrated: a new speed never jumps
   camBlend = Math.min(1, camBlend + dt / CAMERA_BLEND);
   const kb = smooth(camBlend);
   let eye = [0, 0, 0], dir = [0, 0, 0];
@@ -674,6 +696,10 @@ function frame(now) {
   const shown = show.update(time, dt, camera);
   flowGoal = shown.flow;
   const rk = shown.rain;                 // how much rain falls now: 0 a still room .. 1 a rain passage
+  falling = rk * (1 - direction.mix);
+  curtain[0] += dt * SPEED * 0.22 * Math.cos(windAngle);
+  curtain[1] += dt * SPEED * 0.22 * Math.sin(windAngle);
+  curtain[2] += dt * SPEED * 0.015;
   placeImages();
   sound.rain(look.rain, sway, rk);
   // Breath: light and pad swell as you breathe in and ease as you breathe out.
@@ -697,7 +723,7 @@ function frame(now) {
   if (wiresOn) progs.push(wireProg);
   if (rays) progs.push(rayProg);
   const rayScale = H / 1080;   // rays scale with the view like the lattice: their length is set for a 1080 px tall view
-  const rayLen = Math.min(S.rayLength * rayScale, (MAX_POINT - 1) / 2);
+  const rayLen = S.rayLength * rayScale;
   for (const prog of progs) {
   gl.useProgram(prog.p);
   const u = prog.u;
@@ -705,12 +731,11 @@ function frame(now) {
   gl.uniform1f(u.uRayLen, prog === rayProg ? rayLen : 0);
   // Points this far past the edge are not lit (clip units): their sprite's half
   // size and a little more. A wire's segment is short, so a wide margin is safe.
-  const margin = prog === rayProg ? rayLen + 2 : S.maxPx + 4;
+  const margin = prog === rayProg ? Math.min(rayLen * RAY_CAP * (1 + DEPTH[3]), MAX_POINT / 2) + 2 : S.maxPx + 4;
   if (prog === wireProg) gl.uniform2f(u.uCull, 1.5, 1.5);
   else gl.uniform2f(u.uCull, 1 + 2 * margin / W, 1 + 2 * margin / H);
-  gl.uniform1f(u.uRayThreshold, S.rayThreshold);
   gl.uniform1f(u.uRays, rays);
-  gl.uniform1f(u.uRayGain, S.rayGain);
+  gl.uniform3f(u.uRayView, rayScale, (MAX_POINT - 1) / 2, 0); // the view's height over 1080 px; the longest ray the GPU draws
   gl.uniformMatrix4fv(u.uProj, false, proj);
   gl.uniformMatrix4fv(u.uView, false, view);
   gl.uniform1f(u.uTime, time);
@@ -761,6 +786,13 @@ function frame(now) {
   // Through a form it thins, so the form shows between the drops.
   gl.uniform1f(u.uRainShare, sparseShare() + (S.rainShare * (1 - 0.35 * shown.storm) - sparseShare()) * rk);
   gl.uniform1f(u.uRainMix, rk);
+  gl.uniform4f(u.uDepth, DEPTH[0] * falling, DEPTH[1] * falling, DEPTH[2] * falling, DEPTH[3] * falling);
+  // (?depth=r: the rays' length by distance, in the falling rain.)
+  gl.uniform1f(u.uRayDepth, DEPTH[4] * falling);
+  // (The speeds may not ease: a drop's place goes by its speed times the falling time.)
+  gl.uniform2f(u.uDepth2, DEPTH[6] * falling, DEPTH[7]);
+  gl.uniform3fv(u.uEye, camera.eye);
+  gl.uniform3fv(u.uCurtain, curtain);
   gl.uniform1f(u.uStorm, shown.storm);
   gl.uniform4fv(u.uFormA, shown.A);
   gl.uniform4fv(u.uFormB, shown.B);
