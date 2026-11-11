@@ -370,7 +370,7 @@ addEventListener('keydown', (e) => {
 });
 // A key moves on to another episode while the setting is auto, else to the next choice.
 function step(key, list) {
-  if (S[key] === 'auto') { director[key].skip(time); return; }
+  if (S[key] === 'auto') { trackOf(key).skip(time); return; }
   const i = list.findIndex((x) => x.name === S[key]);
   tuner.set(key, list[(i + 1) % list.length].name);
   tuner.refresh();
@@ -392,6 +392,8 @@ let look = null;    // the rain now: its flow, rate, amount and density, easing 
 // Here each episode is put to work as its time comes. A setting other than
 // auto holds its choice over the track's.
 const director = createDirector(SEED);
+// The colours' track: with the colour story, or as the seed alone has them.
+const trackOf = (key) => director[key === 'color' && S.story === 'on' ? 'story' : key];
 const forced = (key) => (S[key] === 'auto' ? undefined : S[key]);
 const chosen = (key, list, e) => list.find((x) => x.name === forced(key)) || e.item;
 
@@ -460,7 +462,7 @@ const TRACKS = Object.keys(BEGIN);
 const episode = {};   // per track: the episode that runs now
 function direct(now, snap) {
   for (const key of TRACKS) {
-    const e = director[key].at(now);
+    const e = trackOf(key).at(now);
     if (e !== episode[key]) { episode[key] = e; BEGIN[key](e, snap); }
   }
 }

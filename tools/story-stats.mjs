@@ -1,0 +1,119 @@
+// Measures the colour story (see director.js) without rendering: over many
+// seeds, how often neighbouring passages differ in hue, how often each colour
+// mode and palette comes, and how far the mood wanders. With and without the story.
+//   node tools/story-stats.mjs [seeds=50] [hours=1]
+globalThis.innerWidth = globalThis.innerHeight = 1000;
+const { COLOR_MODES, PALETTES, SETS } = await import('../config.js');
+const { createDirector, hueOf } = await import('../director.js');
+const { createShow } = await import('../show.js');
+
+const apart = (a, b) => Math.abs(((a - b) % 360 + 540) % 360 - 180);
+// The hue of some colours together: their mean, each weighted by how much colour it has.
+const hueOfAll = (cs) => {
+  let x = 0, y = 0;
+  for (const c of cs) { const [h, s] = hueOf(c); x += s * Math.cos(h * Math.PI / 180); y += s * Math.sin(h * Math.PI / 180); }
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+};
+const pal = (n) => PALETTES.find((p) => p.name === n);
+const ONE_PALETTE = ['mono', 'comet', 'accent'];
+// The rain's main hue in a colour episode (undefined: many colours at once).
+export function rainHue(e) {
+  const name = e.item.name;
+  if (ONE_PALETTE.includes(name)) return hueOfAll([e.p.a]);
+  if (name === 'gradient') return hueOfAll([e.p.a, e.q.b]);
+  if (name === 'palette') return ['sunset', 'ocean'].includes(e.set.name) ? hueOfAll(e.set.c) : undefined;
+  if (name === 'cloud') return ((e.hue + 0.2) % 1) * 360;
+  return undefined;
+}
+// What shows at t: the passage's kind, its main hue, and the names of its colours.
+export function look(S, director, show, t) {
+  const c = show.cast(t);
+  const e = director[S.story === 'on' ? 'story' : 'color'].at(t);
+  const form = c.items.find((i) => i.form !== 'layer'), layer = c.items.find((i) => i.form === 'layer');
+  const name = e.item.name;
+  const rain = name + (ONE_PALETTE.includes(name) ? ` ${e.p.name}` : name === 'gradient' ? ` ${e.p.name}>${e.q.name}`
+    : name === 'palette' ? ` ${e.set.name}` : name === 'cloud' ? ` ${Math.round(((e.hue + 0.2) % 1) * 360)}` : '');
+  // A form is the subject (rain through it takes its colour); else the rain; else the layer.
+  const hue = form ? hueOfAll([pal(form.palette).a]) : c.kind === 'rain' ? rainHue(e)
+    : layer ? hueOfAll([pal(layer.palette).a]) : undefined;
+  return { kind: c.kind, hue, rain, form, layer, e, mood: director.mood(t) % 360 };
+}
+
+if (process.argv[1] === new URL(import.meta.url).pathname) {
+  const SEEDS = Number(process.argv[2]) || 50, SPAN = (Number(process.argv[3]) || 1) * 3600;
+  const out = [];
+  const pct = (n, d) => `${(100 * n / d).toFixed(1)}%`.padStart(6);
+  const res = {};
+  const count = (k, n) => { k[n] = (k[n] || 0) + 1; };
+  for (const story of ['on', 'off']) {
+    const r = res[story] = { far: 0, far2: 0, pairs: 0, many: 0, passages: 0, modes: {}, pals: {}, forms: {}, layers: {}, sets: {}, off: 0, offN: 0 };
+    for (let seed = 1; seed <= SEEDS; seed++) {
+      const S = { scene: 'mix', form: 'auto', layer: 'auto', story };
+      const director = createDirector(seed);
+      const show = createShow(S, { feet: 0, seed });
+      // Sampled each second. A new passage: another kind, or another form.
+      const marks = [];
+      let last = null;
+      for (let t = 0; t < SPAN; t++) {
+        const c = show.cast(t);
+        const key = `${c.kind}|${c.items.filter((i) => i.form !== 'layer').map((i) => i.form + i.palette).join()}`;
+        if (!last || last.key !== key) marks.push(last = { key, t0: t });
+        last.t1 = t;
+        // Shares of time: the rain's mode while rain falls alone, the palettes of forms and layers.
+        const e = director[story === 'on' ? 'story' : 'color'].at(t);
+        if (c.kind === 'rain') {
+          count(r.modes, e.item.name);
+          if ([...ONE_PALETTE, 'gradient'].includes(e.item.name)) count(r.pals, e.p.name);
+          if (e.item.name === 'palette') count(r.sets, e.set.name);
+          const h = rainHue(e);
+          if (h !== undefined) { r.off += apart(h, director.mood(t)); r.offN++; }
+        }
+        for (const i of c.items) count(i.form === 'layer' ? r.layers : r.forms, i.palette);
+      }
+      let prev;
+      for (const m of marks) {
+        const l = look(S, director, show, (m.t0 + m.t1) / 2);
+        r.passages++;
+        if (l.hue === undefined) { r.many++; continue; }
+        if (prev !== undefined) { r.pairs++; if (apart(prev, l.hue) > 90) r.far++; if (apart(prev, l.hue) > 120) r.far2++; }
+        prev = l.hue;
+      }
+    }
+  }
+  const both = (f) => ['on', 'off'].map(f).join('  ');
+  const table = (title, key, names) => {
+    out.push('', title, '                 on     off');
+    for (const n of names) {
+      out.push(`  ${n.padEnd(10)} ${both((s) => { const k = res[s][key]; return pct(k[n] || 0, Object.values(k).reduce((a, b) => a + b, 0)); })}`);
+    }
+  };
+  out.push(`Colour story: ${SEEDS} seeds x ${SPAN / 3600} h`);
+  out.push('', 'Neighbouring passages (main hue: the form\'s palette, else the rain\'s colour at the passage\'s middle, else the layer\'s;',
+    'passages of many colours have none and are left out of the pairs)',
+    '                                         on     off');
+  out.push(`  main hues more than 90 degrees apart ${both((s) => pct(res[s].far, res[s].pairs))}`);
+  out.push(`  main hues more than 120 degrees apart${both((s) => pct(res[s].far2, res[s].pairs))}`);
+  out.push(`  pairs counted                        ${both((s) => String(res[s].pairs).padStart(6))}`);
+  out.push(`  passages of many colours             ${both((s) => pct(res[s].many, res[s].passages))}`);
+  out.push(`  the rain's hue from the mood, mean   ${both((s) => `${(res[s].off / res[s].offN).toFixed(0)} deg`.padStart(6))}`);
+  table('Colour modes (share of the time rain falls alone)', 'modes', COLOR_MODES.map((m) => m.name));
+  table('Palettes of the rain (mono, gradient, accent, comet)', 'pals', PALETTES.map((p) => p.name));
+  table('Sets of the palette rain', 'sets', SETS.map((p) => p.name));
+  table('Palettes of the forms (share of the time a form shows)', 'forms', PALETTES.map((p) => p.name));
+  table('Palettes of the layer', 'layers', PALETTES.map((p) => p.name));
+  // The mood: how far it moves within 20 minutes.
+  const ranges = [];
+  for (let seed = 1; seed <= SEEDS; seed++) {
+    const mood = createDirector(seed).mood;
+    for (let t0 = 0; t0 + 1200 <= SPAN; t0 += 1200) {
+      let lo = Infinity, hi = -Infinity;
+      for (let t = t0; t <= t0 + 1200; t += 10) { const m = mood(t); lo = Math.min(lo, m); hi = Math.max(hi, m); }
+      ranges.push(hi - lo);
+    }
+  }
+  ranges.sort((a, b) => a - b);
+  const q = (x) => ranges[Math.floor(x * (ranges.length - 1))].toFixed(0);
+  out.push('', `The mood's range within 20 minutes (degrees of hue; its axis is 275 long), ${ranges.length} windows`,
+    `  least ${q(0)}  10% ${q(0.1)}  median ${q(0.5)}  90% ${q(0.9)}  most ${q(1)}`);
+  console.log(out.join('\n'));
+}
