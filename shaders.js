@@ -383,6 +383,8 @@ vec3 veilLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
 // below it: its light lifts off as points, the high ones rising fastest.
 // thread: the share of that light the strand's wire shows; around: how near
 // p is to a sky form (1 within its reach, 0 well away): rain gives way there.
+const vec2 LAYER_NEAR = vec2(7.0, 15.0);   // the layer is dark nearer the eye than x, full from y on
+const float FORM_BODY = 1.25;              // the sky forms' light, over what their own functions give
 vec3 formsAt(vec3 p, float id, float v, out vec3 thread, out float around) {
   vec3 c = vec3(0.0);
   thread = vec3(0.0);
@@ -412,10 +414,14 @@ vec3 formsAt(vec3 p, float id, float v, out vec3 thread, out float around) {
       // two never add up to a white flare where a form meets the layer.
       f = layerLight(q, a, b, ff);
       f.x *= 1.0 - min(0.9, max(c.r, max(c.g, c.b)) * 1.5);
+      // Only far from the eye: near it the layer would be loose points across the floor.
+      vec3 eye = -(transpose(mat3(uView)) * uView[3].xyz);
+      f.x *= smoothstep(LAYER_NEAR.x, LAYER_NEAR.y, length(q.xz - eye.xz));
     }
     else if (type == 3) f = cloudLight(q, a, b, e.z, ff, id);
     else if (type == 4) f = ringLight(q, a, b, e.z, ff);
     else f = veilLight(q, a, b, e.z, ff);
+    if (type != 2) f.x *= FORM_BODY;
     float order = mix(hash(id + float(k) * 7.7), e.y > 0.0 ? v : 1.0 - v, e.x * 0.8);
     float on = clamp((a.y * 1.25 - order) / 0.25, 0.0, 1.0) * smoothstep(0.0, 0.4, a.y);
     vec3 light = mix(mix(uFormC[k], uFormD[k], f.z), WHITE_HOT, clamp(f.y, 0.0, 1.0)) * f.x * on * keep;
