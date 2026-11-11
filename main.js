@@ -13,6 +13,7 @@ import {
 } from './config.js';
 import { createShow } from './show.js';
 import { createDirector, hash } from './director.js';
+import { createDirection } from './direction.js';
 import { FLOW_WRAP, POINT_VS, POINT_FS, WIRE_FS, RAY_FS, QUAD_VS, DOWN_FS, BLUR_FS, COMPOSITE_FS } from './shaders.js';
 import { createGL, sub, cross, dot, norm, perspective, lookAt } from './gl.js';
 import { createLattice, fillLattice } from './lattice.js';
@@ -364,7 +365,10 @@ addEventListener('keydown', (e) => {
   if (e.key === 'r') rotation.toggle();         // landscape / portrait
   if (e.key === 'w') step('weather', WEATHER);   // next weather
   if (e.key === 'c') { step('color', COLOR_MODES); show.recolor(); } // next colour, of the rain and the forms
-  if (e.key === 'd') step('flow', FLOWS);        // switch direction
+  if (e.key === 'd') {                           // switch direction (and hold it)
+    tuner.set('flow', flowOf(flowGoal) ? 'down' : 'across');
+    tuner.refresh();
+  }
   if (e.key === 'v') step('camera', CAMERAS);    // next camera move
   if (e.key === 'm') controls.toggleSound();     // sound on and off
 });
@@ -397,11 +401,14 @@ const trackOf = (key) => director[key === 'color' && S.story === 'on' ? 'story' 
 const forced = (key) => (S[key] === 'auto' ? undefined : S[key]);
 const chosen = (key, list, e) => list.find((x) => x.name === forced(key)) || e.item;
 
-let weather = null, colorMode = null, flowMode = null;
+let weather = null, colorMode = null;
 const densityGoal = [1, 1];
-let flowDir = [0, 1];
-// Turning between falling (0) and sideways (1): from, to, progress 0..1, now.
-let turnFrom = 0, turnTo = 0, turnP = 1, turnNow = 0;
+// The rain falls or flows sideways, as the passage has it or the Direction
+// setting; a change never shows both at once (see direction.js).
+const flowOf = (flow) => { const f = FLOWS.find((x) => x.name === forced('flow')); return f ? f.toward : flow.toward; };
+let flowGoal = { toward: 0, angle: 0 };     // the show's direction now (see show.js, flowAt)
+let flowDir = [0, 1];                       // the way the sideways rain flows: a new one each time it begins
+let direction = null;
 // The rain's colours: two looks, and each strand shows one of them. A new
 // colour episode is written to the look that is out of sight, and the strands
 // then go over to it one after another (see POINT_VS): a blend of two colours
@@ -414,14 +421,6 @@ const copyLook = (g) => Object.fromEntries(Object.entries(g).map(([k, v]) => [k,
 // Per track: what an episode e does as it begins (snap: at once, as on load).
 const BEGIN = {
   weather(e) { weather = chosen('weather', WEATHER, e); },
-  flow(e, snap) {
-    flowMode = chosen('flow', FLOWS, e);
-    // A new horizontal direction for each sideways episode, taken while the
-    // rain still falls straight down, so the turn never swings round.
-    if (flowMode.toward && (snap || turnNow < 0.01)) flowDir = [Math.cos(e.angle), Math.sin(e.angle)];
-    if (snap) { turnFrom = turnTo = turnNow = flowMode.toward; turnP = 1; }
-    else if (flowMode.toward !== turnTo) { turnFrom = turnNow; turnTo = flowMode.toward; turnP = 0; }
-  },
   color(e, snap) {
     colorMode = chosen('color', COLOR_MODES, e);
     const p = PALETTES.find((x) => x.name === S.palette) || e.p;
@@ -562,8 +561,11 @@ function ease(dt) {
   sway = rainSway(dt);
   look.flowRate += (weather.flow * (1 + 0.22 * sway) - look.flowRate) * kw;
   look.rain += (weather.rain - look.rain) * kw;
-  turnP = Math.min(1, turnP + dt / Math.max(0.1, S.turnTime));
-  turnNow = turnFrom + (turnTo - turnFrom) * smooth(turnP);
+  if (direction.update(dt, flowOf(flowGoal), look.flow) === 1) {
+    // (With the setting the way is the show's next one, or one from the seed.)
+    const a = flowGoal.toward ? flowGoal.angle : hash(SEED * 5.3 + time) * Math.PI * 2;
+    flowDir = [Math.cos(a), Math.sin(a)];
+  }
   const kd = 1 - Math.exp(-dt / 5.0); // density drifts slowly
   for (let i = 0; i < 2; i++) look.density[i] += (densityGoal[i] - look.density[i]) * kd;
   looks.forEach((l, n) => {
@@ -584,6 +586,9 @@ function ease(dt) {
 // ---------- the show: rain and forms of light, and the mirrors ----------
 // ?seed= gives the show's timeline; else each visit has its own.
 const show = createShow(S, { feet: -HEIGHT / 2, seed: SEED }); // the layer lies just above the strands' feet
+flowGoal = show.flow(time);
+direction = createDirection(flowOf(flowGoal));
+if (flowGoal.toward) flowDir = [Math.cos(flowGoal.angle), Math.sin(flowGoal.angle)];
 // While no rain passage shows, a few pale drops still fall: more in heavier weather.
 const sparseShare = () => 0.03 + 0.05 * look.rain;
 // The images of the lattice in the wall mirrors: per image, x sign and offset,
@@ -665,6 +670,7 @@ function frame(now) {
   direct(time);
   ease(dt);
   const shown = show.update(time, dt, camera);
+  flowGoal = shown.flow;
   const rk = shown.rain;                 // how much rain falls now: 0 a still room .. 1 a rain passage
   placeImages();
   sound.rain(look.rain, sway, rk);
@@ -723,8 +729,9 @@ function frame(now) {
   gl.uniform1f(u.uBowStyle, { bands: 0, drop: 1, led: 2 }[S.rainbow] ?? 1);
   gl.uniform1f(u.uFlow, look.flow);
   gl.uniform1f(u.uRain, look.rain);
-  gl.uniform1f(u.uTurn, turnNow);
-  gl.uniform1f(u.uTurnSteps, Math.max(1, Math.round(S.turnSteps)));
+  gl.uniform1f(u.uTurn, direction.mix);
+  gl.uniform2fv(u.uDirW, direction.weights);
+  gl.uniform4fv(u.uGate, direction.gates);
   gl.uniform2fv(u.uFlowDir, flowDir);
   gl.uniform2f(u.uLane, SPAN / (GRID - 1), HEIGHT / ROWS);
   gl.uniform1f(u.uSpan, SPAN);

@@ -1,9 +1,9 @@
-// The rain's director: which weather, colour mode, direction, density and
+// The rain's director: which weather, colour mode, density and
 // camera move come when. Like the show's timeline (show.js), each is a track
 // of episodes made from hashes of one seed: a time (?t=) gives its episode,
 // and ?seed= gives the same sequence again.
 
-import { WEATHER, FLOWS, COLOR_MODES, PALETTES, PALE, SETS, ACCENTS, DEPTHS, CAMERAS, MODE } from './config.js';
+import { WEATHER, COLOR_MODES, PALETTES, PALE, SETS, ACCENTS, DEPTHS, CAMERAS, MODE } from './config.js';
 
 export const hash = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 const between = (a, b, r) => a + (b - a) * r;
@@ -131,10 +131,7 @@ export function createDirector(seed) {
   const mood = createMood(seed);
   // The show opens with light rain falling in a rainbow.
   const weather = listTrack(seed, 1, WEATHER, WEATHER[1]);
-  // Rain falls for a good while; now and then it flows sideways, each time a
-  // new way (angle), and then falls again.
-  const flow = listTrack(seed, 2, FLOWS, FLOWS[0], (r) => ({ angle: sub(r, 2) * Math.PI * 2 }),
-    (o) => (o.toward ? 0 : 1));
+  // (The rain's direction belongs to the passages, see show.js.)
   // A colour mode, and the colours each mode may need: two palettes (the
   // pale ones come less often: pale rain soon reads as grey), a set, an
   // accent, a near and a far colour, a hue for the clouds.
@@ -160,5 +157,5 @@ export function createDirector(seed) {
     : { share: [1, 1], hold: between(12, 20, sub(r, 2)) }));
   const camera = listTrack(seed, 5, CAMERAS, CAMERAS[0]);
   // color: as the seed alone has it; story: the same track leaning to the mood.
-  return { weather, flow, color: colorTrack(false), story: colorTrack(true), mood, density, camera, skyStart: hash(seed * 3.3 + 9) };
+  return { weather, color: colorTrack(false), story: colorTrack(true), mood, density, camera, skyStart: hash(seed * 3.3 + 9) };
 }

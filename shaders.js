@@ -40,8 +40,10 @@ float CloudHue;
 uniform vec3 uSky0;    // sky: colour at the top
 uniform vec3 uSky1;    // sky: colour at the bottom
 uniform float uFlowRate; // how fast the rain falls now (weather)
-uniform float uTurn;       // 0 rain falls down .. 1 light flows sideways
-uniform float uTurnSteps;  // steps the flow turns through on the way
+// The rain falls down or flows sideways, one after the other, never both (see direction.js).
+uniform float uTurn;       // the flow's colour: 0 as the rain falls down .. 1 as it flows sideways
+uniform vec2 uDirW;        // how much of the falling rain, and of the sideways rain, shows
+uniform vec4 uGate;        // per direction: the falling time its drops may set out from, and for how long
 uniform vec2 uFlowDir;  // horizontal direction of that flow
 uniform vec2 uLane;     // lane width across the flow, lane height
 uniform float uSpan;
@@ -159,7 +161,9 @@ vec3 dropColor(float sd, float cycle) {
 // One drop runs along a line of LEDs (u: 0 start .. 1 end), then waits past the
 // end for the rest of its period. Returns (trail of this drop, tail of the drop
 // before it, head brightness, number of this drop) so each drop can have a colour.
-vec4 drop(float sd, float u, float trailK) {
+// Only drops that set out within the gate (from gate.x, for gate.y) show: as a
+// rain ends no new drops come, and as one begins none is already on its way.
+vec4 drop(float sd, float u, float trailK, vec2 gate) {
   float speed  = mix(0.07, 0.34, pow(hash(sd + 1.0), 1.5));
   float period = mix(1.3, 2.8, hash(sd + 2.0));
   float trail  = mix(0.04, 0.18, hash(sd + 3.0)) * trailK;
@@ -168,10 +172,13 @@ vec4 drop(float sd, float u, float trailK) {
   float k = round(speed / period * FLOW_WRAP);
   float c = uFlow * (k / FLOW_WRAP) + hash(sd + 4.0);
   float cycle = floor(c);
+  float born = (cycle - hash(sd + 4.0)) * (FLOW_WRAP / k);   // the falling time this drop set out at
+  float now = step(mod(born - gate.x, FLOW_WRAP), gate.y);
+  float before = step(mod(born - FLOW_WRAP / k - gate.x, FLOW_WRAP), gate.y);
   float d = fract(c) * period - u;                   // > 0: the LED is behind the head
   float rain = d >= 0.0 ? exp(-d / trail) : exp(d * 120.0);
-  float now = smoothstep(0.0, 0.05, fract(c) * period);   // a drop fades in over its first few LEDs, never lit at once
-  return vec4(rain * now, exp(-(d + period) / trail), exp(-abs(d) * 90.0) * now, mod(cycle, k));
+  now *= smoothstep(0.0, 0.05, fract(c) * period);   // a drop fades in over its first few LEDs, never lit at once
+  return vec4(rain * now, exp(-(d + period) / trail) * before, exp(-abs(d) * 90.0) * now, mod(cycle, k));
 }
 
 // Light gathered from several drops, with each drop's own random hue.
@@ -208,16 +215,16 @@ void strandRain(inout Lit L, float seed, float u, float trailK, float w) {
   if (w == 0.0) return;                              // no rain on this strand
   float g3 = hash(seed + 6.0) * 0.6;
   float g4 = 0.3 + hash(seed + 7.0) * 0.6;
-  gather(L, drop(seed, u, trailK), seed, w);
-  gather(L, drop(seed + 17.0, u, trailK), seed + 17.0, w);
-  gather(L, drop(seed + 31.0, u, trailK), seed + 31.0, w * smoothstep(g3, g3 + 0.15, uRain));
-  gather(L, drop(seed + 53.0, u, trailK), seed + 53.0, w * smoothstep(g4, g4 + 0.15, uRain));
+  gather(L, drop(seed, u, trailK, uGate.xy), seed, w);
+  gather(L, drop(seed + 17.0, u, trailK, uGate.xy), seed + 17.0, w);
+  gather(L, drop(seed + 31.0, u, trailK, uGate.xy), seed + 31.0, w * smoothstep(g3, g3 + 0.15, uRain));
+  gather(L, drop(seed + 53.0, u, trailK, uGate.xy), seed + 53.0, w * smoothstep(g4, g4 + 0.15, uRain));
 }
 
-// Light flowing at theta from straight down, leaning towards uFlowDir: LEDs in
-// one thin tube along that direction light up in turn. Returns the place along
-// the tube (0 .. 1), for the colour.
-float tiltedRain(inout Lit L, vec3 pos, float theta, float trailK, float w) {
+// Light flowing sideways, towards uFlowDir: LEDs in one thin tube along that
+// direction light up in turn. Returns the place along the tube (0 .. 1), for the colour.
+float sidewaysRain(inout Lit L, vec3 pos, float trailK, float w) {
+  const float theta = 1.5707963;                     // (from straight down)
   vec3 hz = vec3(uFlowDir.x, 0.0, uFlowDir.y);
   float st = sin(theta), ct = cos(theta);
   vec3 D = vec3(hz.x * st, -ct, hz.z * st);
@@ -230,8 +237,8 @@ float tiltedRain(inout Lit L, vec3 pos, float theta, float trailK, float w) {
   float k = trailK * mix(1.0, 2.0, st);
   w *= rainOn(lane);
   if (w == 0.0) return along;
-  gather(L, drop(lane, along, k), lane, w);
-  gather(L, drop(lane + 97.0, along, k), lane + 97.0, w * smoothstep(0.2, 0.8, uRain));
+  gather(L, drop(lane, along, k, uGate.zw), lane, w);
+  gather(L, drop(lane + 97.0, along, k, uGate.zw), lane + 97.0, w * smoothstep(0.2, 0.8, uRain));
   return along;
 }
 
@@ -481,25 +488,13 @@ void main() {
   Grad0 = uGrad0[look]; Grad1 = uGrad1[look]; ColA = uColA[look]; ColB = uColB[look];
   Lit L = Lit(0.0, 0.0, vec3(0.0), vec3(0.0));
 
-  // The flow turns from straight down to sideways in uTurnSteps steps; each
-  // step's lanes cross-fade into the next, so the streaks seem to tilt over.
+  // The rain falling down, or flowing sideways; while one gives way to the
+  // other the flow's colour goes over from one to the other.
   float trailK = mix(1.0, 1.7, uRain) * uTrail;
-  float t = uTurn * uTurnSteps;
-  float k0 = min(floor(t), uTurnSteps);
-  float f = t - k0;
   vec3 col = vec3(0.0);
-  for (int i = 0; i < 2; i++) {
-    float k = k0 + float(i);
-    float w = i == 0 ? 1.0 - f : f;
-    if (w < 0.001 || k > uTurnSteps + 0.5) continue;
-    if (k < 0.5) {
-      strandRain(L, seed, u, trailK, w);
-      col += flowColor(u, spatial, h) * w;
-    } else {
-      float along = tiltedRain(L, pos, k / uTurnSteps * 1.5707963, trailK, w);
-      col += flowColor(along, spatial, h) * w;
-    }
-  }
+  if (uDirW.x > 0.001) strandRain(L, seed, u, trailK, uDirW.x);
+  if (uTurn < 0.999) col += flowColor(u, spatial, h) * (1.0 - uTurn);
+  if (uDirW.y > 0.001 || uTurn > 0.001) col += flowColor(sidewaysRain(L, pos, trailK, uDirW.y), spatial, h) * uTurn;
   float rain = L.rain;
   float tip = L.tip;
   // Rays come only from a drop's head, and few LEDs are near one: the rest
