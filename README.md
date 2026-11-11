@@ -31,7 +31,7 @@ Inspired by teamLab's *Light Sculpture - Point*.
 
 ## Use
 
-- **Click or tap**: a ripple of light (and a bell). **Drag** to look around: the picture follows the mouse or the finger.
+- **Click or tap**: a ring of light spreads from the point you touched (and a bell rings). **Drag** to look around: the picture follows the mouse or the finger.
 - **Buttons, bottom right**: settings ⚙, full screen, a phone with an arrow (landscape / portrait; on touch screens only), sound ♪, volume.
 - **Landscape / portrait**: the rotate button (or `r`) shows the picture in the other shape, also when the phone's rotation lock is on. Where the browser can lock the orientation (Android Chrome, in full screen or as an installed app) it does that; where it cannot (iPhone and iPad Safari, desktop) the page turns its own picture a quarter, so turn the phone to match. Pressing again goes back; really turning the phone also ends it.
 - **Keys**:
@@ -74,9 +74,13 @@ image, towards that line. The show passes through:
   and goes beside the others, each time at a height, a thickness and a
   brightness of its own; under a form it thins out, so the form stays the
   subject. With the room to itself it is the subject: a brighter sea in a
-  longer swell, its crests paler. In a still room a ripple is a ring that
-  spreads level, like one on water, lighting the strands as it passes; in
-  the rain it is a round wave. A tap sets it off about where the forms are.
+  longer swell, its crests paler. In a still room a ripple that comes by
+  itself is a ring that spreads level, like one on water, lighting the
+  strands as it passes; in the rain it is a round wave. A tap makes a ring
+  around the point you touched, round on the screen: a crisp front with a
+  short wake, in the LEDs about where the forms are, before and behind that
+  place alike, with a thin dark band behind the front, so it shows in rain
+  and across a form too.
 
 The forms move, slowly, each in its own way, and the mirror floor shows each
 move:

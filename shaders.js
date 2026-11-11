@@ -47,6 +47,7 @@ uniform vec2 uLane;     // lane width across the flow, lane height
 uniform float uSpan;
 uniform float uFogFar;
 uniform vec4 uRipples[8]; // xyz center, w start time
+uniform vec4 uRippleN[8]; // a touch's ring: xyz from the eye that touched to its centre, w how deep it is, before and behind the touch (see RING_DEEP in main.js; 0: a wave that came by itself)
 uniform float uRest;
 uniform float uRainGain;
 uniform float uTipGain;
@@ -431,6 +432,9 @@ vec3 formsAt(vec3 p, float id, float v, out vec3 thread, out float around) {
   return c;
 }
 
+// A touch's ring: how crisp its front, how short its wake, how far behind
+// the front its dark band runs, and the light it adds in rain.
+const vec4 RING = vec4(9.0, 2.4, 0.85, 8.0);
 void main() {
   float seed = aData.w;
   float u = aData.y;
@@ -494,14 +498,37 @@ void main() {
     return;
   }
 
-  // Spherical waves of light.
-  float ring = 0.0;
+  // Waves of light. One that comes by itself is round. A touch's is a ring
+  // on the screen, around the place of the touch: an LED before or behind
+  // that place lights as the ring passes it on the screen (as the eye that
+  // touched sees it, in the plane the view faces now), so the eye sees one
+  // ring, many LEDs deep. A crisp front with a short wake, and a thin dark
+  // band behind the front (shade), so it also shows in rain and across a form.
+  float id = seed * 0.37 + u * 91.7;
+  float ring = 0.0, shade = 0.0, touched = 0.0;   // touched: the part of ring that touches made
+  vec3 ahead = -vec3(uView[0][2], uView[1][2], uView[2][2]);   // the way the view faces
   for (int i = 0; i < 8; i++) {
     vec4 r = uRipples[i];
     float age = uTime - r.w;
     if (age < 0.0 || age > 7.0) continue;
-    float x = length(pos - r.xyz) - age * 3.6;
+    vec4 n = uRippleN[i];
+    vec3 d = pos - r.xyz;
     float fade = 1.0 - age / 7.0;
+    if (n.w != 0.0) {
+      // A touch on the floor's image: the same, seen in the floor.
+      vec3 a = n.w < 0.0 ? vec3(ahead.x, -ahead.y, ahead.z) : ahead;
+      float zc = max(dot(n.xyz, a), 0.05);               // how deep the touch is
+      float z = max(dot(d + n.xyz, a), 0.05);            // how deep this LED is
+      float x = length((d + n.xyz) * (zc / z) - n.xyz) - age * 3.6;
+      float deep = log(z / zc) / n.w;
+      float slab = exp(-deep * deep) * fade * fade;
+      float wave = (x > 0.0 ? exp(-x * x * RING.x) : exp(x * RING.y)) * slab * smoothstep(0.0, 0.2, age);
+      ring += wave;
+      touched += wave;
+      shade += exp(-(x + RING.z) * (x + RING.z) * 6.0) * slab;
+      continue;
+    }
+    float x = length(d) - age * 3.6;
     // In the still room a wave is a ring that spreads level, like one on water:
     // a band of light as tall as a hand's reach, running out along the strands.
     float dy = pos.y - r.y;
@@ -512,7 +539,6 @@ void main() {
 
   // The forms' light. A wave lifts it at most to white: past that the LED
   // looks the same, and the extra light would only swell the glow around it.
-  float id = seed * 0.37 + u * 91.7;
   vec3 thread;
   float around;
   vec3 form = formsAt(pos, id, u, thread, around);
@@ -520,6 +546,9 @@ void main() {
   vec3 flare = form * min(1.0, 1.0 / max(fm, 1e-3));
   float inForm = clamp(fm, 0.0, 1.0);                // drops in a form take its colour
 
+  float dim = 1.0 - 0.8 * min(shade, 1.0);
+  form *= dim;
+  thread *= dim;
   vec3 c = form + flare * 2.5 * ring;
   vec3 glint = vec3(0.0);
   vec3 wireCol = thread + flare * ring;
@@ -552,10 +581,12 @@ void main() {
     const float WHITE[11] = float[11](0.5, 0.5, 0.15, 0.2, 0.3, 0.0, 0.3, 0.35, 0.35, 0.3, 0.35);
     float white = 0.0;
     for (int i = 0; i < 11; i++) white += WHITE[i] * W[i];
-    c += (restCol * uRest + rainCol * rain * uRainGain + mix(tipCol, vec3(1.0), white) * tip * uTipGain
+    c += ((restCol * uRest + rainCol * rain * uRainGain + mix(tipCol, vec3(1.0), white) * tip * uTipGain) * dim
         + mix(restCol, vec3(1.0), 0.35) * ring * 4.0) * rk * (1.0 - 0.25 * uStorm) * (1.0 - 0.75 * around * (1.0 - inForm));
+    // Among so many drops a touch's ring needs more light, and paler, to be seen.
+    c += mix(restCol, vec3(1.0), 0.6) * touched * RING.w * rk;
     glint = tipCol * tip * uTipGain * rk;            // the head's light in its own colour: the light rays
-    wireCol += (rainCol * rain * uRainGain * 0.2 + restCol * uRest * 1.5 * near + restCol * ring * 1.2) * rk;
+    wireCol += ((rainCol * rain * uRainGain * 0.2 + restCol * uRest * 1.5 * near) * dim + restCol * ring * 1.2) * rk;
   }
   if (rk < 0.999) {
     // The still room's look: a faint lattice in the room's colour with a
@@ -564,10 +595,10 @@ void main() {
     vec3 drop = mix(pale, flare, inForm * 0.8);
     float tw = hash(id + 3.0) < 0.2
       ? pow(0.5 + 0.5 * sin(uTime * (0.3 + 1.2 * hash(id + 1.0)) + hash(id + 2.0) * 6.2832), 30.0) * uTwinkle : 0.0;
-    c += (uTint * uRest + pale * tw + drop * (rain * uRainGain * 0.5 + tip * uTipGain) + pale * 5.0 * ring) * (1.0 - rk);
+    c += ((uTint * uRest + pale * tw + drop * (rain * uRainGain * 0.5 + tip * uTipGain)) * dim + pale * 5.0 * ring) * (1.0 - rk);
     // The strands catch the light of the forms they run through, and a faint
     // sheen of the room's: thin lit threads, never dark bars.
-    wireCol += (drop * rain * uRainGain * 0.2 + uTint * uRest * 1.5 * near + pale * ring * 1.2) * (1.0 - rk);
+    wireCol += ((drop * rain * uRainGain * 0.2 + uTint * uRest * 1.5 * near) * dim + pale * ring * 1.2) * (1.0 - rk);
   }
 
   float fog = 1.0 - smoothstep(uFogFar * 0.3, uFogFar, dist);

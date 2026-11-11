@@ -240,13 +240,17 @@ function adapt(rawDt, now) {
 }
 
 // ---------- interaction ----------
-const ripples = new Float32Array(8 * 4).fill(-1e4);
+// Waves of light: where each began and when; and, for a touch's ring, the
+// way from the eye that touched to it, and how deep the ring is (see RING_DEEP;
+// < 0: it is seen in the floor; 0: a wave that came by itself).
+const ripples = new Float32Array(8 * 4).fill(-1e4), rippleN = new Float32Array(8 * 4);
 let rippleIndex = 0;
-function addRipple(x, y, z, t) {
-  ripples.set([x, y, z, t], rippleIndex * 4);
+function addRipple(at, t, from = [0, 0, 0], deep = 0) {
+  ripples.set([...at, t], rippleIndex * 4);
+  rippleN.set([...from, deep], rippleIndex * 4);
   rippleIndex = (rippleIndex + 1) % 8;
   // Every wave rings a bell, from the side where it is seen.
-  sound.ripple(panOf([x, y, z]));
+  sound.ripple(panOf(at));
 }
 // Left (-1) .. right (1): where a point in the room is seen, for the sound.
 const panOf = (p) => (camera ? dot(sub(p, camera.eye), camera.r) / 6 : 0);
@@ -311,7 +315,15 @@ function breathAt(dt) {
 }
 
 
-// A ripple goes where the view is hit at screen point (x, y).
+// A ripple goes where the view is hit at screen point (x, y): a ring that
+// spreads from that point, round on the screen. It runs through the LEDs
+// before and behind the place of the touch alike, each lit as the ring passes
+// it on the screen, so the eye sees one ring, many LEDs deep (see POINT_VS).
+// How far before and behind the touch the ring's light reaches, as a share of
+// the way from the eye (e-fold, in log distance): few LEDs lie in one thin
+// sheet, and the eye moves on, so the LEDs near it would smear the ring.
+const RING_DEEP = 0.35;
+const RING_DEEP_IMAGE = 0.12;   // of a touch on the floor's image: its ring is round in the floor, not above it
 function rippleAt(x, y) {
   if (!camera) return;
   const p = view.point(x, y); // from the screen's point to the picture's
@@ -319,15 +331,14 @@ function rippleAt(x, y) {
   const ny = 1 - (p.y / view.h) * 2;
   const th = Math.tan(fovRad() / 2);
   const { eye, f, r, u, aspect } = camera;
-  const dir = norm([
-    f[0] + r[0] * nx * th * aspect + u[0] * ny * th,
-    f[1] + r[1] * nx * th * aspect + u[1] * ny * th,
-    f[2] + r[2] * nx * th * aspect + u[2] * ny * th,
-  ]);
-  const D = 10;   // about where the forms are: far enough for the wave to be seen whole
+  // About as far into the room as the forms are: far enough for the ring to
+  // be seen whole. (f is a unit vector: every point of the screen is as deep.)
+  const D = 10;
+  const from = [0, 1, 2].map((i) => (f[i] + r[i] * nx * th * aspect + u[i] * ny * th) * D);
+  const at = eye.map((v, i) => v + from[i]);
   // A tap on the floor's image rings the light whose image it is.
-  const hy = eye[1] + dir[1] * D;
-  addRipple(eye[0] + dir[0] * D, hy < FLOOR ? 2 * FLOOR - hy : hy, eye[2] + dir[2] * D, time);
+  if (at[1] < FLOOR) addRipple([at[0], 2 * FLOOR - at[1], at[2]], time, [from[0], -from[1], from[2]], -RING_DEEP_IMAGE);
+  else addRipple(at, time, from, RING_DEEP);
 }
 
 // A mouse rings at once. A finger or pen only looks around while it drags;
@@ -653,7 +664,7 @@ function frame(now) {
   // A wave now and then, somewhere in the field.
   if (S.ripples > 0 && time > nextAuto) {
     const where = (i) => hash(SEED + ++autoWaves * 5.71 + i) - 0.5;   // from the seed, like the rest of the show
-    addRipple(where(1) * SPAN * 0.6, where(2) * HEIGHT * 0.5, where(3) * SPAN * 0.6, time);
+    addRipple([where(1) * SPAN * 0.6, where(2) * HEIGHT * 0.5, where(3) * SPAN * 0.6], time);
     // While waves repaint the field, they come more often.
     // The gaps sway with 1/f fluctuation: about half to twice the setting.
     const every = colorMode.name === 'repaint' ? Math.min(S.ripples, 6) : S.ripples;
@@ -745,6 +756,7 @@ function frame(now) {
   gl.uniform3fv(u.uColA, both('a'));
   gl.uniform3fv(u.uColB, both('b'));
   gl.uniform4fv(u.uRipples, ripples);
+  gl.uniform4fv(u.uRippleN, rippleN);
   // Rain spreads strand by strand as a rain passage comes, from the few
   // strands that carry pale drops in a still room.
   // Through a form it thins, so the form shows between the drops.
