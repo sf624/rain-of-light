@@ -54,7 +54,7 @@ function rand(a, b) {
   return (h >>> 0) / 4294967296;
 }
 
-// Spacing along a strand (?jitter=; a prototype). Returns the rows (in row
+// Spacing along a strand (the setting LED spacing, ?jitter=). Returns the rows (in row
 // units, 0 .. rows) of a strand's LEDs, how many of them are lit, and the gain
 // that keeps the strand's light as a whole the same.
 //   0.25, 0.5: each LED moved along its strand by up to that share of the pitch.
