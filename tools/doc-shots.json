@@ -132,7 +132,7 @@
       {"q": "rays=4&rayLength=50", "label": "rays=4&rayLength=50", "crop": [0.3, 0.2, 0.7, 0.6]},
       {"q": "rays=8&rayLength=50", "label": "rays=8&rayLength=50", "crop": [0.3, 0.2, 0.7, 0.6]},
       {"q": "rays=8", "label": "rays=8", "crop": [0.3, 0.2, 0.7, 0.6]},
-      {"q": "rays=8&rayLength=30", "label": "rays=8&rayLength=30", "crop": [0.3, 0.2, 0.7, 0.6]}
+      {"q": "rays=4", "label": "rays=4", "crop": [0.3, 0.2, 0.7, 0.6]}
     ] },
     { "name": "weather", "cols": 2, "base": "scene=rain&flow=down&t=30&color=mono&palette=deep sea", "width": 1200, "cells": [
       {"q": "weather=drizzle", "label": "weather=drizzle"},

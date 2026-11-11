@@ -100,7 +100,9 @@ A mirror image is the same lattice drawn again at another place:
 - **The floor.** The whole lattice is drawn a second time with the uniform
   `uMirror` set. The vertex shader then places the LED at
   `2 · floor − y`, and scales its light by the setting `mirror` and by
-  `exp(−height / MIRROR_FADE)` (`main.js: MIRROR_FADE`, 22 units).
+  `exp(−height / MIRROR_FADE)` (`main.js: MIRROR_FADE`, 22 units). The
+  falling rain's image is also fainter where you look down at the floor
+  than at a glancing look (see "How the falling rain fades with distance").
 - **The walls.** With `walls` at 1, each draw is instanced 9 times: the
   room itself and its 8 neighbours. `main.js: placeImages` gives each
   instance a sign flip and an offset in x and z, and a gain of 0.7 per
@@ -203,10 +205,18 @@ use `drawElements` with `LINE_STRIP`.
   LED gives the same light wherever it sits between pixels.
 - **Wires** (`WIRE_FS`). One pixel wide, lit with the light of the LEDs
   along them. Thinned strands lose their wire; thinned LEDs do not.
-- **Rays** (`RAY_FS`). Only for LEDs near a drop's head whose light passes
-  `rayThreshold`, only while rain falls, and never in the floor's image. The
-  sprite is `2 · rayLength + 1` px wide (scaled to a 1080 px tall view) with
-  2 to 8 thin lines through it.
+- **Rays** (`RAY_FS`). Only for LEDs near a drop's head, only while rain
+  falls, and never in the floor's image. A ray's length follows the head's
+  light as seen (after the fog, the mirror, thinning and the fade near the
+  eye, with far LEDs dimmed as in a 1080 px tall view):
+  `rayLength · light / RAY_LIGHT` (`shaders.js: rayK`, `RAY_LIGHT` 3), at
+  most `RAY_CAP` (2.5) times the setting, scaled to the view. A near, bright
+  head casts a long ray; a far, dim one a short ray; a ray grows in and out
+  with its head. The sprite is `2 · length + 1` px wide, with 2 to 8 thin
+  lines through it. A ray under 0.75 px (`RAY_MIN`) is not drawn, and a
+  short ray is faint, so none appears at once. A longer ray is a little
+  dimmer along its length, so a near head does not flare. The rays' light is
+  0.3 of the head's (`RAY_GAIN`).
 
 ### Glow and tone mapping
 
@@ -290,6 +300,36 @@ The falling time `look.flow` is integrated in `main.js: ease`, so a change
 of speed never makes drops jump. It wraps at `FLOW_WRAP` (1000). Each drop's
 rate is rounded so that it runs a whole number of cycles in 1000 units:
 the wrap is seamless, however long the page runs.
+
+### How the falling rain fades with distance
+
+![Rain three ways: only the nearest strands; more of the room; the whole room, near strands bright and far ones dim](img/fog.jpg)
+
+Near strands stand out bright, and far ones fade into a dim mesh behind
+them, as in a real room. Otherwise the rain fills the view evenly, like a
+pattern. Three things do it, in `POINT_VS` (`phys`), for the falling rain's
+look only (the forms, the still room and the sideways rain keep the plain
+fog), as much as falling rain shows (`uFallLight`: the rain's weight times
+how much of it falls rather than flows):
+
+- **Light by distance.** An LED under 1.5 px keeps 1.5 px and dims (see
+  "The draws"), so its light falls as 1 / distance. The falling rain dims
+  further by `(px / 1.5)^FALL_DIM` (0.65), measured as in a 1080 px tall
+  view: its light falls as about 1 / distance^1.65. Its wire dims the same
+  way from 4 units on.
+- **Mist.** In place of the fog's band (full light up to 30% of the visible
+  distance, then a fade), the light thins along the way to the eye:
+  `exp(−distance / (MIST · visible distance))`, `MIST` 0.68. The distance
+  is along the ray, so the edges of a wide view see no farther than its
+  middle. It still ends at the visible distance.
+- **The floor's image.** It is fainter where you look down at it than at a
+  glancing look (Schlick's Fresnel): from `FLOOR_MIN` (0.7) of its light
+  straight down to all of it towards the far end.
+
+`FALL_GAIN` (1.8) keeps the picture as bright as with the plain fog. Example:
+at 1280x720 in `rain` weather, the mean brightness is the same as with the
+plain fog. In a phone's tall view it is about 85% of it, and the floor's
+image still shows in the lower half.
 
 ### Rain flowing sideways
 
@@ -428,8 +468,9 @@ stillLook = room tint · rest + pale · twinkle
 - A wave lifts a form's light at most to white (`flare`).
 
 The result is then scaled by the fog, by the mirror's gain, by thinning
-(`aRank` against `uDensity`), and by the size dimming. An LED whose light is
-almost nothing is dropped.
+(`aRank` against `uDensity`), and by the size dimming. The rain's look is
+also scaled by `phys` (see "How the falling rain fades with distance"). An
+LED whose light is almost nothing is dropped.
 
 ## 5. The show
 
@@ -907,6 +948,14 @@ strips use the restart index for the same reason. The cost is that the
 shader runs for every LED of every pass, visible or not: about half a
 million on a desktop by default, and nine times that with wall mirrors
 ("Each copy draws the lattice again: costly", says the setting's hint).
+
+**Only the falling rain fades as in a real room.** The falling rain's light
+falls off with distance more steeply than the rest, and the floor mirrors it
+less straight down. That gives the falling rain its depth: without it,
+thousands of equal far strands fill the view as evenly as a pattern. The
+forms keep the plain fog: each is one subject at one place, and they would
+only dim. The sideways rain keeps it too: its flow across the strands
+already shows the depth.
 
 **Mirrors are the same LEDs again.** The images are computed at the LED
 itself and only drawn elsewhere. A reflection is always exact, and costs one
