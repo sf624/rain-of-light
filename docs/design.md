@@ -34,7 +34,7 @@ The constraints:
   colours are all worked out per LED in the vertex shader.
 - **A seeded show.** The show's timeline, the director's tracks and the
   places of the automatic ripples come from hashes of one seed (`?seed=`).
-  A time (`?t=`) then shows one passage. Some things still use
+  A time (`?t=`) then shows one passage. Some things use
   `Math.random`: the strands' places and their own seeds and thinning ranks
   (`lattice.js: fillLattice`, so each drop's timing), the 1/f sways
   (`sway.js: createSway`: the rain's swell, the gaps between automatic
@@ -79,9 +79,9 @@ a strand come from bit reversal (`lattice.js: rowRanks`), so every share is
 spread evenly. Example: on a strand of 8 LEDs, the order is rows 0, 4, 2, 6,
 1, 5, 3, 7. At a share of one half, rows 0, 2, 4 and 6 stay: every other
 LED. Each strand starts this order at its own row, and strands get random
-ranks. An earlier order shared by all strands (and a Bayer matrix across
-them) left dark rows at the same heights, which showed as straight dark
-lines (commit "Fix straight dark lines when the lattice thins").
+ranks. One order shared by all strands (or a Bayer matrix across them)
+would leave dark rows at the same heights, which show as straight dark
+lines.
 
 Changing `grid`, `rows`, `layout` or `jitter` rebuilds the buffers, 250 ms
 after the slider stops (`main.js: apply`).
@@ -598,11 +598,6 @@ A new sideways rain takes a new direction each time (`main.js: ease` sets
 `flowDir`). The `d` key and the Direction setting hold one direction; they
 change it the same way.
 
-Earlier versions turned the rain while it fell, first in steps of 10°, then
-as a cross-fade. For some seconds both rains showed, and the rain was seen
-turning. The commit "Sideways rain is a passage of its own: a rain never
-turns" replaced this.
-
 ## 6. Sound
 
 The music is made live with Web Audio, with no sound files
@@ -659,9 +654,8 @@ is [settings.md](settings.md).
 
 Where a value comes from (`tuner.js: loadSettings`): the default, then what
 this browser saved (`localStorage`, key `STORAGE_KEY`), then the URL
-(`?key=value`). The URL wins. `main.js` then checks every value: an option
-that no longer exists falls back to its default; a number is clamped to its
-range.
+(`?key=value`). The URL wins. `main.js` then checks every value: an unknown
+option falls back to its default; a number is clamped to its range.
 
 The panel (`tuner.js: createTuner`) opens with the gear button, the `p` key
 or a link ending in `#tune`. It saves only values changed in the panel, not
@@ -868,11 +862,9 @@ Details and commands are in [development.md](development.md).
 ## 11. Decisions and trade-offs
 
 **Light adds up; nothing hides anything.** The LEDs, wires and rays are drawn
-with additive blending and no depth buffer. The first prototype drew opaque
-round LEDs with a depth test. The crystal scene changed this, "so near
-strands never stand dark in front of a form" (commit "Light the crystal
-scene's strands, haze and cores"). The strands are fine threads, so additive
-light reads right.
+with additive blending and no depth buffer, so near strands never stand dark
+in front of a form. The strands are fine threads, so additive light reads
+right.
 
 **Points, not a full-screen effect.** The picture is made of real points,
 one per LED, each of the same physical size. A form is not drawn as a shape:
@@ -898,44 +890,25 @@ more pass, not a different renderer.
 **Nothing comes or goes at once.** Many details exist only to avoid a one-frame
 step: the rain share fades per strand, LEDs fade near the eye, a drop fades
 in over its first LEDs, a wave swells in, a form's LEDs fade as they rise
-away. The commit "No strand of light comes or goes at once" found the steps
-with a detector over seeded runs. It also found that the noise's hash, built
-on a sine, jumped all at once every few seconds; `hash3` has no sine now.
+away. The noise's hash (`hash3`) uses no sine: a hash built on a sine jumps
+all at once every few seconds.
 
-**Two colour looks, not a blend.** Blending two colour modes passed through
-grey, and with changes every 10 to 25 s the rain was grey much of the time.
-Now a new colour takes the rain over strand by strand (commit "Polish,
-round 2").
+**Two colour looks, not a blend.** Blending two colour modes passes through
+grey. So a new colour takes the rain over strand by strand.
 
-**A rain never turns.** The direction once had a track of its own and turned
-mid-rain, first in steps, then as a cross-fade. Both rains showed at once.
-Now the direction belongs to the passage, and changes only between rains.
+**A rain never turns.** The direction belongs to the passage, and changes
+only between rains. A rain that turned while it fell would show both
+directions at once.
 
 **Exact wraps for long sessions.** The falling time wraps at 1000, and every
-drop's rate is rounded to fit it, so the wrap never shows (commit "Wrap the
-falling time exactly, so long sessions stay smooth").
+drop's rate is rounded to fit it, so the wrap never shows.
 
 **Seeds, with limits.** The show, the tracks and the places of the
 automatic ripples are seeded, so a link with `?seed=` and `?t=` shows one
 passage. The strands (places, seeds, ranks), the 1/f sways and the music
-still use `Math.random`. The tools seed `Math.random`
+use `Math.random`. The tools seed `Math.random`
 inside the page when they need an exact repeat.
 
 **No build, by hand.** With no bundler, the service worker cannot know the
 files; `sw.js: CORE` is a list kept by hand, and network-first caching avoids
 any version to bump.
-
-**What was tried and dropped** (from the git log):
-
-- A moving-rain mode: "It did not look as good as the fixed LEDs"
-  (commit "Remove moving-rain mode").
-- Lightning in a downpour (commit "Drop the lightning, …").
-- A meditation timer (commit "Drop the meditation timer"). The breathing
-  guide stayed.
-- The storm passage was dropped once and brought back: "what was not wanted
-  was the heavy rain" (commit "Bring back the storm passage; no downpour on
-  its own"). Shower and downpour now never come on their own.
-- A sound note shown for 10 s at the start (commit "Remove the sound note
-  shown at the start").
-- One thinning order for all strands, and a Bayer matrix across them: they
-  drew straight dark lines.
