@@ -61,12 +61,16 @@ const listTrack = (seed, salt, list, first, more = () => ({}), again = () => 0, 
 
 // ---------- the colour story ----------
 // The show's colours belong together from one passage to the next: they lean
-// towards one mood, a hue that wanders slowly along an axis from green
-// through blue, violet and pink to amber, and back (never across
-// yellow-green, where no palette lies). A leg goes some way along it (step,
-// degrees) at a pace of its own (degrees a minute), mostly on the same way
-// as the last (on); from blue to amber takes some 10 to 20 minutes.
-const MOOD = { from: 135, to: 410, step: [100, 200], pace: [11, 20], on: 0.75 };
+// towards one mood, a hue that wanders along an axis from green through
+// blue, violet and pink to amber, and back (never across yellow-green, where
+// no palette lies). It goes from one palette's hue to the next on the axis
+// (stops), a leg taking a time of its own (leg, seconds), mostly on the same
+// way as the last (on), always so after a turn, and back where the axis
+// ends; from blue to amber takes some 4 to 6 minutes. So no one colour holds
+// the room for long: a wide gap between two palettes takes no longer than a
+// narrow one, a turn halfway would keep one colour twice as long, and turns
+// one after another would rock between two.
+const MOOD = { from: 135, leg: [120, 180], on: 0.75 };
 // A choice that leans is the likelier the nearer its hues are to the mood:
 // a quarter as likely this many degrees of hue away.
 const NEAR = 32;
@@ -76,14 +80,16 @@ const FREE = 0.2;
 const MANY = 0.25;
 
 export function createMood(seed) {
+  // The stops: the hues of the palettes of colour (not the pale ones), green first.
+  const stops = PALETTES.filter((p) => !PALE.includes(p.name))
+    .map((p) => { const h = hueOf(p.a)[0]; return h < MOOD.from ? h + 360 : h; }).sort((x, y) => x - y);
   const track = createTrack(seed, 6, (prev, r) => {
-    const a = prev ? prev.b : between(MOOD.from, MOOD.to, sub(r, 3));
-    const step = between(...MOOD.step, sub(r, 0));
-    // Mostly on the same way, as far as the axis goes; back where it ends.
-    const way = prev ? Math.sign(prev.b - prev.a) * (sub(r, 1) < MOOD.on ? 1 : -1) : sub(r, 1) < 0.5 ? 1 : -1;
-    const to = (w) => Math.min(MOOD.to, Math.max(MOOD.from, a + w * step));
-    const b = Math.abs(to(way) - a) < MOOD.step[0] / 2 ? to(-way) : to(way);
-    return { a, b, hold: Math.abs(b - a) / between(...MOOD.pace, sub(r, 2)) * 60 };
+    const i = prev ? prev.j : Math.floor(sub(r, 3) * stops.length);
+    // Mostly on the same way, always so after a turn, as far as the axis goes; back where it ends.
+    const last = prev && prev.j - prev.i;
+    const way = prev ? last * (prev.turn || sub(r, 1) < MOOD.on ? 1 : -1) : sub(r, 1) < 0.5 ? 1 : -1;
+    const j = stops[i + way] === undefined ? i - way : i + way;
+    return { i, j, turn: prev !== undefined && j - i !== last, a: stops[i], b: stops[j], hold: between(...MOOD.leg, sub(r, 2)) };
   });
   // The mood at time t: a hue in degrees (above 360: round again, 400 is 40).
   return (t) => { const e = track.at(Math.max(0, t)); return e.a + (e.b - e.a) * smooth((Math.max(0, t) - e.start) / e.hold); };
@@ -96,13 +102,16 @@ export function hueOf([r, g, b]) {
   const h = max === r ? (g - b) / c : max === g ? 2 + (b - r) / c : 4 + (r - g) / c;
   return [(h * 60 + 360) % 360, c];
 }
+// How far apart two hues are, in degrees (0 .. 180).
+export const apart = (a, b) => Math.abs(((a - b) % 360 + 540) % 360 - 180);
+// Hues this many degrees apart or less are of one family (the eye sees one colour).
+export const KIN = 50;
 // How well some colours suit a mood: the share of their colour near its hue, 0 .. 1.
 function suits(colours, mood) {
   let near = 0, all = 0;
   for (const c of colours) {
     const [h, s] = hueOf(c);
-    const d = ((h - mood) % 360 + 540) % 360 - 180;
-    near += s / (1 + (d / NEAR) ** 2) ** 2;   // (a long tail: of two far colours the nearer still wins)
+    near += s / (1 + (apart(h, mood) / NEAR) ** 2) ** 2;   // (a long tail: of two far colours the nearer still wins)
     all += s;
   }
   return all > 0 ? near / all : 0;
