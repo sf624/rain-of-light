@@ -7,7 +7,7 @@
 // Each function returns { centre, size, turn, tilt, yaw, f, dissolve, bound }:
 // what the shader's form needs (see formsAt in shaders.js). f is per form
 // (f[0..2], see each); dissolve (0 .. 1) lifts the form away as rising points
-// (or, falling back, gathers it out of them); bound is how far from the
+// (the veil, the fractal); bound is how far from the
 // centre any of its light reaches, so LEDs farther away skip it.
 // `face` is the way from the eye towards the form (an angle about the
 // vertical, eased in show.js): some forms turn a face to the room, and some
@@ -59,23 +59,6 @@ function spiral(age, leave, ph, face) {
     tilt: 1.4 + 0.3 * Math.sin(0.023 * age + 2 * ph),
     f: [0.15 + 0.85 * smooth(age / 24) * (1 - smooth(leave * 1.15)), 0, 0],
     bound: size * 1.05,
-  };
-}
-
-// A cloud of points: round heads heaped over a flat base, its long side to
-// the room. It gathers as points fall into place, drifts across the room,
-// and now and then parts into two drifts that come together again; it goes
-// by rising away as points.
-// f[0]: how far each drift has moved from the centre, along the cloud.
-function cloud(age, leave, ph, face) {
-  const size = 2.9;           // about one head's radius
-  const apart = 2.2 * swell(age, 24, 90, 50);
-  return {
-    centre: [2.6 * Math.sin(0.022 * age + ph), -4.0 + 0.4 * Math.sin(0.03 * age), 2.6 * Math.sin(0.017 * age + 2 * ph + 1)],
-    size, f: [apart, 0, 0],
-    yaw: face + 0.35 * Math.sin(0.019 * age + ph),
-    dissolve: Math.max(0.85 * (1 - smooth(age / 14)), smooth(leave * 1.1)),
-    bound: size * 3.2 + apart,
   };
 }
 
@@ -196,10 +179,10 @@ function fractal(age, leave, ph) {
   };
 }
 
-export const MOTIONS = { orb, spiral, cloud, ring, veil, solid, attractor, knot, fractal };
+export const MOTIONS = { orb, spiral, ring, veil, solid, attractor, knot, fractal };
 // How far beyond its own path each form keeps, as the eye sees it: the loose
 // and the wide ones read from a distance, and none flares right at the eye.
-const BACK = { orb: 2.5, spiral: 2.5, ring: 2.5, cloud: 3.5, veil: 3, solid: 2.5, attractor: 3, knot: 3.5, fractal: 3 };
+const BACK = { orb: 2.5, spiral: 2.5, ring: 2.5, veil: 3, solid: 2.5, attractor: 3, knot: 3.5, fractal: 3 };
 
 // The form's place at its age: the defaults filled in. anchor is the place
 // on its own path (the eye's way to it gives `face`); centre is where it shows.
