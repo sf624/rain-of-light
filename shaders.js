@@ -81,20 +81,12 @@ uniform vec3 uMirror;     // floor height, reflection gain (> 0: drawing the ref
 uniform vec4 uCopy[9];    // wall mirrors, per instance: x sign, x offset, z sign, z offset
 uniform float uCopyGain[9];
 uniform vec2 uCull;       // a point this far out of the view (in clip units, 1: the edge) is not lit
-// (Temporary, ?depth=: candidate treatments that give the falling rain depth.)
-// Weights, already times how much falling rain shows: curtains, aerial
-// perspective, bold near strands and fine far ones, near heads' sideways glints.
-uniform vec4 uDepth;
-// And: light that falls off as in a real room (dimming as the square of the
-// distance, mist that thins the light, a floor that mirrors more at a glancing
-// look), times how much falling rain shows; drops' speeds in a narrower range (constant).
-uniform vec2 uDepth2;
+// How much of the falling rain's light goes as in a real room (see main():
+// phys): as much as falling rain shows.
+uniform float uFallLight;
 uniform vec3 uEye;        // where the eye is
-uniform vec3 uCurtain;    // the curtains' drift (x, z offset, integrated in JS) and their slow change
-uniform float uRayDepth;  // rays: weight of a length by distance, in place of one by light
 out vec3 vColor;
 out float vSize;
-out vec2 vGlint;          // light rays: how bright the sideways glint is, how much longer the rays are
 
 // Light rays: how long a ray is, in Ray lengths, for a head seen this bright.
 // It grows from nothing in step with the light, so a ray grows in and out with
@@ -190,7 +182,7 @@ vec3 dropColor(float sd, float cycle) {
 // Only drops that set out within the gate (from gate.x, for gate.y) show: as a
 // rain ends no new drops come, and as one begins none is already on its way.
 vec4 drop(float sd, float u, float trailK, vec2 gate) {
-  float speed  = mix(mix(0.07, 0.15, uDepth2.y), mix(0.34, 0.25, uDepth2.y), pow(hash(sd + 1.0), 1.5));
+  float speed  = mix(0.07, 0.34, pow(hash(sd + 1.0), 1.5));
   float period = mix(1.3, 2.8, hash(sd + 2.0));
   float trail  = mix(0.04, 0.18, hash(sd + 3.0)) * trailK;
   // The falling time wraps every FLOW_WRAP, so each drop runs a whole number of
@@ -231,55 +223,20 @@ void gather(inout Lit L, vec4 r, float sd, float w) {
 // little near 1 so that a full share still lights every strand fully, and the
 // mean share is the one asked for.
 const float SHARE_FADE = 0.3;
-float rainOn(float n, float share) {
-  float s = share * (1.0 + (1.0 / (1.0 - 0.5 * SHARE_FADE) - 1.0) * pow(min(share, 1.0), 8.0));
+float rainOn(float n) {
+  float s = uRainShare * (1.0 + (1.0 / (1.0 - 0.5 * SHARE_FADE) - 1.0) * pow(uRainShare, 8.0));
   return clamp((s - hash(n + 9.0)) / (SHARE_FADE * max(s, 1e-4)) + 0.5, 0.0, 1.0);
 }
 
-// (Temporary, ?depth=.) How the falling rain on one strand changes with where
-// the strand stands: its share of rain, its amount, trail and light; and how
-// far it is (0 near .. 1 far). All of it follows the strand's place smoothly,
-// so no strand's rain comes or goes at once.
-struct Deep { float share; float rain; float trail; float gain; float tip; float far; };
-Deep deepAt(vec2 xz, float hd) {
-  Deep D = Deep(1.0, uRain, 1.0, 1.0, 1.0, smoothstep(4.0, 24.0, hd));
-  if (uDepth.x > 0.001) {
-    // Curtains: a slow field over the room drifts with the wind. Where it is
-    // high the strands rain heavily; where it is low only a few do, and you
-    // see through to the far strands.
-    vec2 q = (xz + uCurtain.xy) * 0.17;
-    float n = noise3(vec3(q, uCurtain.z)) * 0.7 + noise3(vec3(q * 2.3 + 5.1, uCurtain.z * 1.3 + 2.7)) * 0.3;
-    float c = smoothstep(0.4, 0.62, n);
-    D.share *= mix(1.0, mix(0.04, 1.3, c), uDepth.x);
-    D.rain = mix(D.rain, min(1.0, D.rain + 0.4 * c), uDepth.x);
-    D.gain *= mix(1.0, mix(0.75, 1.2, c), uDepth.x);
-  }
-  if (uDepth.y > 0.001) {
-    // Aerial perspective: near drops bright with long trails, far ones dim and short.
-    // (The heads change less: a bright near head would only glow as a blot.)
-    D.gain *= mix(1.0, mix(1.6, 0.4, D.far), uDepth.y);
-    D.tip *= mix(1.0, mix(1.1, 0.45, D.far), uDepth.y);
-    D.trail *= mix(1.0, mix(1.45, 0.65, D.far), uDepth.y);
-  }
-  if (uDepth.z > 0.001) {
-    // Roles: every near strand rains, boldly; far away only a few, finely.
-    D.share *= mix(1.0, mix(1.0, 0.35, D.far), uDepth.z);
-    D.gain *= mix(1.0, mix(1.3, 0.85, D.far), uDepth.z);
-  }
-  return D;
-}
-
-void strandRain(inout Lit L, float seed, float u, float trailK, float w, Deep D) {
-  w *= rainOn(seed, uRainShare * D.share);
+void strandRain(inout Lit L, float seed, float u, float trailK, float w) {
+  w *= rainOn(seed);
   if (w == 0.0) return;                              // no rain on this strand
-  trailK *= D.trail;
-  vec4 k = vec4(D.gain, D.gain, D.tip, 1.0);         // (the trail's and the head's light, apart)
   float g3 = hash(seed + 6.0) * 0.6;
   float g4 = 0.3 + hash(seed + 7.0) * 0.6;
-  gather(L, drop(seed, u, trailK, uGate.xy) * k, seed, w);
-  gather(L, drop(seed + 17.0, u, trailK, uGate.xy) * k, seed + 17.0, w);
-  gather(L, drop(seed + 31.0, u, trailK, uGate.xy) * k, seed + 31.0, w * smoothstep(g3, g3 + 0.15, D.rain));
-  gather(L, drop(seed + 53.0, u, trailK, uGate.xy) * k, seed + 53.0, w * smoothstep(g4, g4 + 0.15, D.rain));
+  gather(L, drop(seed, u, trailK, uGate.xy), seed, w);
+  gather(L, drop(seed + 17.0, u, trailK, uGate.xy), seed + 17.0, w);
+  gather(L, drop(seed + 31.0, u, trailK, uGate.xy), seed + 31.0, w * smoothstep(g3, g3 + 0.15, uRain));
+  gather(L, drop(seed + 53.0, u, trailK, uGate.xy), seed + 53.0, w * smoothstep(g4, g4 + 0.15, uRain));
 }
 
 // Light flowing sideways, towards uFlowDir: LEDs in one thin tube along that
@@ -296,7 +253,7 @@ float sidewaysRain(inout Lit L, vec3 pos, float trailK, float w) {
   float len = abs(D.x) * uSpan + abs(D.y) * uHeight + abs(D.z) * uSpan;
   float along = dot(pos, D) / len + 0.5;
   float k = trailK * mix(1.0, 2.0, st);
-  w *= rainOn(lane, uRainShare);
+  w *= rainOn(lane);
   if (w == 0.0) return along;
   gather(L, drop(lane, along, k, uGate.zw), lane, w);
   gather(L, drop(lane + 97.0, along, k, uGate.zw), lane + 97.0, w * smoothstep(0.2, 0.8, uRain));
@@ -553,16 +510,15 @@ void main() {
   // other the flow's colour goes over from one to the other.
   float trailK = mix(1.0, 1.7, uRain) * uTrail;
   vec3 col = vec3(0.0);
-  Deep D = deepAt(seen.xz, length(seen.xz - uEye.xz));
-  if (uDirW.x > 0.001) strandRain(L, seed, u, trailK, uDirW.x, D);
+  if (uDirW.x > 0.001) strandRain(L, seed, u, trailK, uDirW.x);
   if (uTurn < 0.999) col += flowColor(u, spatial, h) * (1.0 - uTurn);
   if (uDirW.y > 0.001 || uTurn > 0.001) col += flowColor(sidewaysRain(L, pos, trailK, uDirW.y), spatial, h) * uTurn;
   float rain = L.rain;
   float tip = L.tip;
   // Rays come only from a drop's head, and few LEDs are near one: the rest
   // stop here (no colour of a head comes to 4 times its light, and the light
-  // only dims from here on; ?depth='s physical light at most quadruples it).
-  if (uRayLen > 0.0 && uRayLen * rayK(tip * uTipGain * uRainMix * 4.0 * (1.0 + 3.0 * uDepth2.x)) < RAY_MIN) {
+  // only dims from here on; the falling rain's light (phys) at most 3.6 times it).
+  if (uRayLen > 0.0 && uRayLen * rayK(tip * uTipGain * uRainMix * 4.0 * (1.0 + 2.6 * uFallLight)) < RAY_MIN) {
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
     gl_PointSize = 0.0;
     vColor = vec3(0.0);
@@ -600,22 +556,32 @@ void main() {
   vec3 glint = vec3(0.0);
   vec3 wireCol = thread + flare * ring;
   float near = 1.0 - smoothstep(3.0, 12.0, dist);
-  // (?depth=) Physical light for the rain (its look only: the forms keep
-  // theirs). An LED under 1.5 px (in a view 1080 px tall) dims as the square of its size (its light
-  // falls as 1 / distance squared, not 1 / distance), its wire likewise from
-  // 4 units on. Mist takes a share of the light per unit of the way (along the
-  // ray, not the depth), in place of the fog, and still ends at the visible
-  // distance. A glossy floor mirrors little straight down and much at a
-  // glancing look (Schlick's Fresnel). PHYS_GAIN keeps the near rain about as bright as before.
+  // The falling rain's light falls off with distance as in a real room,
+  // which is what makes near strands stand out from far ones (its look only:
+  // the forms keep theirs).
+  // - An LED under 1.5 px (in a view 1080 px tall) keeps its size and dims;
+  //   the falling rain dims FALL_DIM times as steeply, so its light falls as
+  //   about 1 / distance^1.65 instead of 1 / distance. Its wire dims likewise
+  //   from 4 units on.
+  // - A mist takes a share of the light per unit of the way (along the ray to
+  //   the eye, not the depth, so the edges of a wide view see no farther),
+  //   over MIST times the visible distance, in place of the fog's even band;
+  //   it still ends at the visible distance.
+  // - The floor mirrors less when looked at straight down than at a glancing
+  //   look (Schlick's Fresnel), down to FLOOR_MIN of its image.
+  // - FALL_GAIN keeps the falling rain as bright on the whole as the fog alone.
   float phys = 1.0, physWire = 1.0;
-  if (uDepth2.x > 0.001) {
-    const float PHYS_GAIN = 2.0, MIST = 14.0;
+  if (uFallLight > 0.001) {
+    const float FALL_GAIN = 1.8, FALL_DIM = 0.65, MIST = 0.68, FLOOR_MIN = 0.7;
     float fog0 = 1.0 - smoothstep(uFogFar * 0.3, uFogFar, dist);
-    float mist = exp(-length(mv.xyz) / MIST) * (1.0 - smoothstep(uFogFar * 0.85, uFogFar, dist)) * 1.2;
-    float f = PHYS_GAIN * min(2.0, mist / max(fog0, 1e-3));
-    if (uMirror.y > 0.0) f *= min(1.0, 2.5 * (0.04 + 0.96 * pow(1.0 - abs(normalize(seen - uEye).y), 5.0)));
-    phys = mix(1.0, f * min(1.0, uSize * uFocal / (dist * uRayView.x) / 1.5), uDepth2.x);  // (as in a view 1080 px tall)
-    physWire = mix(1.0, f * min(1.0, 4.0 / dist), uDepth2.x);
+    float mist = exp(-length(mv.xyz) / (MIST * uFogFar)) * (1.0 - smoothstep(uFogFar * 0.85, uFogFar, dist)) * 1.2;
+    float f = FALL_GAIN * min(2.0, mist / max(fog0, 1e-3));
+    if (uMirror.y > 0.0) {
+      float glance = pow(1.0 - abs(normalize(seen - uEye).y), 5.0);
+      f *= mix(FLOOR_MIN, 1.0, min(1.0, 2.5 * (0.04 + 0.96 * glance)));
+    }
+    phys = mix(1.0, f * pow(min(1.0, uSize * uFocal / (dist * uRayView.x) / 1.5), FALL_DIM), uFallLight);
+    physWire = mix(1.0, f * pow(min(1.0, 4.0 / dist), FALL_DIM), uFallLight);
   }
   float rk = uRainMix;
   if (rk > 0.001) {
@@ -638,12 +604,6 @@ void main() {
       rainCol = mix(rainCol, room, uStorm * 0.75);
       tipCol = mix(tipCol, mix(room, vec3(1.0), 0.3), uStorm * 0.75);
       restCol = mix(restCol, room, uStorm * 0.75);
-    }
-    if (uDepth.y > 0.001) {
-      // (?depth=) Far drops go cool and pale, as through air.
-      float k = D.far * 0.6 * uDepth.y;
-      rainCol = mix(rainCol, vec3(dot(rainCol, vec3(0.3, 0.5, 0.2))) * vec3(0.72, 0.85, 1.1), k);
-      tipCol = mix(tipCol, vec3(dot(tipCol, vec3(0.3, 0.5, 0.2))) * vec3(0.72, 0.85, 1.1), k);
     }
     rainCol = mix(rainCol, flare * 1.3, inForm * 0.8);
     tipCol = mix(tipCol, mix(flare, vec3(1.0), 0.4) * 1.3, inForm * 0.8);
@@ -709,17 +669,10 @@ void main() {
   // Every LED has the same physical size; only its brightness changes.
   // Below 1.5 px, keep the size and dim it instead, so far LEDs do not shimmer.
   float px = uSize * uFocal / dist;
-  float maxPx = uMaxPx;
   // The head's light as seen in a view 1080 px tall (in a smaller view an LED
   // dims sooner with distance): what a light ray's length goes by.
   float seenLight = max(glint.r, max(glint.g, glint.b)) * min(1.0, px / (uRayView.x * 1.5));
-  if (uDepth.z > 0.001) {
-    // (?depth=) A near head is drawn larger, with its light.
-    float bold = uDepth.z * (1.0 - D.far) * smoothstep(0.15, 0.8, tip * uTipGain * uRainMix);
-    px *= 1.0 + 0.5 * bold;
-    maxPx *= 1.0 + 0.4 * bold;
-  }
-  float shown = clamp(px, 1.5, max(1.5, maxPx));
+  float shown = clamp(px, 1.5, max(1.5, uMaxPx));
   c *= min(1.0, px / shown);
   glint *= min(1.0, px / shown);
   gl_Position = clip;
@@ -727,25 +680,18 @@ void main() {
   vColor = c;
   // A pixel wider each side, so the LED's light is spread by area (see POINT_FS).
   gl_PointSize = shown + 2.0;
-  // Light rays: only LEDs whose head light passes the threshold, drawn as a
-  // larger sprite of thin rays around the LED, in the LED's own colour.
+  // Light rays: only LEDs near a drop's head, drawn as a larger sprite of
+  // thin rays around the LED, in the head's colour, as long as its light makes them.
   if (uRayLen > 0.0) {
-    // (?depth=) Near heads cast a sideways glint across their neighbours, and longer rays.
-    float g = uDepth.w * (1.0 - smoothstep(3.0, 9.0, dist));
-    vGlint = vec2(g * 0.6, 1.0 + g);
-    // The ray's length goes by the head's light (rayK). (?depth=r: by
-    // distance instead, as long as the setting at RAY_REF from the eye, and
-    // growing in with the light all the same.)
-    const float RAY_REF = 10.0;
+    // The ray's length goes by the head's light (rayK), at most what the GPU draws.
     float k = rayK(seenLight);
-    k = mix(k, min(RAY_CAP, RAY_REF / dist) * min(1.0, k * 4.0), uRayDepth);
-    float len = min(uRayLen * k, uRayView.y / vGlint.y);
+    float len = min(uRayLen * k, uRayView.y);
     if (len < RAY_MIN) {
       gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
       gl_PointSize = 0.0;
       return;
     }
-    gl_PointSize = 2.0 * len * vGlint.y + 1.0;
+    gl_PointSize = 2.0 * len + 1.0;
     vSize = gl_PointSize;
     // A short ray is faint, so one that grows from nothing never pops in; a
     // long one is a little dimmer along its length, so a near head does not flare.
@@ -794,7 +740,6 @@ in float vSize;
 uniform float uGain;
 uniform float uRays;
 const float RAY_GAIN = 0.3;  // the rays' light, over the head's
-in vec2 vGlint;
 out vec4 outColor;
 void main() {
   vec2 p = (gl_PointCoord - 0.5) * vSize;       // pixels from the LED
@@ -808,11 +753,6 @@ void main() {
     float across = abs(dot(p, vec2(dir.y, -dir.x)));
     float fade = 1.0 - smoothstep(0.0, 1.0, along);
     light += exp(-across * across * 1.5) * fade * fade;
-  }
-  if (vGlint.x > 0.001) {                        // (?depth=) a sideways glint, the whole width
-    float along = abs(p.x) / half_;
-    float fade = 1.0 - smoothstep(0.0, 1.0, along);
-    light += exp(-p.y * p.y * 1.5) * fade * fade * fade * vGlint.x * 1.3;
   }
   outColor = vec4(vColor * light * RAY_GAIN * uGain, 1.0);
 }`;
