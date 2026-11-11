@@ -48,12 +48,12 @@ export function createTuner({ schema, settings, defaults, storageKey, onChange }
       let input, out = null;
       if (item.options) {
         input = document.createElement('select');
-        for (const opt of item.options) {
+        item.options.forEach((opt, i) => {
           const o = document.createElement('option');
           o.value = opt;
-          o.textContent = opt;
+          o.textContent = item.labels?.[i] ?? opt; // a plain name, when the value is not one
           input.append(o);
-        }
+        });
         input.addEventListener('change', () => set(item.key, input.value));
       } else {
         input = document.createElement('input');

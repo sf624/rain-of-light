@@ -171,6 +171,11 @@ resolution (down to half), and raised again when the device keeps up. Set
 `Quality` to `full` in the panel (or `?quality=full`) to always draw at the
 screen's full sharpness; `?dpr=` still sets the upper limit.
 
+The LEDs sit evenly along each strand, like an LED curtain. `LED spacing` in
+the panel (or `?jitter=`) scatters them: `0.25` and `0.5` move each LED by up
+to that share of the gap, `pitch` gives each strand its own gap, and `cluster`
+gathers them in bunches and gaps. It is off (even) by default.
+
 ## Install and offline
 
 On a phone or in Chrome / Edge you can install it ("Add to Home Screen" /
