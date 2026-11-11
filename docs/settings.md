@@ -245,10 +245,11 @@ five above:
   pair parts, and its two lights go separate ways: a small difference has
   grown large. The path is drawn along its course as it comes, and fades
   from its start as it goes.
-- **knot**: a Lissajous curve, a closed line that swings three ways at
-  once. Its broad side faces the room. Its phases drift, so the figure
-  keeps changing; two lights run round it. It is drawn once round as it
-  comes, and undone as it goes.
+- **knot**: a Lissajous curve, a closed rod of light that swings three
+  ways at once: twice across while it goes once up and down, and three
+  times in depth. Its broad side faces the room, a figure of eight; its
+  phase sways, so the loops open and close a little, and two lights run
+  round it. It is drawn once round as it comes, and undone as it goes.
 - **fractal**: a Sierpinski pyramid. A whole pyramid rises out of the
   floor, point to point with its image; then it is divided into four
   pyramids, and each of those into four, more and less finely as it

@@ -161,19 +161,18 @@ function attractor(age, leave, ph, face) {
 }
 
 // A knot: a Lissajous curve, drawn once round as it comes, its broad side
-// to the room, swaying. Its phases drift, so the figure keeps changing and
-// is never knotted the same way for long. It goes as the curve is undone
-// from where it began.
-// turn: its phase; f[0] .. f[1]: the part of the curve that shows; f[2]:
-// which of its sets of frequencies (KNOT in shaders.js), one for its whole life.
-const KNOTS = 2;
+// to the room, swaying. Its phase sways about the place where its loops
+// stand widest open, never as far as where they close into one line. It
+// goes as the curve is undone from where it began.
+// turn: its phase; f[0] .. f[1]: the part of the curve that shows.
+const KNOT_SWAY = 0.55;                             // how far the phase sways from 0, where the loops stand widest (they close at pi / 2)
 function knot(age, leave, ph, face) {
-  const size = 4.0, drift = 1.5;
+  const size = 4.6, drift = 1.3;
   return {
     centre: [drift * Math.sin(0.022 * age + ph), -3.2 + 0.3 * Math.sin(0.03 * age + ph), drift * Math.cos(0.018 * age + ph)],
-    size, turn: 0.045 * age + ph,
-    yaw: face + 0.6 * Math.sin(0.027 * age + 2 * ph),
-    f: [-0.1 + 1.2 * smooth(leave * 1.1), -0.05 + 1.15 * smooth(age / 18), Math.floor(ph / TAU * 7 * KNOTS) % KNOTS],
+    size, turn: KNOT_SWAY * Math.sin(0.04 * age + ph),
+    yaw: face + 0.35 * Math.sin(0.027 * age + 2 * ph),
+    f: [-0.1 + 1.2 * smooth(leave * 1.1), -0.05 + 1.15 * smooth(age / 18), 0],
     bound: size * 1.4 + 0.8,
   };
 }

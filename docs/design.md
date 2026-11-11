@@ -427,12 +427,16 @@ the form's first colour to its second:
   equations' units) and stay together for about the first third of their
   length, so each pair of lights sets out as one and then parts.
 - `knotLight`: a Lissajous curve, `x = sin(u t + p)`, `y = sin(v t)`,
-  `z = sin(w t + q)` with whole numbers `u, v, w` (`KNOT`) and drifting
-  phases. The LEDs are dense along a strand, so the shader starts from the
-  LED's height: the curve passes that height at `2 v` values of `t` (4 or
-  6). From each it takes one step along the curve's tangent towards the
-  LED, and keeps the nearest place found. The cost does not grow with the
-  curve's length. Two lights run round the curve (`runner`).
+  `z = sin(w t + q)` with `u, v, w` = 2, 1, 3 (`KNOT`): it swings twice
+  across while it goes once up and down, so it runs aslant or level and
+  hardly ever along a strand. The phase sways about 0, where the loops
+  stand widest, and stays well short of a quarter turn, where they close
+  into one line (`forms.js: KNOT_SWAY`). The LEDs are dense along a
+  strand, so the shader starts from the LED's height: the curve passes
+  that height at `2 v` values of `t` (2). From each it takes one step
+  along the curve's tangent towards the LED, and keeps the nearest place
+  found. The cost does not grow with the curve's length. The line is a
+  rod of even light (`rod`); two lights run round it (`runner`).
 - `fractalLight`: a Sierpinski tetrahedron, by folding. At each division
   the point is mirrored across three planes onto the pyramid of one corner,
   and that pyramid is scaled to the size of the whole; one distance to a
@@ -451,7 +455,7 @@ is not. The attractor, the knot and the fractal also stop early outside
 their own box or pyramid.
 
 The thin forms (ring, veil, solid, knot) are about one strand gap thick
-(`shaders.js: fineness`; `rod` for the solid, `lineGlow` for the knot), so a
+(`shaders.js: fineness`; `rod` for the solid and the knot), so a
 coarse lattice still catches them.
 
 **Coming and going.** A form does not fade evenly. Each LED has an order

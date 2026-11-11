@@ -425,12 +425,10 @@ vec3 veilLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
   return vec3(light, hem * 0.35, clamp(y / tall * 1.7, 0.0, 1.0));
 }
 
-// The forms drawn as lines (a solid's edges, a knot): a bright thread in a
-// soft sheath, like the ring's, from the squared distance to the line (in
+// The forms drawn as lines (a solid's edges, a knot): a rod of even light
+// with a clean edge and nothing around it, wide enough that two strands
+// catch it wherever it runs. d2: the squared distance to the line (in
 // strand gaps, see fineness).
-float lineGlow(float d2) { return exp(-d2 * 12.0) + 0.22 * exp(-d2 * 3.0); }
-// A bolder line: a rod of even light with a clean edge and nothing around
-// it, wide enough that two strands catch it wherever it runs.
 float rod(float d2) { return 1.0 - smoothstep(0.13, 0.25, d2); }
 // Light running along a line: how bright a place is that lies a way (back) behind
 // the running head (0 .. 1 of the way to the head after it): a head, a trail
@@ -517,27 +515,27 @@ vec3 attractorLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
 }
 
 // A knot: a Lissajous curve in three dimensions, x = sin(u t + a.w),
-// y = sin(v t), z = sin(w t + phase), a closed line that is knotted anew as
-// its phases drift. Two lights run round it. f.z: which frequencies
-// (KNOT); f.x .. f.y: the part of the curve that shows (0 .. 1 of the way round).
+// y = sin(v t), z = sin(w t + phase), a closed line whose loops open and
+// close a little as its phase sways. It swings twice across while it goes
+// once up and down (a figure of eight, woven in depth), so it runs mostly
+// aslant or level, hardly ever along a strand, and its loops are few and wide.
+// Two lights run round it. f.x .. f.y: the part of the curve that shows (0 .. 1 of the way round).
 // The curve passes the LED's height at 2 v places: the nearest place on it
 // is sought from each (one step along the curve), so the cost does not grow
 // with the curve's length.
-const vec3 KNOT[2] = vec3[2](vec3(3.0, 2.0, 1.0), vec3(2.0, 3.0, 1.0));
+const vec3 KNOT = vec3(2.0, 1.0, 3.0);               // u, v, w: how often it swings across, up and down, and in depth
 const vec3 KNOT_BOX = vec3(1.0, 0.9, 0.4);          // its half width, height and depth, in units of its size: its broad side shows the figure
 vec3 knotLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
   const float TAU = 6.2831853;
-  vec3 w = KNOT[int(f.z + 0.5)];
+  vec3 w = KNOT;
   vec3 amp = a.z * KNOT_BOX;
   vec3 ph = vec3(a.w, 0.0, a.w * 0.618 + 1.0);
   vec3 q = turned(p - b.xyz, yaw, 0.0);
   if (any(greaterThan(abs(q), amp + 1.2))) return vec3(0.0);   // the curve comes nowhere near
   float ys = asin(clamp(q.y / amp.y, -1.0, 1.0));
   float best = 1e9, at = 0.0, level = 0.0;
-  for (int i = 0; i < 6; i++) {
-    float k = float(i / 2);
-    if (k >= w.y) break;
-    float t = ((i % 2 == 0 ? ys : 3.14159265 - ys) + TAU * k) / w.y;
+  for (int i = 0; i < 2; i++) {                      // (2 v places, and v is 1)
+    float t = (i == 0 ? ys : 3.14159265 - ys) / w.y;
     vec3 ang = w * t + ph;
     vec3 c = amp * sin(ang), T = amp * w * cos(ang);
     t += clamp(dot(q - c, T) / max(dot(T, T), 1e-4), -0.3, 0.3);
@@ -548,8 +546,8 @@ vec3 knotLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
   float s = fract(at / TAU);
   float shown = smoothstep(f.x, f.x + 0.04, s) * (1.0 - smoothstep(f.y - 0.04, f.y, s));
   float run = runner(fract((uTime * 0.021 - s) * 2.0), 0.3);
-  float g = lineGlow(best * fineness()) * shown * (0.4 + 1.9 * level * level);
-  return vec3(g * (9.0 + 8.0 * run), g * run * run * 0.2, clamp(run * 1.3, 0.0, 1.0));
+  float g = rod(best * fineness()) * shown * (0.75 + 0.6 * level * level);
+  return vec3(g * (7.0 + 9.0 * run), g * run * run * 0.3, clamp(run * 1.3, 0.0, 1.0));
 }
 
 // A fractal: a Sierpinski tetrahedron standing on its base, a pyramid made
