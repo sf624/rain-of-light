@@ -271,6 +271,7 @@ vec3 spiralLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
 // points glinting; below the surface it soon goes dark. f.x: how bright it
 // is; f.y: how much it has the room to itself (0 .. 1): alone it is the
 // subject, a brighter sea in a longer, higher swell, its crests paler.
+// f.z: the least of that glow it keeps among rain or under a form.
 vec3 layerLight(vec3 p, vec4 a, vec4 b, vec4 f) {
   float s = b.y + (0.35 * sin(p.x * 0.42 + uTime * 0.45) + 0.25 * sin(p.z * 0.57 - uTime * 0.33)
           + 0.12 * sin((p.x - p.z) * 1.1 + uTime * 0.8)) * (1.0 + 0.5 * f.y)
@@ -281,7 +282,7 @@ vec3 layerLight(vec3 p, vec4 a, vec4 b, vec4 f) {
   float below = dy < 0.0 ? exp(dy / 0.7) : 0.0;
   float n = noise3(vec3(p.x * 0.8, uTime * 0.25, p.z * 0.8));
   float glint = 0.3 + 2.2 * n * n;
-  return vec3((top * 1.5 * glint + below * 0.22) * f.x * (1.0 + 1.2 * f.y), top * top * (0.15 + 0.1 * f.y),
+  return vec3((top * 1.5 * glint + below * 0.22) * f.x * (1.0 + 1.2 * max(f.y, f.z)), top * top * (0.15 + 0.1 * f.y),
     clamp(max(-dy, f.y * 0.7 * top * n * 1.6), 0.0, 1.0));
 }
 

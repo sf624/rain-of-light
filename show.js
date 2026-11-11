@@ -28,6 +28,8 @@ const between = (a, b, r) => a + (b - a) * r;
 const RAIN_IN = { at: -5, fade: 14 }, RAIN_OUT = { at: 4, fade: 16 };
 const SKY_IN = { at: -2, fade: 12 }, SKY_OUT = { at: -5, fade: 10 };
 const SKY_INTO_RAIN = { at: 2, fade: 15 };   // a form going as rain comes
+// Among rain or under a form the layer keeps this share of the glow it has alone.
+const LAYER_UNDER = 0.6;
 const LAYER_IN = { at: -6, fade: 12 }, LAYER_OUT = { at: 2, fade: 12 };
 const EASE = 2.5;                             // s: a change of scene or form setting blends in this long
 
@@ -182,7 +184,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
     let m;
     if (form === LAYER) {                     // the layer: its surface height, its thickness
       m = { centre: [0, feet + between(0.5, 1.8, hash(r * 61 + 1)), 0], size: between(0.2, 0.45, hash(r * 61 + 2)),
-        turn: 0, tilt: 0, yaw: 0, f: [between(0.55, 1, hash(r * 61 + 3)), s.alone, 0], dissolve: 0, bound: 1e4 };
+        turn: 0, tilt: 0, yaw: 0, f: [between(0.55, 1, hash(r * 61 + 3)), s.alone, LAYER_UNDER], dissolve: 0, bound: 1e4 };
     } else {
       const leave = out ? smooth(gone / e.outFade) : 0;
       m = motion(form.name, age, leave, r, s.face ?? 0, view?.rise);
@@ -248,11 +250,11 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
     const skyNow = Math.min(1, sky.reduce((n, s) => n + s.w, 0));
     slots.forEach((s, n) => {
       if (!s || s.w <= 0.001) return;
-      // While rain falls, or under a form, the layer thins out, LED by LED:
+      // While rain falls, or under a form, the layer thins out a little, LED by LED:
       // the rain shows through it, and the form stays the subject. It lies
       // too low to come from the top down: always LED by LED.
       // With the room to itself (no rain, no form) it is the subject (alone).
-      if (n === 2) place(n, { ...s, w: s.w * (1 - 0.45 * rainNow) * (1 - 0.5 * skyNow), alone: (1 - rainNow) * (1 - skyNow) }, 0, view, dt);
+      if (n === 2) place(n, { ...s, w: s.w * (1 - 0.2 * rainNow) * (1 - 0.2 * skyNow), alone: (1 - rainNow) * (1 - skyNow) }, 0, view, dt);
       else {
         place(n, s, rainNow, view, dt);
         forms.push({ name: s.x.e.form.name, w: s.w, out: s.x.out, at: [B[n * 4], B[n * 4 + 1], B[n * 4 + 2]] });
