@@ -26,18 +26,19 @@ export const FLOWS = [
   { name: 'across', toward: 1, hold: [14, 24], weight: 1 },
 ];
 // Colour modes. Their order is the order of the weights uW in the shader.
+// many: rain of many colours at once, whatever the mood (see director.js, the colour story).
 export const COLOR_MODES = [
   { name: 'mono',     hold: [14, 26], weight: 3 },   // one palette
   { name: 'gradient', hold: [14, 24], weight: 2 },   // two palettes, flowing
-  { name: 'rainbow',  hold: [10, 18], weight: 1.5 }, // a random hue per drop
+  { name: 'rainbow',  hold: [10, 18], weight: 1.5, many: true }, // a random hue per drop
   { name: 'palette',  hold: [14, 24], weight: 2 },   // each drop picks from a set of colours
   { name: 'accent',   hold: [12, 20], weight: 1 },   // pale rain, now and then a coloured drop
   { name: 'comet',    hold: [12, 20], weight: 1.5 }, // white heads, coloured trails
-  { name: 'speed',    hold: [12, 20], weight: 1 },   // slow drops warm, fast ones blue-white
+  { name: 'speed',    hold: [12, 20], weight: 1, many: true },   // slow drops warm, fast ones blue-white
   { name: 'cloud',    hold: [16, 28], weight: 2 },   // drifting clouds of colour
-  { name: 'depth',    hold: [12, 20], weight: 1 },   // one colour near, another far
-  { name: 'repaint',  hold: [20, 32], weight: 1.2 }, // each wave paints the field anew
-  { name: 'sky',      hold: [45, 75], weight: 1 },   // dawn, day, dusk and night go by
+  { name: 'depth',    hold: [12, 20], weight: 1, many: true },   // one colour near, another far
+  { name: 'repaint',  hold: [20, 32], weight: 1.2, many: true }, // each wave paints the field anew
+  { name: 'sky',      hold: [45, 75], weight: 1, many: true },   // dawn, day, dusk and night go by
 ];
 COLOR_MODES.forEach((m, i) => { m.mode = COLOR_MODES.map((_, k) => (k === i ? 1 : 0)); });
 export const MODE = Object.fromEntries(COLOR_MODES.map((m, i) => [m.name, i]));
@@ -116,7 +117,7 @@ export const DEFAULTS = {
   rainGain: 4.0, tipGain: 5.0, exposure: 1.8, bloom: 0.8, fog: 34, blackFloor: 3,
   rays: '2', rayGain: 0.3, rayLength: 20, rayThreshold: 0.7,
   speed: 1.0, trail: 1.0, weather: 'auto', turnTime: 8, turnSteps: 1,
-  color: 'auto', palette: 'auto', rainbow: 'drop', bandSpeed: 0.17, bandScale: 1.0, saturation: 1.0,
+  color: 'auto', story: 'on', palette: 'auto', rainbow: 'drop', bandSpeed: 0.17, bandScale: 1.0, saturation: 1.0,
   set: 'auto', skyDay: 90,
   flow: 'auto',
   camera: 'orbit', orbit: 0.025, radius: 10, fov: 76,
@@ -199,6 +200,8 @@ export const SCHEMA = [
         + 'palette: each drop picks from a set / accent: pale rain, now and then a coloured drop / '
         + 'comet: white heads, coloured trails / speed: colour by speed / cloud: drifting clouds of colour / '
         + 'depth: near and far / repaint: waves repaint the field / sky: a day goes by' },
+    { key: 'story', label: 'Colour story', options: ['on', 'off'],
+      hint: 'on: the colours of the rain and the forms drift slowly together, from cool to warm and back / off: each is chosen on its own' },
     { key: 'rainbow', label: 'Rainbow style', options: ['drop', 'led', 'bands'],
       hint: 'drop: a random hue per drop / led: a random hue per LED / bands: flowing bands' },
     { key: 'palette', label: 'Palette', options: ['auto', ...PALETTES.map((p) => p.name)] },

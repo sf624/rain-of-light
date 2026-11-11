@@ -6,7 +6,7 @@
 // timeline is made from hashes of one seed: a time (?t=) gives its picture.
 
 import { PALETTES, PALE, FORMS, LAYER, PASSAGES } from './config.js';
-import { hash } from './director.js';
+import { hash, weighted, createMood, leaning, leanTo } from './director.js';
 import { motion } from './forms.js';
 
 const ROOM_TINT = [0.35, 0.5, 1.0];          // the room's colour while no form shows
@@ -18,6 +18,14 @@ const UNDER = {
   ice: ['deep sea', 'sakura'], aurora: ['deep sea', 'sakura'], 'deep sea': ['aurora', 'sakura'],
 };
 const STORM_GAIN = 0.8;                       // a form among rain glows this much more, to hold its own
+const paletteNamed = (n) => PALETTES.find((q) => q.name === n);
+// One of some palettes (by name), from x in 0 .. 1: any one without a mood
+// (m undefined), else the likelier the nearer it is to it (see director.js,
+// the colour story). Its place in the list.
+function palAt(names, x, m) {
+  if (m === undefined) return Math.floor(x * names.length) % names.length;
+  return names.indexOf(weighted(names, x, (n) => leanTo(m, paletteNamed(n))));
+}
 const smooth = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 const between = (a, b, r) => a + (b - a) * r;
 
@@ -40,7 +48,7 @@ const POOLS = {
   crystal: PASSAGES.filter((p) => !p.rain).map((p) => (p.sky ? p : { ...p, weight: p.weight * 0.5 })),
 };
 
-function createTimeline(seed, pool, name) {
+function createTimeline(seed, pool, name, mood) {
   const list = [];   // passages: { start, kind, sky, layer } (sky, layer: episodes or null)
   let next = 0, n = 0;
   const recent = [];  // the forms shown, the latest first
@@ -55,7 +63,9 @@ function createTimeline(seed, pool, name) {
     const names = form.palettes;
     // What the show opens with is there almost at once.
     const inAt = start > 0 ? start + how.at : -how.fade * 0.8;
-    return { id: `${name}-${++n}`, form, r, pal: Math.floor(hash(r * 53 + 2) * names.length) % names.length,
+    // Its palette: as the seed alone has it (pal), and with the colour story (told).
+    const x = hash(r * 53 + 2);
+    return { id: `${name}-${++n}`, form, r, start, pal: palAt(names, x), told: palAt(names, x, leaning(true, hash(r * 53 + 4), mood, start)),
       inAt, inFade: how.fade, outAt: Infinity, outFade: 1 };
   };
   const close = (e, T, how) => { if (e) { e.outAt = T + how.at; e.outFade = how.fade; } };
@@ -115,16 +125,19 @@ function createTimeline(seed, pool, name) {
     }
     return { rain: Math.min(1, Math.max(0, rain)), items: [...items.values()] };
   }
-  return { at };
+  // The passage at time t.
+  const passage = (t) => { extend(t); return list.findLast((p) => p.start <= t); };
+  return { at, passage };
 }
 
 export function createShow(S, { feet, seed = Math.random() * 1000 }) {
+  const mood = createMood(seed);              // the colour story's mood at a time (see director.js)
   const timelines = {};
-  const timeline = (name) => (timelines[name] ||= createTimeline(seed, POOLS[name], name));
+  const timeline = (name) => (timelines[name] ||= createTimeline(seed, POOLS[name], name, mood));
   const held = new Map();                     // form name -> a held episode
   const holdOf = (form) => {
     if (!held.has(form.name)) {
-      held.set(form.name, { id: `held-${form.name}`, form, r: hash(seed), pal: 0,
+      held.set(form.name, { id: `held-${form.name}`, form, r: hash(seed), start: 0, pal: 0, told: 0,
         inAt: 0, inFade: 1, outAt: Infinity, outFade: 1 });
     }
     return held.get(form.name);
@@ -152,12 +165,23 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
   // form setting blends in rather than cutting. Per episode: its weight now.
   const shown = new Map();                    // id -> { x, w, col: [c, d, the room's colour with it] }
   let rainNow = null, shift = 0;
-  const paletteOf = (e) => e.form.palettes[(e.pal + shift) % e.form.palettes.length];
+  const story = () => S.story === 'on';
+  // An episode's palette, by name: one of its form's (the colour key moves on from it).
+  const nameOf = (e, names, pal) => names[(pal + shift) % names.length];
+  const paletteOf = (e) => nameOf(e, e.form.palettes, story() ? e.told : e.pal);
+  // The palette an episode shows in (above: the form's episode over a layer, if any).
+  // The layer answers the form above it with a colour that sets it off:
+  // with the story, of those the one nearer the mood as the form came.
+  const shownIn = (e, above) => {
+    const under = e.form === LAYER && above && UNDER[paletteOf(above)];
+    if (!under) return paletteOf(e);
+    if (!story()) return nameOf(e, under, e.pal);
+    const m = leaning(true, hash(e.r * 31 + above.r * 29), mood, above.start);
+    return nameOf(e, under, palAt(under, hash(e.r * 29 + above.r * 31), m));
+  };
   const colorsOf = (e, above) => {
-    // The layer answers the form above it with a colour that sets it off.
-    const names = e.form === LAYER && above ? UNDER[above] : e.form.palettes;
-    const name = names[(e.pal + shift) % names.length];
-    const of = (n) => PALETTES.find((q) => q.name === n);
+    const name = shownIn(e, above);
+    const of = paletteNamed;
     const p = of(name);
     // The room's colour with this form: its own, or under a pale form the
     // colour of its ground (white light in a white room has no colour at all).
@@ -217,7 +241,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
     const kc = first ? 1 : 1 - Math.exp(-dt / 2.0);
     const ids = new Set();
     const top = want.items.filter((x) => x.e.form !== LAYER).sort((a, b) => b.w - a.w)[0];
-    const above = top && paletteOf(top.e);
+    const above = top?.e;
     for (const x of want.items) {
       ids.add(x.e.id);
       const s = shown.get(x.e.id);
@@ -275,5 +299,12 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
   // The colour key: every form, shown now or later, takes its next palette.
   function recolor() { shift++; }
 
-  return { update, recolor };
+  // For the tools: what the timeline has at t (the passage's kind, and each form's palette).
+  function cast(t) {
+    const tl = timeline('mix'), es = tl.at(t).items.filter((x) => x.w > 0.5).map((x) => x.e);
+    const top = es.find((e) => e.form !== LAYER);
+    return { kind: tl.passage(t).kind.name, items: es.map((e) => ({ form: e.form.name, palette: shownIn(e, top) })) };
+  }
+
+  return { update, recolor, cast };
 }

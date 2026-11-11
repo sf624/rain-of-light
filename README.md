@@ -101,7 +101,17 @@ move:
 
 The layer near the floor takes a colour that answers the form above it (blue
 under amber, violet under green, and so on); a pale form (ice, candle) sets
-the room and its rain in a deeper colour. The forms keep a little beyond the
+the room and its rain in a deeper colour.
+
+The colours tell one slow story: a mood, a hue that wanders from green through
+blue, violet and pink to amber and back, never at one pace, taking some 10 to
+20 minutes from blue to amber. The rain's colours, each form's and the layer's
+lean towards it, so one passage's colours belong with the next's. About one
+choice in five is free of it, and rain of many colours (rainbow, speed, depth,
+repaint, sky) still comes, less often: surprises stay. `?story=off` (Colour
+story in the panel) gives each its own colour, as the seed alone has it.
+
+The forms keep a little beyond the
 middle of the room as you look at them, low enough that the top of the view
 never cuts them. A
 form that comes or goes while rain falls does so from the top down, as if
@@ -181,7 +191,7 @@ work, because the scripts are ES modules.
 | --- | --- |
 | `index.html`, `style.css` | the page |
 | `main.js` | the frame loop: puts the directors' choices to work, the camera, the drawing |
-| `director.js` | the rain's director: which weather, colour mode, direction, density and camera move come when, from the seed |
+| `director.js` | the rain's director: which weather, colour mode, direction, density and camera move come when, from the seed; and the colour story's mood |
 | `config.js` | palettes, colour modes, weathers, camera moves, forms, passages, the room, default settings and the panel's layout |
 | `show.js` | the show's director: the timeline of passages, how much rain falls, which forms of light show, and how bright |
 | `forms.js` | how each form of light moves through its life: where it is, how large and how turned |
@@ -196,7 +206,7 @@ work, because the scripts are ES modules.
 | `manifest.webmanifest`, `icons/` | the install information and the app icons |
 | `sw.js` | the service worker: network first, cached files when offline (add new files to its list) |
 | `docs/` | the GIFs shown above |
-| `tools/` | makes those GIFs (see below) |
+| `tools/` | makes those GIFs (see below); `story-stats.mjs` measures the colour story over many seeds, in node |
 | `test/smoke.mjs` | the smoke test (see Test) |
 | `test/render-audio.mjs` | renders the page's sound to a WAV file, for listening and measuring (see Test) |
 
@@ -218,7 +228,7 @@ Needs Node 22 and Chrome (`google-chrome` or `chromium` on PATH, or set
 software GL, and fails on any error, a shown fallback message, a stalled frame
 loop or a black canvas. It also clicks, presses the keys and tries every colour
 mode, the pinned scenes (`rain`, `crystal`), the newer forms (`ring`, `veil`)
-and a time part-way through the show, changes the scene in the panel (it must not reload) and checks that
+and a time part-way through the show (with and without the colour story), changes the scene in the panel (it must not reload) and checks that
 Reset brings back the mix. It also renders a few seconds of sound offline and
 checks that a held orb sounds, a still room is much quieter, and nothing
 clips. GitHub Actions runs it on every pull request and push to main.
