@@ -13,12 +13,25 @@ import { renderSound, levels, RATE } from './render-audio.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TIMEOUT_MS = 780_000;
+const WAIT_MS = 90_000; // bound of one poll: CI runners are several times slower than a desktop
 const MIN_FRAMES = 4; // software GL is slow: a few frames per second, so the page is small (480x300)
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
   '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.json': 'application/json' };
 
 let server, chrome, userDir;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Poll `probe` (an async function; a throw counts as "not yet") until it returns a truthy value.
+// `tick` runs on every round (used to fail early on page errors). On timeout, fail naming the step.
+async function poll(what, probe, { tick, timeout = WAIT_MS, every = 200 } = {}) {
+  const end = Date.now() + timeout;
+  let last = '';
+  for (;;) {
+    tick?.();
+    try { const v = await probe(); if (v) return v; last = ''; } catch (e) { last = ` (last error: ${e.message})`; }
+    if (Date.now() > end) return fail(`timed out after ${timeout / 1000} s waiting for ${what}${last}`);
+    await sleep(every);
+  }
+}
 
 function cleanup() {
   if (chrome?.pid) { try { process.kill(-chrome.pid, 'SIGKILL'); } catch {} }
@@ -180,31 +193,35 @@ async function visit(cdp, base, query, interact) {
   const check = (when) => {
     if (errors.length) fail(`[${label}] ${when}:\n  ${[...new Set(errors)].join('\n  ')}`);
   };
-  await sleep(1500);
+  // Ready = the document has loaded and the page's own #fallback element exists (the page script ran).
+  const pageUrl = `${base}${query}`;
+  await poll(`the page to load (#fallback present) [${label}] ${pageUrl}`,
+    () => evalJs(`document.readyState === 'complete' && !!document.getElementById('fallback')`), { tick: () => check('while loading') });
   check('while loading');
   const state = await evalJs(`({ fb: !document.getElementById('fallback').hidden, text: document.getElementById('fallback').textContent, f: window.__frames })`);
   if (state.fb) fail(`[${label}] #fallback is visible: ${state.text}`);
   if (query === '#tune') { // the panel's footer: the repository link, and the commit from version.json
-    let foot = null;
-    for (let i = 0; i < 40 && !foot?.sha; i++) {
-      foot = await evalJs(`(() => { const a = [...document.querySelectorAll('.tuner-foot a')];
+    const foot = await poll(`the panel footer with the commit link [${label}] ${pageUrl}`, async () => {
+      const f = await evalJs(`(() => { const a = [...document.querySelectorAll('.tuner-foot a')];
         return { gh: a[0]?.href, rel: a[0]?.rel, sha: a[1]?.textContent, href: a[1]?.href }; })()`);
-      if (!foot.sha) await sleep(500);
-    }
+      return f.sha ? f : null;
+    }, { tick: () => check('waiting for the panel footer') });
     if (foot.gh !== 'https://github.com/sf624/rain-of-light' || !foot.rel.includes('noopener')) fail(`[${label}] no GitHub link in the panel: ${JSON.stringify(foot)}`);
     if (foot.sha !== FAKE_SHA.slice(0, 7) || foot.href !== `https://github.com/sf624/rain-of-light/commit/${FAKE_SHA}`) fail(`[${label}] commit link wrong: ${JSON.stringify(foot)}`);
     // a vertical drag that starts on a slider must scroll the panel, not move the slider
     const ta = await evalJs(`getComputedStyle(document.querySelector('.tuner input[type=range]')).touchAction`);
     if (ta !== 'pan-y') fail(`[${label}] the panel's sliders have touch-action ${ta}, not pan-y`);
   }
-  let f2 = state.f; // wait up to 15 s for MIN_FRAMES frames, and for more frames after the check above
-  for (let i = 0; i < 30 && (f2 < MIN_FRAMES || f2 - state.f < 3); i++) { await sleep(500); f2 = await evalJs('window.__frames'); }
-  if (f2 < MIN_FRAMES || f2 - state.f < 3) fail(`[${label}] frame loop not advancing (${state.f} -> ${f2} frames in 15 s)`);
+  // wait for MIN_FRAMES frames, and for more frames after the check above
+  const f2 = await poll(`the frame loop to advance (>= ${MIN_FRAMES} frames, 3 more than ${state.f}) [${label}] ${pageUrl}`, async () => {
+    const n = await evalJs('window.__frames'); return n >= MIN_FRAMES && n - state.f >= 3 ? n : 0;
+  }, { tick: () => check('while waiting for frames') });
+  const framesAfter = (n, what) => poll(`a new frame ${what} [${label}] ${pageUrl}`, async () => (await evalJs('window.__frames')) > n, { tick: () => check(`while waiting for a frame ${what}`) });
   if (interact) {
     await s('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 200, y: 120 });
     await s('Input.dispatchMouseEvent', { type: 'mousePressed', x: 200, y: 120, button: 'left', clickCount: 1 });
     await s('Input.dispatchMouseEvent', { type: 'mouseReleased', x: 200, y: 120, button: 'left', clickCount: 1 });
-    await sleep(500);
+    await sleep(500); // time is the thing here: lets the click's effect play out before the keys
     for (const k of 'cwdvpmpm') { // p and m twice: panel and sound go back
       await s('Input.dispatchKeyEvent', { type: 'keyDown', key: k, text: k, code: `Key${k.toUpperCase()}` });
       await s('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code: `Key${k.toUpperCase()}` });
@@ -216,36 +233,28 @@ async function visit(cdp, base, query, interact) {
     for (const want of [true, false]) {
       await s('Input.dispatchKeyEvent', { type: 'keyDown', key: 'r', text: 'r', code: 'KeyR' });
       await s('Input.dispatchKeyEvent', { type: 'keyUp', key: 'r', code: 'KeyR' });
-      let turned = null;
-      for (let i = 0; i < 20 && turned !== want; i++) { await sleep(250); turned = await evalJs(`document.body.classList.contains('turned')`); }
-      if (turned !== want) fail(`[${label}] key r left body.turned at ${turned}, not ${want}`);
-      const fr = await evalJs('window.__frames');
-      let moved2 = false;
-      for (let i = 0; i < 40 && !moved2; i++) { await sleep(500); moved2 = await evalJs('window.__frames') > fr; }
-      if (!moved2) fail(`[${label}] frame loop stopped after turning the picture (${want})`);
+      await poll(`key r to set body.turned to ${want} [${label}] ${pageUrl}`,
+        async () => (await evalJs(`document.body.classList.contains('turned')`)) === want, { tick: () => check('after key r') });
+      await framesAfter(await evalJs('window.__frames'), `after turning the picture (${want})`);
     }
     check('after turning the picture');
     // The scene changes in place (no reload), and Reset brings back the mix.
     await evalJs(`(() => { window.__stay = 1; const s = [...document.querySelectorAll('.tuner select')]
       .find((x) => [...x.options].some((o) => o.value === 'crystal')); s.value = 'crystal';
       s.dispatchEvent(new Event('change')); })()`);
-    await sleep(1500);
-    const f = await evalJs('window.__frames');
     // A frame can take over a second on a slow software renderer: wait for one.
-    let moved = false;
-    for (let i = 0; i < 40 && !moved; i++) { await sleep(500); moved = await evalJs('window.__frames') > f; }
+    await framesAfter(await evalJs('window.__frames'), 'after changing the scene');
     if (await evalJs('window.__stay') !== 1) fail(`[${label}] changing the scene reloaded the page`);
-    if (!moved) fail(`[${label}] frame loop stopped after changing the scene`);
     const scene = await evalJs(`(() => { [...document.querySelectorAll('.tuner-buttons button')]
       .find((b) => b.textContent === 'Reset').click(); return [...document.querySelectorAll('.tuner select')]
       .find((x) => [...x.options].some((o) => o.value === 'crystal')).value; })()`);
     if (scene !== 'mix') fail(`[${label}] Reset left the scene at ${scene}, not mix`);
-    await sleep(500);
+    await framesAfter(await evalJs('window.__frames'), 'after Reset');
     if (await evalJs('window.__stay') !== 1) fail(`[${label}] Reset reloaded the page`);
     check('after changing the scene and Reset');
   }
   await evalJs(`(() => { const o = document.getElementById('overlay'); if (o) o.style.display = 'none'; })()`);
-  await sleep(300);
+  await framesAfter(await evalJs('window.__frames'), 'after hiding the overlay'); // the screenshot shows a frame drawn without it
   const shot = await s('Page.captureScreenshot', { format: 'png' });
   const share = nonBlackShare(Buffer.from(shot.data, 'base64'));
   if (share < 0.001) fail(`[${label}] canvas looks black (${(share * 100).toFixed(3)}% lit pixels)`);
@@ -265,7 +274,8 @@ await cdp.opened;
 // Colour modes come from config.js (it reads `innerWidth`, so import it in the page, not in Node).
 const { targetId } = await cdp.send('Target.createTarget', { url: `${base}index.html` });
 const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
-await sleep(500);
+await poll(`index.html to load before reading config.js (${base}index.html)`, async () =>
+  (await cdp.send('Runtime.evaluate', { expression: `location.href.startsWith(${JSON.stringify(base)}) && document.readyState === 'complete'`, returnByValue: true }, sessionId)).result.value === true);
 const r = await cdp.send('Runtime.evaluate', { expression: `import('./config.js').then((c) => c.COLOR_MODES.map((m) => m.name))`,
   awaitPromise: true, returnByValue: true }, sessionId);
 if (r.exceptionDetails || !Array.isArray(r.result.value)) fail(`could not read COLOR_MODES from config.js: ${r.exceptionDetails?.exception?.description || r.exceptionDetails?.text}`);
