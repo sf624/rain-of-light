@@ -527,7 +527,7 @@ direct(time, true);
 // nothing here: the show reads them every frame and blends into the change.
 let rebuildTimer = 0;
 function apply(key) {
-  if (key === 'grid' || key === 'rows' || key === 'layout') {
+  if (key === 'grid' || key === 'rows' || key === 'layout' || key === 'jitter') {
     clearTimeout(rebuildTimer);
     rebuildTimer = setTimeout(buildLattice, 250); // wait for the slider to settle
   }
