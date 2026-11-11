@@ -137,14 +137,14 @@ python3 -I tools/doc-images.py /tmp/shots docs/img
 ```
 
 After a change that shows, make the pictures again and look at each one:
-a form or a passage may no longer be on screen at the time a cell names.
+a form or a passage may then be off screen at the time a cell names.
 `show.cast(t)` (see `tools/story-stats.mjs` for how to load `show.js` in
 Node) tells which passage and forms show at a time of a seed. A cell can
 also give `click`, `keys`, `crop` and `ui` (keep the buttons); the top of
 `tools/doc-shots.mjs` lists them. `DOC_SHOTS=other.json` tries out another
 list.
 
-The share picture, `og-image.jpg` (1200x630, named in `index.html`), was
+The share picture, `og-image.jpg` (1200x630, named in `index.html`), is
 made with the same tool, from a list of its own given by `DOC_SHOTS=`: one
 figure, `"w": 1200, "h": 675`, one cell with the query
 `scene=mix&form=orb&layer=on&weather=drizzle&color=cloud&seed=8&t=30`
