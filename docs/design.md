@@ -405,9 +405,12 @@ the form's first colour to its second:
 - `solidLight`: the edges of a tetrahedron or an octahedron (`SOLID`,
   `CORNER`, `EDGE`). The distance to each edge is that from a point to a
   straight piece of line, worked out exactly, 6 or 12 times. Each edge
-  shows from its two corners inward, as far as it is drawn. An edge that
-  runs level glows more (as the ring's level parts do), and each corner is
-  a white-hot point.
+  is a rod of even light with a clean edge (`rod`), dark around and
+  inside the solid, and shows from its two corners inward, as far as it
+  is drawn. Each corner is a white-hot point. The solid stands on the axis
+  of a corner and leans at most 0.4 rad (`forms.js: solid`), so every edge
+  runs aslant or level: an edge along a strand would light one strand or
+  none.
 - `attractorLight`: the path of the Lorenz equations. The path is long (16
   turns, twice), so the shader does not measure a distance to it.
   `lorenz.js: lorenzField` works the two paths out once on the CPU (fourth
@@ -448,7 +451,7 @@ is not. The attractor, the knot and the fractal also stop early outside
 their own box or pyramid.
 
 The thin forms (ring, veil, solid, knot) are about one strand gap thick
-(`shaders.js: fineness`; `lineGlow` for the solid and the knot), so a
+(`shaders.js: fineness`; `rod` for the solid, `lineGlow` for the knot), so a
 coarse lattice still catches them.
 
 **Coming and going.** A form does not fade evenly. Each LED has an order
