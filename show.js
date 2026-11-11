@@ -6,7 +6,7 @@
 // timeline is made from hashes of one seed: a time (?t=) gives its picture.
 
 import { PALETTES, PALE, FORMS, LAYER, PASSAGES } from './config.js';
-import { hash, weighted, createMood, leaning, leanTo } from './director.js';
+import { hash, weighted, createMood, leaning, leanTo, hueOf, apart, KIN } from './director.js';
 import { motion } from './forms.js';
 
 const ROOM_TINT = [0.35, 0.5, 1.0];          // the room's colour while no form shows
@@ -21,11 +21,17 @@ const STORM_GAIN = 0.8;                       // a form among rain glows this mu
 const paletteNamed = (n) => PALETTES.find((q) => q.name === n);
 // One of some palettes (by name), from x in 0 .. 1: any one without a mood
 // (m undefined), else the likelier the nearer it is to it (see director.js,
-// the colour story). Its place in the list.
-function palAt(names, x, m) {
-  if (m === undefined) return Math.floor(x * names.length) % names.length;
-  return names.indexOf(weighted(names, x, (n) => leanTo(m, paletteNamed(n))));
+// the colour story); tired: how much less likely each one is (see TIRE). Its place in the list.
+function palAt(names, x, m, tired) {
+  if (m === undefined && !tired) return Math.floor(x * names.length) % names.length;
+  return names.indexOf(weighted(names, x, (n) => (m === undefined ? 1 : leanTo(m, paletteNamed(n))) * (tired ? tired(n) : 1)));
 }
+const hueNamed = (n) => hueOf(paletteNamed(n).a)[0];
+// With the colour story, once the forms have kept one family of hues (see
+// KIN) for this many seconds, a palette of that family is this much less
+// likely for the next form, even for a choice free of the mood (a surprise
+// should not be the colour that has held the room).
+const TIRE = { after: 90, by: 0.05 };
 const smooth = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 const between = (a, b, r) => a + (b - a) * r;
 
@@ -52,6 +58,13 @@ function createTimeline(seed, pool, name, mood) {
   const list = [];   // passages: { start, kind, sky, layer } (sky, layer: episodes or null)
   let next = 0, n = 0;
   const recent = [];  // the forms shown, the latest first
+  const told = [];    // their palettes with the colour story ({ start, hue }), the latest first
+  // How much less likely each palette is for a form that starts at start (see TIRE).
+  const tiredAt = (start) => {
+    let since = start;
+    for (const o of told) { if (apart(o.hue, told[0].hue) > KIN) break; since = o.start; }
+    return start - since < TIRE.after ? () => 1 : (n) => (apart(hueNamed(n), told[0].hue) <= KIN ? TIRE.by : 1);
+  };
   const pickKind = (prev, r) => {
     // The same kind again is rare; a still room never follows itself.
     const w = pool.map((p) => (p === prev ? (p.sky ? 0.35 : p.rain ? 0.2 : 0) : 1) * p.weight);
@@ -64,8 +77,12 @@ function createTimeline(seed, pool, name, mood) {
     // What the show opens with is there almost at once.
     const inAt = start > 0 ? start + how.at : -how.fade * 0.8;
     // Its palette: as the seed alone has it (pal), and with the colour story (told).
-    const x = hash(r * 53 + 2);
-    return { id: `${name}-${++n}`, form, r, start, pal: palAt(names, x), told: palAt(names, x, leaning(true, hash(r * 53 + 4), mood, start)),
+    // (A sky form's palette also tires, see TIRE; the layer's does not.)
+    const x = hash(r * 53 + 2), m = leaning(true, hash(r * 53 + 4), mood, start);
+    const sky = form !== LAYER;
+    const pick = palAt(names, x, m, sky ? tiredAt(start) : undefined);
+    if (sky) told.unshift({ start, hue: hueNamed(names[pick]) });
+    return { id: `${name}-${++n}`, form, r, start, pal: palAt(names, x), told: pick,
       inAt, inFade: how.fade, outAt: Infinity, outFade: 1 };
   };
   const close = (e, T, how) => { if (e) { e.outAt = T + how.at; e.outFade = how.fade; } };

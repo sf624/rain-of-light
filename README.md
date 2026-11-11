@@ -104,10 +104,13 @@ under amber, violet under green, and so on); a pale form (ice, candle) sets
 the room and its rain in a deeper colour.
 
 The colours tell one slow story: a mood, a hue that wanders from green through
-blue, violet and pink to amber and back, never at one pace, taking some 10 to
-20 minutes from blue to amber. The rain's colours, each form's and the layer's
-lean towards it, so one passage's colours belong with the next's. About one
-choice in five is free of it, and rain of many colours (rainbow, speed, depth,
+blue, violet and pink to amber and back. It moves from one palette's colour to
+the next in two to three minutes, never at one pace, taking some 4 to 6
+minutes from blue to amber. The rain's colours, each form's and the layer's
+lean towards it, so one passage's colours belong with the next's, and no one
+colour holds the room for long: once the forms have kept one colour for a
+minute and a half, the next form most likely takes another. About one choice
+in five is free of the mood, and rain of many colours (rainbow, speed, depth,
 repaint, sky) still comes, less often: surprises stay. `?story=off` (Colour
 story in the panel) gives each its own colour, as the seed alone has it.
 

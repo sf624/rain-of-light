@@ -1,13 +1,13 @@
 // Measures the colour story (see director.js) without rendering: over many
 // seeds, how often neighbouring passages differ in hue, how often each colour
 // mode and palette comes, and how far the mood wanders. With and without the story.
+// It also measures how long the picture stays in one colour family.
 //   node tools/story-stats.mjs [seeds=50] [hours=1]
 globalThis.innerWidth = globalThis.innerHeight = 1000;
 const { COLOR_MODES, PALETTES, SETS } = await import('../config.js');
-const { createDirector, hueOf } = await import('../director.js');
+const { createDirector, hueOf, apart, KIN } = await import('../director.js');
 const { createShow } = await import('../show.js');
 
-const apart = (a, b) => Math.abs(((a - b) % 360 + 540) % 360 - 180);
 // The hue of some colours together: their mean, each weighted by how much colour it has.
 const hueOfAll = (cs) => {
   let x = 0, y = 0;
@@ -39,6 +39,34 @@ export function look(S, director, show, t) {
   return { kind: c.kind, hue, rain, form, layer, e, mood: director.mood(t) % 360 };
 }
 
+// How long the picture stays in one colour family: the stretches of time (s)
+// in which the main hue (see look) stays within KIN degrees (see director.js). A stretch ends
+// when the hue (or no hue: many colours at once) lies outside for more than
+// GRACE seconds, so one short passage of another colour does not end it.
+const GRACE = 30, STEP = 5;
+export function stretches(S, director, show, span) {
+  const out = [];
+  let lo, hi, h0, from, outside;   // the stretch: its range from its first hue h0, its start, since when outside
+  const close = (t) => { if (from !== undefined) out.push(t - from); from = undefined; };
+  for (let t = 0; t < span; t += STEP) {
+    const { hue } = look(S, director, show, t);
+    if (from !== undefined && hue !== undefined) {
+      const d = ((hue - h0) % 360 + 540) % 360 - 180;
+      if (Math.max(hi, d) - Math.min(lo, d) <= KIN) { lo = Math.min(lo, d); hi = Math.max(hi, d); outside = undefined; continue; }
+    }
+    if (from !== undefined) {
+      outside ??= t;
+      if (t - outside <= GRACE) continue;
+      close(outside);
+      t = outside - STEP;            // start again where it left the family
+      continue;
+    }
+    if (hue !== undefined) { from = t; h0 = hue; lo = hi = 0; outside = undefined; }
+  }
+  close(outside ?? span);
+  return out;
+}
+
 if (process.argv[1] === new URL(import.meta.url).pathname) {
   const SEEDS = Number(process.argv[2]) || 50, SPAN = (Number(process.argv[3]) || 1) * 3600;
   const out = [];
@@ -46,7 +74,7 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
   const res = {};
   const count = (k, n) => { k[n] = (k[n] || 0) + 1; };
   for (const story of ['on', 'off']) {
-    const r = res[story] = { far: 0, far2: 0, pairs: 0, many: 0, passages: 0, modes: {}, pals: {}, forms: {}, layers: {}, sets: {}, off: 0, offN: 0 };
+    const r = res[story] = { runs: [], far: 0, far2: 0, pairs: 0, many: 0, passages: 0, modes: {}, pals: {}, forms: {}, layers: {}, sets: {}, off: 0, offN: 0 };
     for (let seed = 1; seed <= SEEDS; seed++) {
       const S = { scene: 'mix', form: 'auto', layer: 'auto', story };
       const director = createDirector(seed);
@@ -70,6 +98,7 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
         }
         for (const i of c.items) count(i.form === 'layer' ? r.layers : r.forms, i.palette);
       }
+      r.runs.push(...stretches(S, director, show, SPAN));
       let prev;
       for (const m of marks) {
         const l = look(S, director, show, (m.t0 + m.t1) / 2);
@@ -96,6 +125,16 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
   out.push(`  pairs counted                        ${both((s) => String(res[s].pairs).padStart(6))}`);
   out.push(`  passages of many colours             ${both((s) => pct(res[s].many, res[s].passages))}`);
   out.push(`  the rain's hue from the mood, mean   ${both((s) => `${(res[s].off / res[s].offN).toFixed(0)} deg`.padStart(6))}`);
+  out.push('', `Stretches in one colour family (main hue within ${KIN} degrees, an outside spell under ${GRACE} s forgiven)`,
+    '                                         on     off');
+  const runs = (s) => [...res[s].runs].sort((a, b) => a - b);
+  const at = (s, x) => { const l = runs(s); return `${(l[Math.floor(x * (l.length - 1))] / 60).toFixed(1)} min`.padStart(9); };
+  const long = (s) => { const l = runs(s), all = l.reduce((a, b) => a + b, 0); return pct(l.filter((x) => x > 240).reduce((a, b) => a + b, 0), all); };
+  out.push(`  median                            ${both((s) => at(s, 0.5))}`);
+  out.push(`  90%                               ${both((s) => at(s, 0.9))}`);
+  out.push(`  longest                           ${both((s) => at(s, 1))}`);
+  out.push(`  share of time in stretches > 4 min   ${both(long)}`);
+  out.push(`  stretches > 4 min                    ${both((s) => String(runs(s).filter((x) => x > 240).length).padStart(6))}`);
   table('Colour modes (share of the time rain falls alone)', 'modes', COLOR_MODES.map((m) => m.name));
   table('Palettes of the rain (mono, gradient, accent, comet)', 'pals', PALETTES.map((p) => p.name));
   table('Sets of the palette rain', 'sets', SETS.map((p) => p.name));
@@ -113,7 +152,7 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
   }
   ranges.sort((a, b) => a - b);
   const q = (x) => ranges[Math.floor(x * (ranges.length - 1))].toFixed(0);
-  out.push('', `The mood's range within 20 minutes (degrees of hue; its axis is 275 long), ${ranges.length} windows`,
+  out.push('', `The mood's range within 20 minutes (degrees of hue; its whole axis runs from aurora's hue to amber's), ${ranges.length} windows`,
     `  least ${q(0)}  10% ${q(0.1)}  median ${q(0.5)}  90% ${q(0.9)}  most ${q(1)}`);
   console.log(out.join('\n'));
 }
