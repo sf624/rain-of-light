@@ -66,6 +66,15 @@ uniform float uSat;
 uniform vec2 uDensity;  // share of strands, share of LEDs per strand, that are on
 uniform float uBowStyle; // rainbow: 0 bands, 1 a random hue per drop, 2 per LED
 uniform float uRainShare; // share of strands (or lanes across the flow) that carry rain
+// The light on this lattice (see lattice.js: latticeLight), so that a denser
+// one is as bright as a sparser one: the light of the forms, waves and rest
+// per LED, the light per wire, the share of LEDs that twinkle.
+uniform vec3 uLight;
+// The rain on this lattice (see lattice.js: latticeLight): [0] the scale of the
+// share of strands, and of lanes across the flow, that carry rain; [1] along a
+// strand, [2] along a lane: how many times as many LEDs per length lie there
+// as on the lattice the light is set for, and each one's light.
+uniform vec2 uRainK[3];
 // The show: how much of the rain's look there is, forms of light, and the mirrors.
 uniform float uRainMix;   // 0: the still room's look (pale drops, the room's tint) .. 1: the rain's colours
 uniform float uStorm;     // 0 .. 1: how much rain falls through a form (the rain gives way to it)
@@ -184,7 +193,9 @@ vec3 dropColor(float sd, float cycle) {
 // before it, head brightness, number of this drop) so each drop can have a colour.
 // Only drops that set out within the gate (from gate.x, for gate.y) show: as a
 // rain ends no new drops come, and as one begins none is already on its way.
-vec4 drop(float sd, float u, float trailK, vec2 gate) {
+// led: the line's LEDs per length, so that the head stays about one LED long,
+// and each LED's light (uRainK).
+vec4 drop(float sd, float u, float trailK, vec2 gate, vec2 led) {
   float speed  = mix(0.07, 0.34, pow(hash(sd + 1.0), 1.5));
   float period = mix(1.3, 2.8, hash(sd + 2.0));
   float trail  = mix(0.04, 0.18, hash(sd + 3.0)) * trailK;
@@ -197,9 +208,9 @@ vec4 drop(float sd, float u, float trailK, vec2 gate) {
   float now = step(mod(born - gate.x, FLOW_WRAP), gate.y);
   float before = step(mod(born - FLOW_WRAP / k - gate.x, FLOW_WRAP), gate.y);
   float d = fract(c) * period - u;                   // > 0: the LED is behind the head
-  float rain = d >= 0.0 ? exp(-d / trail) : exp(d * 120.0);
+  float rain = (d >= 0.0 ? exp(-d / trail) : exp(d * 120.0 * led.x)) * led.y;
   now *= smoothstep(0.0, 0.05, fract(c) * period);   // a drop fades in over its first few LEDs, never lit at once
-  return vec4(rain * now, exp(-(d + period) / trail) * before, exp(-abs(d) * 90.0) * now, mod(cycle, k));
+  return vec4(rain * now, exp(-(d + period) / trail) * before * led.y, exp(-abs(d) * 90.0 * led.x) * now * led.y, mod(cycle, k));
 }
 
 // Light gathered from several drops, with each drop's own random hue.
@@ -226,20 +237,21 @@ void gather(inout Lit L, vec4 r, float sd, float w) {
 // little near 1 so that a full share still lights every strand fully, and the
 // mean share is the one asked for.
 const float SHARE_FADE = 0.3;
-float rainOn(float n) {
-  float s = uRainShare * (1.0 + (1.0 / (1.0 - 0.5 * SHARE_FADE) - 1.0) * pow(uRainShare, 8.0));
+float rainOn(float n, float k) {
+  float s = uRainShare * k;
+  s *= 1.0 + (1.0 / (1.0 - 0.5 * SHARE_FADE) - 1.0) * pow(s, 8.0);
   return clamp((s - hash(n + 9.0)) / (SHARE_FADE * max(s, 1e-4)) + 0.5, 0.0, 1.0);
 }
 
 void strandRain(inout Lit L, float seed, float u, float trailK, float w) {
-  w *= rainOn(seed);
+  w *= rainOn(seed, uRainK[0].x);
   if (w == 0.0) return;                              // no rain on this strand
   float g3 = hash(seed + 6.0) * 0.6;
   float g4 = 0.3 + hash(seed + 7.0) * 0.6;
-  gather(L, drop(seed, u, trailK, uGate.xy), seed, w);
-  gather(L, drop(seed + 17.0, u, trailK, uGate.xy), seed + 17.0, w);
-  gather(L, drop(seed + 31.0, u, trailK, uGate.xy), seed + 31.0, w * smoothstep(g3, g3 + 0.15, uRain));
-  gather(L, drop(seed + 53.0, u, trailK, uGate.xy), seed + 53.0, w * smoothstep(g4, g4 + 0.15, uRain));
+  gather(L, drop(seed, u, trailK, uGate.xy, uRainK[1]), seed, w);
+  gather(L, drop(seed + 17.0, u, trailK, uGate.xy, uRainK[1]), seed + 17.0, w);
+  gather(L, drop(seed + 31.0, u, trailK, uGate.xy, uRainK[1]), seed + 31.0, w * smoothstep(g3, g3 + 0.15, uRain));
+  gather(L, drop(seed + 53.0, u, trailK, uGate.xy, uRainK[1]), seed + 53.0, w * smoothstep(g4, g4 + 0.15, uRain));
 }
 
 // Light flowing sideways, towards uFlowDir: LEDs in one thin tube along that
@@ -256,10 +268,10 @@ float sidewaysRain(inout Lit L, vec3 pos, float trailK, float w) {
   float len = abs(D.x) * uSpan + abs(D.y) * uHeight + abs(D.z) * uSpan;
   float along = dot(pos, D) / len + 0.5;
   float k = trailK * mix(1.0, 2.0, st);
-  w *= rainOn(lane);
+  w *= rainOn(lane, uRainK[0].y);
   if (w == 0.0) return along;
-  gather(L, drop(lane, along, k, uGate.zw), lane, w);
-  gather(L, drop(lane + 97.0, along, k, uGate.zw), lane + 97.0, w * smoothstep(0.2, 0.8, uRain));
+  gather(L, drop(lane, along, k, uGate.zw, uRainK[2]), lane, w);
+  gather(L, drop(lane + 97.0, along, k, uGate.zw, uRainK[2]), lane + 97.0, w * smoothstep(0.2, 0.8, uRain));
   return along;
 }
 
@@ -270,7 +282,7 @@ const vec3 WHITE_HOT = vec3(1.0, 0.96, 0.9);
 
 // The thin forms (a hoop, a curtain) are as thick as about one gap between
 // strands, so that a coarse lattice still catches them: this scales their
-// squared distances (1 on a lattice of 72 strands a side, less on a coarser one).
+// squared distances (1 on a lattice of 72 strands a side or more, less on a coarser one).
 float fineness() { float k = min(1.0, 0.5 / uLane.x); return k * k; }
 
 // Turned by yaw about the vertical, then tilted about the new x axis.
@@ -600,12 +612,17 @@ void main() {
   vec3 flare = form * min(1.0, 1.0 / max(fm, 1e-3));
   float inForm = clamp(fm, 0.0, 1.0);                // drops in a form take its colour
 
-  vec3 c = form + flare * 2.5 * ring;
+  float near = 1.0 - smoothstep(3.0, 12.0, dist);
+  // The light in the room (forms, waves, rest): a denser lattice shares it out
+  // among more LEDs and wires (uLight), so the room is as bright.
+  float wave = ring * uLight.x, rest = uRest * uLight.x;
+  vec3 c = (form + flare * 2.5 * ring) * uLight.x;
   // The light that casts rays: all of the LED's light but the rain's trails
   // and the LEDs' light at rest (a drop's head, a form, a wave, a twinkle).
   vec3 glint = c;
-  vec3 wireCol = thread + flare * ring;
-  float near = 1.0 - smoothstep(3.0, 12.0, dist);
+  vec3 wireCol = (thread + flare * ring) * uLight.y;
+  float wireRest = uRest * 1.5 * near * uLight.y, wireWave = ring * 1.2 * uLight.y;
+  float wireRain = uRainGain * 0.2 / uRainK[1].y;     // a wire's light does not grow with its LEDs' light
   // The falling rain's light falls off with distance as in a real room,
   // which is what makes near strands stand out from far ones (its look only:
   // the forms keep theirs).
@@ -661,23 +678,23 @@ void main() {
     const float WHITE[11] = float[11](0.5, 0.5, 0.15, 0.2, 0.3, 0.0, 0.3, 0.35, 0.35, 0.3, 0.35);
     float white = 0.0;
     for (int i = 0; i < 11; i++) white += WHITE[i] * W[i];
-    c += (restCol * uRest + rainCol * rain * uRainGain + mix(tipCol, vec3(1.0), white) * tip * uTipGain
-        + mix(restCol, vec3(1.0), 0.35) * ring * 4.0) * rk * (1.0 - 0.25 * uStorm) * (1.0 - 0.75 * around * (1.0 - inForm)) * phys;
-    glint += (tipCol * tip * uTipGain + mix(restCol, vec3(1.0), 0.35) * ring * 4.0) * rk * phys; // a head's light in its own colour
-    wireCol += (rainCol * rain * uRainGain * 0.2 + restCol * uRest * 1.5 * near + restCol * ring * 1.2) * rk * physWire;
+    c += (restCol * rest + rainCol * rain * uRainGain + mix(tipCol, vec3(1.0), white) * tip * uTipGain
+        + mix(restCol, vec3(1.0), 0.35) * wave * 4.0) * rk * (1.0 - 0.25 * uStorm) * (1.0 - 0.75 * around * (1.0 - inForm)) * phys;
+    glint += (tipCol * tip * uTipGain + mix(restCol, vec3(1.0), 0.35) * wave * 4.0) * rk * phys; // a head's light in its own colour
+    wireCol += (rainCol * rain * wireRain + restCol * wireRest + restCol * wireWave) * rk * physWire;
   }
   if (rk < 0.999) {
     // The still room's look: a faint lattice in the room's colour with a
     // sparse twinkle, a few pale drops, and waves.
     vec3 pale = mix(uTint, vec3(1.0), 0.55);
     vec3 drop = mix(pale, flare, inForm * 0.8);
-    float tw = hash(id + 3.0) < 0.2
+    float tw = hash(id + 3.0) < uLight.z
       ? pow(0.5 + 0.5 * sin(uTime * (0.3 + 1.2 * hash(id + 1.0)) + hash(id + 2.0) * 6.2832), 30.0) * uTwinkle : 0.0;
-    c += (uTint * uRest + pale * tw + drop * (rain * uRainGain * 0.5 + tip * uTipGain) + pale * 5.0 * ring) * (1.0 - rk);
-    glint += (pale * tw + drop * tip * uTipGain + pale * 5.0 * ring) * (1.0 - rk);
+    c += (uTint * rest + pale * tw + drop * (rain * uRainGain * 0.5 + tip * uTipGain) + pale * 5.0 * wave) * (1.0 - rk);
+    glint += (pale * tw + drop * tip * uTipGain + pale * 5.0 * wave) * (1.0 - rk);
     // The strands catch the light of the forms they run through, and a faint
     // sheen of the room's: thin lit threads, never dark bars.
-    wireCol += (drop * rain * uRainGain * 0.2 + uTint * uRest * 1.5 * near + pale * ring * 1.2) * (1.0 - rk);
+    wireCol += (drop * rain * wireRain + uTint * wireRest + pale * wireWave) * (1.0 - rk);
   }
 
   float fog = 1.0 - smoothstep(uFogFar * 0.3, uFogFar, dist);

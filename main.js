@@ -16,7 +16,7 @@ import { createDirector, hash } from './director.js';
 import { createDirection } from './direction.js';
 import { FLOW_WRAP, RAY_CAP, POINT_VS, POINT_FS, WIRE_FS, QUAD_VS, DOWN_FS, BLUR_FS, COMPOSITE_FS } from './shaders.js';
 import { createGL, sub, cross, dot, norm, perspective, lookAt } from './gl.js';
-import { createLattice, fillLattice } from './lattice.js';
+import { createLattice, fillLattice, latticeLight } from './lattice.js';
 import { createControls } from './controls.js';
 import { keepAwake } from './wakelock.js';
 import { view, createRotation } from './rotate.js';
@@ -107,9 +107,10 @@ const compProg = program(QUAD_VS, COMPOSITE_FS);
 const MAX_POINT = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1]; // the largest sprite this GPU draws
 
 const lattice = createLattice(gl);
-let count = 0, GRID = 0, ROWS = 0, wireCount = 0;
+let count = 0, GRID = 0, ROWS = 0, wireCount = 0, light = null;
 function buildLattice() {
-  ({ count, GRID, ROWS, wireCount } = fillLattice(gl, lattice, S, SPAN));
+  ({ count, GRID, ROWS, wireCount } = fillLattice(gl, lattice, S, SPAN, HEIGHT));
+  light = latticeLight(GRID, ROWS, SPAN, HEIGHT);
 }
 buildLattice();
 const pointVao = lattice.pointVao;
@@ -528,7 +529,7 @@ direct(time, true);
 // nothing here: the show reads them every frame and blends into the change.
 let rebuildTimer = 0;
 function apply(key) {
-  if (key === 'grid' || key === 'rows' || key === 'layout' || key === 'jitter') {
+  if (['leds', 'aspect', 'grid', 'rows', 'layout', 'jitter'].includes(key)) {
     clearTimeout(rebuildTimer);
     rebuildTimer = setTimeout(buildLattice, 250); // wait for the slider to settle
   }
@@ -721,6 +722,8 @@ function frame(now) {
   gl.uniform1f(u.uSize, S.size);
   gl.uniform1f(u.uMaxPx, S.maxPx * renderScale); // pixels shrink with the scale
   gl.uniform1f(u.uRest, S.rest);
+  gl.uniform3f(u.uLight, light.room, light.wire, light.twinkle);
+  gl.uniform2fv(u.uRainK, [...light.share, ...light.fall, ...light.side]);
   gl.uniform1f(u.uRainGain, S.rainGain);
   gl.uniform1f(u.uTipGain, S.tipGain);
   gl.uniform1f(u.uTrail, S.trail);

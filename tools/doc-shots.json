@@ -61,15 +61,25 @@
       {"q": "rainShare=0.6", "label": "rainShare=0.6"},
       {"q": "rainShare=1", "label": "rainShare=1"}
     ] },
-    { "name": "grid", "cols": 3, "base": "scene=rain&flow=down&t=30", "cells": [
-      {"q": "grid=24", "label": "grid=24"},
-      {"q": "grid=72", "label": "grid=72"},
-      {"q": "grid=140", "label": "grid=140"}
+    { "name": "leds", "cols": 3, "base": "scene=crystal&layer=off&form=ring&t=30", "cells": [
+      {"q": "leds=250", "label": "leds=250"},
+      {"q": "leds=1000", "label": "leds=1000"},
+      {"q": "leds=1700", "label": "leds=1700"}
     ] },
-    { "name": "rows", "cols": 3, "base": "scene=rain&flow=down&t=30", "cells": [
-      {"q": "rows=24", "label": "rows=24"},
-      {"q": "rows=96", "label": "rows=96"},
-      {"q": "rows=220", "label": "rows=220"}
+    { "name": "aspect", "cols": 3, "base": "scene=crystal&layer=off&form=ring&t=30", "cells": [
+      {"q": "aspect=0.5", "label": "aspect=0.5"},
+      {"q": "aspect=1", "label": "aspect=1"},
+      {"q": "aspect=2", "label": "aspect=2"}
+    ] },
+    { "name": "grid", "cols": 3, "base": "scene=rain&flow=down&t=30&rows=55", "cells": [
+      {"q": "grid=40", "label": "grid=40"},
+      {"q": "grid=134", "label": "grid=134"},
+      {"q": "grid=160", "label": "grid=160"}
+    ] },
+    { "name": "rows", "cols": 3, "base": "scene=rain&flow=down&t=30&grid=134", "cells": [
+      {"q": "rows=20", "label": "rows=20"},
+      {"q": "rows=55", "label": "rows=55"},
+      {"q": "rows=160", "label": "rows=160"}
     ] },
     { "name": "layout", "cols": 3, "base": "scene=rain&flow=down&weather=downpour&trail=4&t=30&fov=30&radius=16&grid=24&rows=48&wire=0&exposure=3", "cells": [
       {"q": "layout=strands", "label": "layout=strands", "crop": [0.3, 0.2, 0.7, 0.6]},

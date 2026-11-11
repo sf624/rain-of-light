@@ -8,32 +8,32 @@
     {
       "name": "rain",
       "seed": 1,
-      "q": "scene=rain&color=cloud&weather=drizzle&flow=down&density=manual&strandShare=0.7&rowShare=0.85&seed=8&t=30&orbit=0.03&exposure=2.4&grid=72&rows=96"
+      "q": "scene=rain&color=cloud&weather=drizzle&flow=down&density=manual&strandShare=0.7&rowShare=0.85&seed=8&t=30&orbit=0.03&exposure=2.4&leds=1000"
     },
     {
       "name": "storm",
       "seed": 1,
-      "q": "scene=mix&form=orb&color=mono&weather=rain&flow=down&density=manual&seed=3&t=30&orbit=0.04&grid=72&rows=96"
+      "q": "scene=mix&form=orb&color=mono&weather=rain&flow=down&density=manual&seed=3&t=30&orbit=0.04&leds=1000"
     },
     {
       "name": "orb",
       "seed": 1,
-      "q": "scene=crystal&form=orb&layer=on&seed=1&t=30&orbit=0.07&grid=72&rows=96"
+      "q": "scene=crystal&form=orb&layer=on&seed=1&t=30&orbit=0.07&leds=1000"
     },
     {
       "name": "spiral",
       "seed": 1,
-      "q": "scene=crystal&form=spiral&layer=on&seed=5&t=96&orbit=0.05&grid=72&rows=96"
+      "q": "scene=crystal&form=spiral&layer=on&seed=5&t=96&orbit=0.05&leds=1000"
     },
     {
       "name": "knot",
       "seed": 1,
-      "q": "scene=crystal&form=knot&layer=on&seed=1&t=40&orbit=0.05&grid=72&rows=96"
+      "q": "scene=crystal&form=knot&layer=on&seed=1&t=40&orbit=0.05&leds=1000"
     },
     {
       "name": "veil",
       "seed": 1,
-      "q": "scene=crystal&form=veil&layer=on&seed=3&t=30&orbit=0.05&grid=72&rows=96"
+      "q": "scene=crystal&form=veil&layer=on&seed=3&t=30&orbit=0.05&leds=1000"
     }
   ]
 }
