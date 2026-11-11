@@ -14,7 +14,7 @@ testing and capturing, see [development.md](development.md).
 You stand in a dark room full of hanging strands of tiny LEDs, over a floor
 of black glass. Light falls down the strands like rain. Now and then the rain
 stops, and a large form of light gathers among the same LEDs: an orb, a
-spiral, a cloud, a ring or a veil, or one of four forms of mathematics (a
+spiral, a ring or a veil, or one of four forms of mathematics (a
 solid, an attractor, a knot, a fractal). A low sea of light (the layer) glows near
 the floor. The colours drift slowly together, and calm music follows what is
 shown. A click sends a wave of light through the room and rings a bell.
@@ -384,7 +384,7 @@ look that no strand shows.
 
 ### Forms of light
 
-![The nine forms alone: orb, spiral, cloud, ring, veil, solid, attractor, knot and fractal](img/forms.jpg)
+![The eight forms alone: orb, spiral, ring, veil, solid, attractor, knot and fractal](img/forms.jpg)
 
 `shaders.js: formsAt` adds the light of up to three forms: two sky forms
 (one coming, one going) and the layer. For each it calls a function that
@@ -395,9 +395,6 @@ the form's first colour to its second:
   in two.
 - `spiralLight`: a tilted disc with two arms and a bright bulge, slowly
   turning. It unfurls from its core.
-- `cloudLight`: six round heads over a flat base, lit from above. Each LED
-  lights only where the cloud is thick enough for it, so the edge frays
-  into single points.
 - `ringLight`: a hoop, a bright thread in a soft sheath, with two brighter
   arcs. It may part into two crossing hoops.
 - `veilLight`: a curtain like an aurora, in travelling folds, with a bright
@@ -468,7 +465,7 @@ dark, and those between are partly lit. Normally the order is random per
 LED, so a form gathers LED by LED. While rain falls (not sideways), the order follows the
 height (`uFormE[k].x`), so a form comes from the top down, as if rain
 gathered into it, and goes from the top down, as if it ran off as rain.
-A form that rises away as points (`uFormE[k].w`, the cloud and the veil)
+A form that rises away as points (`uFormE[k].w`, the veil and the fractal)
 shows each LED's light a random way below it, so the light lifts off.
 
 **Colour.** The light is the form's first colour mixed towards its second,
@@ -561,10 +558,10 @@ another, from hashes of the seed and the passage's number:
   gathers on it or runs off it.
 - Otherwise the new form is never one of the last two. Each of the others
   is as likely as its weight (`config.js: FORMS`: 1 for the orb, spiral,
-  cloud, ring and veil, 0.4 for the solid, attractor, knot and fractal)
+  ring and veil, 0.4 for the solid, attractor, knot and fractal)
   times the square of how many forms have come since it last did. Over an
-  hour a form comes about 36 times: each of the first five 4.6 times, each
-  of the other four 3.3 times (`tools/story-stats.mjs`).
+  hour a form comes about 36 times: each of the first four about 5.2 times, each
+  of the other four about 3.9 times (`tools/story-stats.mjs`).
 
 The scene setting chooses a pool (`show.js: POOLS`): `mix` uses all
 passages; `crystal` uses only `form` and `still` (and `still` half as
@@ -595,7 +592,7 @@ centre, tilt, how it comes and goes, its own measures and its reach.
 
 Where a form is comes from `forms.js: motion`, as a function of its age and
 of how far it has gone on its way out. Each form has a life of its own
-(`forms.js: orb`, `spiral`, `cloud`, `ring`, `veil`, `solid`, `attractor`,
+(`forms.js: orb`, `spiral`, `ring`, `veil`, `solid`, `attractor`,
 `knot`, `fractal`). For example, the orb
 rises out of the floor to meet its image, drifts, parts in two now and then,
 and sinks back as it leaves. The ring rises lying flat, stands up, and lies
@@ -723,14 +720,13 @@ The layers:
   the same 1/f sway as the light rain, and how much rain falls.
 - **Form voices.** Each form has a voice that swells and fades with its
   weight, panned to where it is seen (`mixVoices`): the orb a warm low hum,
-  the spiral a slow figure of notes (scheduled in `tick`), the cloud a high
-  shimmer, the ring a glassy tone, the veil a soft air, the solid a chord
+  the spiral a slow figure of notes (scheduled in `tick`), the ring a glassy tone, the veil a soft air, the solid a chord
   of three pure fifths, the knot two tones that beat at different paces,
   the fractal a root and fifth in three octaves, each half as loud. The
   attractor's is a figure too (`tick`): its notes follow a path of its own
   through the Lorenz equations (`lorenz.js: lorenzStep`), low notes on one
-  wing and high ones on the other. The cloud and the
-  veil also get a little high noise (`AIRY`).
+  wing and high ones on the other. The
+  veil also gets a little high noise (`AIRY`).
 - **Pale drops.** In a still room a high, soft note falls now and then.
 - **Reverb.** A 6 s convolution reverb (`impulse`), then a compressor.
 

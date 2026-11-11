@@ -2,7 +2,7 @@
 
 A room of small points of light over a mirror floor. Rain of light falls
 through it. Now and then the rain eases off, and a large form of light
-gathers in the room: an orb, a spiral, a cloud of points, a ring, or a veil
+gathers in the room: an orb, a spiral, a ring, or a veil
 like an aurora; or a form of mathematics: a regular solid, the butterfly of
 the Lorenz equations, a Lissajous knot, or a fractal pyramid. Sometimes the rain falls through the form. The show moves
 between these on its own, with slow cross-fades. The weather, the colours
@@ -20,7 +20,7 @@ ripple of light rings a bell.
     <td align="center"><img src="docs/spiral.gif" alt="A spiral of pale blue light turns slowly above a green layer of light and is mirrored in the floor" width="100%"><br><sub>a spiral</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/cloud.gif" alt="A cloud of pink points of light, round heads lit from above over a flat base, floats above a thin blue layer of light and its image in the mirror floor" width="100%"><br><sub>a cloud</sub></td>
+    <td align="center"><img src="docs/attractor.gif" alt="The path of the Lorenz equations in pink light, two wings with a dark eye each, lights travelling along it, above a layer of light and its image in the mirror floor" width="100%"><br><sub>an attractor</sub></td>
     <td align="center"><img src="docs/veil.gif" alt="A veil of green light like an aurora: rays of many heights rise from a bright wavy hem, above a blue layer of light and its image in the floor" width="100%"><br><sub>a veil</sub></td>
   </tr>
 </table>
@@ -62,7 +62,7 @@ also go in the URL, on either page. A few that people use:
 | --- | --- |
 | `?scene=rain` | only the rain |
 | `?scene=crystal` | only the forms of light |
-| `?form=orb` | always the orb (also `spiral`, `cloud`, `ring`, `veil`, `solid`, `attractor`, `knot`, `fractal`, `none`) |
+| `?form=orb` | always the orb (also `spiral`, `ring`, `veil`, `solid`, `attractor`, `knot`, `fractal`, `none`) |
 | `?color=cloud&weather=drizzle` | a colour mode and a weather |
 | `?seed=7&t=120` | one order of the show, from 2 minutes in |
 | `?breath=off` | no breathing swell of the light |

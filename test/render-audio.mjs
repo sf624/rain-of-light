@@ -205,13 +205,13 @@ async function showTrack(root, query, seconds) {
   let t = Number(params.get('t')) || 0;
   show.update(t, STEP);
   show.update(t += STEP, STEP);
-  const NAMES = ['orb', 'spiral', 'layer', 'cloud'];   // by form type
+  const NAMES = ['orb', 'spiral', 'layer', 'ring'];   // by form type
   for (let k = 0; k * STEP < seconds; k++) {
     const st = show.update(t += STEP, STEP);
-    const w = { orb: 0, spiral: 0, cloud: 0 };
+    const w = { orb: 0, spiral: 0, ring: 0 };
     for (let n = 0; n < 2; n++) if (st.A[n * 4 + 1] > 0) w[NAMES[st.A[n * 4]]] += st.A[n * 4 + 1];
     const r3 = (x) => Math.round(x * 1000) / 1000;
-    track.push({ at: r3(k * STEP), t: r3(t), rain: r3(st.rain), orb: r3(w.orb), spiral: r3(w.spiral), cloud: r3(w.cloud), layer: r3(st.A[2 * 4 + 1]) });
+    track.push({ at: r3(k * STEP), t: r3(t), rain: r3(st.rain), orb: r3(w.orb), spiral: r3(w.spiral), ring: r3(w.ring), layer: r3(st.A[2 * 4 + 1]) });
   }
   return track;
 }

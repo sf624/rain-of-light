@@ -334,42 +334,6 @@ vec3 layerLight(vec3 p, vec4 a, vec4 b, vec4 f) {
     clamp(max(-dy, f.y * 0.7 * top * n * 1.6), 0.0, 1.0));
 }
 
-// A cloud of points: round heads of several heights heaped over a flat base,
-// its long side turned by yaw, in two drifts (parted by f.x along it). It is
-// lit from above: the top of each head
-// glows bright and pale, its underside and the base lie in a deeper shade,
-// so the heads stand out from each other. Each LED inside lights where the
-// cloud is thick enough for it, so its edge frays into single points, and
-// each point breathes at its own pace.
-vec3 cloudLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f, float id) {
-  float t = uTime * 0.05;
-  vec3 o = vec3(f.x, 0.0, 0.0) / a.z;
-  vec3 q = turned(p - b.xyz, yaw, 0.0) / a.z;
-  // The heads: (place, radius); the first three go one way as it parts.
-  const vec4 PUFF[6] = vec4[6](vec4(-1.55, 0.0, 0.3, 0.7), vec4(-0.7, 0.5, -0.3, 0.9), vec4(-0.1, 0.05, 0.6, 0.8),
-                               vec4(0.4, 0.95, 0.15, 1.0), vec4(1.3, 0.35, -0.25, 0.8), vec4(1.95, -0.05, 0.3, 0.55));
-  float field = 0.0, cap = 0.0;
-  for (int i = 0; i < 6; i++) {
-    float fi = float(i);
-    vec3 c = PUFF[i].xyz + 0.12 * sin(vec3(1.3, 0.9, 1.1) * t * 3.0 + fi * vec3(2.1, 4.3, 1.7)) + (i < 3 ? -o : o);
-    vec3 d = (q - c) / PUFF[i].w;
-    float r = length(d);
-    field += exp(-r * r * 2.0);
-    // The head's lit top: a shell over its upper side.
-    cap = max(cap, exp(-(r - 0.8) * (r - 0.8) * 14.0) * smoothstep(-0.1, 0.55, d.y / max(r, 1e-3)));
-  }
-  float grain = noise3(p * 0.5 + vec3(t, -t * 0.4, t * 0.7));
-  float base = smoothstep(-0.42, -0.3, q.y);         // the flat base
-  float env = field * base + (grain - 0.5) * 0.35;
-  float dens = smoothstep(0.12, 0.8, env);
-  float top = cap * base * smoothstep(-0.2, 0.2, grain - 0.5 + cap);
-  float h = hash(id + 41.3);
-  float lit = max(smoothstep(h * 0.6, h * 0.6 + 0.1, dens), smoothstep(h * 0.5, h * 0.5 + 0.1, top));
-  float tw = 0.7 + 0.3 * sin(uTime * (0.3 + 0.4 * hash(id + 7.1)) + h * 40.0);
-  float light = lit * (0.32 + 0.6 * dens + 10.0 * top * sqrt(top)) * tw;
-  return vec3(light, top * 0.3, clamp(top * 0.9 + (hash(id + 3.3) - 0.5) * 0.3, 0.0, 1.0));
-}
-
 // A ring: a hoop of light, a bright thread in a soft sheath, its face tilted,
 // two brighter arcs slowly running round it. It may part into two hoops that
 // lean apart (f.x radians) and cross.
@@ -625,19 +589,18 @@ vec3 formsAt(vec3 p, float id, float v, out vec3 thread, out float around) {
       vec3 eye = -(transpose(mat3(uView)) * uView[3].xyz);
       f.x *= smoothstep(LAYER_NEAR.x, LAYER_NEAR.y, length(q.xz - eye.xz));
     }
-    else if (type == 3) f = cloudLight(q, a, b, e.z, ff, id);
-    else if (type == 4) f = ringLight(q, a, b, e.z, ff);
-    else if (type == 5) f = veilLight(q, a, b, e.z, ff);
-    else if (type == 6) f = solidLight(q, a, b, e.z, ff);
-    else if (type == 7) f = attractorLight(q, a, b, e.z, ff);
-    else if (type == 8) f = knotLight(q, a, b, e.z, ff);
+    else if (type == 3) f = ringLight(q, a, b, e.z, ff);
+    else if (type == 4) f = veilLight(q, a, b, e.z, ff);
+    else if (type == 5) f = solidLight(q, a, b, e.z, ff);
+    else if (type == 6) f = attractorLight(q, a, b, e.z, ff);
+    else if (type == 7) f = knotLight(q, a, b, e.z, ff);
     else f = fractalLight(q, a, b, e.z, ff, id);
     if (type != 2) f.x *= FORM_BODY;
     float order = mix(hash(id + float(k) * 7.7), e.y > 0.0 ? v : 1.0 - v, e.x * 0.8);
     float on = clamp((a.y * 1.25 - order) / 0.25, 0.0, 1.0) * smoothstep(0.0, 0.4, a.y);
     vec3 light = mix(mix(uFormC[k], uFormD[k], f.z), WHITE_HOT, clamp(f.y, 0.0, 1.0)) * f.x * on * keep;
     c += light;
-    thread += light * (type == 3 || type == 9 ? 0.25 : type == 2 || type == 4 || type >= 6 ? 0.5 : 1.0);   // a cloud is points, hardly threads; a hoop or a line is not its strands
+    thread += light * (type == 8 ? 0.25 : type == 2 || type == 3 || type >= 5 ? 0.5 : 1.0);   // a fractal is points, hardly threads; a hoop or a line is not its strands
   }
   return c;
 }

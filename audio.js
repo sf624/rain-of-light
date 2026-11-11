@@ -9,8 +9,7 @@
 // change at the same moment. The show's own fades are the clock; the music
 // only eases a little behind them.
 // - Each form of light has a voice that swells and fades with it: the orb a
-//   warm, low hum; the spiral a slow figure of notes that turns; the cloud a
-//   high, airy shimmer; the ring a clear, glassy tone; the veil a soft, open
+//   warm, low hum; the spiral a slow figure of notes that turns; the ring a clear, glassy tone; the veil a soft, open
 //   air; the solid a still chord of pure fifths; the attractor a figure that
 //   wanders between a low and a high wing, never the same way twice; the
 //   knot two tones that beat against each other, each at its own pace; the
@@ -41,12 +40,12 @@ const HOME = 0;                                          // where the harmony re
 const BELLS = [62, 64, 66, 69, 71, 74, 76, 78, 81]; // D major pentatonic
 // The forms' voices, and the chord each one brings when it gathers: the orb
 // (warm palettes) the low, warm G; the spiral the open, unresolved A sus2;
-// the cloud and the veil the soft Em9; the ring the still B minor; the solid
+// the veil the soft Em9; the ring the still B minor; the solid
 // the A sus2 (it is made of fifths); the attractor the restless B minor; the
 // knot the G; the fractal D itself.
-const FORM_CHORD = { orb: 2, spiral: 3, cloud: 4, ring: 1, veil: 4, solid: 3, attractor: 1, knot: 2, fractal: 0 };
+const FORM_CHORD = { orb: 2, spiral: 3, ring: 1, veil: 4, solid: 3, attractor: 1, knot: 2, fractal: 0 };
 const VOICES = Object.keys(FORM_CHORD);
-const AIRY = { cloud: 0.012, veil: 0.007 };              // the forms with the air of the noise, and how much
+const AIRY = { veil: 0.007 };                            // the forms with the air of the noise, and how much
 const SETTLE = 6;    // s: a chord a form brought is not changed again sooner
 
 export function createAudio({ settings }) {
@@ -133,7 +132,7 @@ export function createAudio({ settings }) {
       p.connect(send(0.9));
       voice[name] = { g, p };
     }
-    // The air of the cloud and the veil: the rain's noise, high and narrow, very soft.
+    // The air of the veil: the rain's noise, high and narrow, very soft.
     const air = ctx.createBiquadFilter();
     air.type = 'bandpass';
     air.frequency.value = 3800;
@@ -248,7 +247,7 @@ export function createAudio({ settings }) {
   // figures of notes (see tick); the others are held, like the pad.
   function formLayer(name, notes, t, hold) {
     if (name === 'spiral' || name === 'attractor' || settings.formSound <= 0) return;
-    const level = { orb: 0.035, cloud: 0.025, ring: 0.02, veil: 0.022, solid: 0.022, knot: 0.024, fractal: 0.022 }[name];
+    const level = { orb: 0.035, ring: 0.02, veil: 0.022, solid: 0.022, knot: 0.024, fractal: 0.022 }[name];
     const dest = fadeTo(voice[name].g);
     if (name === 'orb') {
       // Warm and low: the root, its fifth and its octave, soft and dark.
@@ -256,17 +255,6 @@ export function createAudio({ settings }) {
       sustain(r, [['triangle', 0, -3, 1], ['sine', 0, 3, 0.8]], { t, hold, attack: 6, peak: level, cutoff: 700, pan: -0.2, dest, follow: false });
       sustain(r + 7, [['sine', 0, 0, 1], ['triangle', 0, 5, 0.4]], { t, hold, attack: 7, peak: level * 0.8, cutoff: 800, pan: 0.2, dest, follow: false });
       sustain(r + 12, [['sine', 0, -2, 1], ['triangle', 0, 2, 0.5]], { t, hold, attack: 8, peak: level * 0.6, cutoff: 900, pan: 0, dest, follow: false });
-    } else if (name === 'cloud') {
-      // Airy and high: the top notes two octaves up, each a pair a little
-      // apart (a slow shimmer), with the air of the noise.
-      for (const [i, m] of notes.slice(-3).entries()) {
-        sustain(m + 24, [['sine', 0, -7, 1], ['sine', 0, 7, 1]],
-          { t, hold, attack: 8, peak: level * 0.22, cutoff: 6000, pan: (i - 1) * 0.6, dest, follow: false });
-      }
-      for (const [i, m] of notes.slice(-2).entries()) {
-        sustain(m + 12, [['sine', 0, -5, 1], ['triangle', 0, 5, 0.3]],
-          { t, hold, attack: 7, peak: level * 0.35, cutoff: 3000, pan: i ? 0.4 : -0.4, dest, follow: false });
-      }
     } else if (name === 'ring') {
       // Clear and glassy: the root and its fifth two octaves up, pure sines,
       // each a pair a hair apart in tune, so the tone turns slowly.
