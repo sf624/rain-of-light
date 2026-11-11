@@ -79,16 +79,18 @@ export async function launch(tmp) {
   await new Promise((r) => { ws.onopen = r; });
   const send = (method, params = {}, sessionId) => new Promise((resolve, reject) => { const i = ++id; pending.set(i, { resolve, reject }); ws.send(JSON.stringify({ id: i, method, params, sessionId })); });
 
-  // Opens index.html + query in a new tab, w x h, on the fake clock.
-  async function open(query, { w, h, seed = 1, ui = false }) {
+  // Opens a page (index.html, or lab.html) + query in a new tab, w x h, on the
+  // fake clock; touch: as a phone's touch screen (no hover, a coarse pointer).
+  async function open(query, { w, h, seed = 1, ui = false, page: file = 'index.html', touch = false }) {
     const { targetId } = await send('Target.createTarget', { url: 'about:blank' });
     const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true });
     const s = (m, p) => send(m, p, sessionId);
-    const size = (width, height) => s('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
+    const size = (width, height) => s('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: touch });
     await s('Runtime.enable'); await s('Page.enable');
+    if (touch) await s('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
     await size(w, h);
     await s('Page.addScriptToEvaluateOnNewDocument', { source: clock(seed, ui) });
-    await s('Page.navigate', { url: base + 'index.html?' + query });
+    await s('Page.navigate', { url: base + file + '?' + query });
     const ev = async (expression) => { const r = await s('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
       if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text); return r.result.value; };
     for (let i = 0; i < 100; i++) { await sleep(100); if (await ev('typeof window.__step === "function" && !!document.querySelector("canvas") && document.readyState === "complete"')) break; }

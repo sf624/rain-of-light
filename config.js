@@ -133,9 +133,12 @@ export const DEFAULTS = {
 // Older links used ?color=, ?weather= and ?flow= the same way, so they still work.
 export const STORAGE_KEY = 'rain-of-light:settings';
 
+// The panel. An item with `viewer: n` is also on the viewer page's small
+// panel (index.html), as its nth control, under `short` if it has one; the
+// lab (lab.html) shows every item.
 export const SCHEMA = [
   { title: 'Scene', items: [
-    { key: 'scene', label: 'Scene', options: SCENES,
+    { key: 'scene', label: 'Scene', options: SCENES, viewer: 1,
       hint: 'mix: rain and forms of light come and go, and blend / rain: only the rain / crystal: only the forms of light' },
     { key: 'form', label: 'Form', options: ['auto', ...FORMS.map((f) => f.name), 'none'],
       hint: 'auto: as the scene brings them / or hold one form (none: no form)' },
@@ -151,7 +154,7 @@ export const SCHEMA = [
     { key: 'rainShare', label: 'Share of strands with rain', min: 0, max: 1, step: 0.01 },
   ] },
   { title: 'Display', items: [
-    { key: 'quality', label: 'Quality', options: ['auto', 'full'],
+    { key: 'quality', label: 'Quality', options: ['auto', 'full'], viewer: 4,
       hint: 'auto: lowers the sharpness if frames are slow, and raises it again when they are not / full: always as sharp as the screen allows' },
   ] },
   { title: 'Density', items: [
@@ -179,7 +182,7 @@ export const SCHEMA = [
   { title: 'Light', items: [
     { key: 'rainGain', label: 'Trail brightness', min: 0, max: 12, step: 0.1 },
     { key: 'tipGain', label: 'Head brightness', min: 0, max: 15, step: 0.1 },
-    { key: 'exposure', label: 'Exposure', min: 0.2, max: 4, step: 0.05 },
+    { key: 'exposure', label: 'Exposure', min: 0.2, max: 4, step: 0.05, viewer: 3, short: 'Brightness' },
     { key: 'bloom', label: 'Glow', min: 0, max: 2, step: 0.05 },
     { key: 'fog', label: 'Visible distance', min: 6, max: 40, step: 0.5 },
     { key: 'rays', label: 'Light rays', options: ['off', '2', '4', '6', '8'],
@@ -200,7 +203,7 @@ export const SCHEMA = [
       hint: 'auto: as the passage has it (now and then a passage of sideways rain) / down: from above / across: sideways' },
   ] },
   { title: 'Colour', items: [
-    { key: 'color', label: 'Colour mode', options: ['auto', ...COLOR_MODES.map((m) => m.name)],
+    { key: 'color', label: 'Colour mode', options: ['auto', ...COLOR_MODES.map((m) => m.name)], viewer: 2,
       hint: 'mono: one palette / gradient: flowing gradient / rainbow: a hue per drop / '
         + 'palette: each drop picks from a set / accent: pale rain, now and then a coloured drop / '
         + 'comet: white heads, coloured trails / speed: colour by speed / cloud: drifting clouds of colour / '
@@ -236,10 +239,10 @@ export const SCHEMA = [
   ] },
   { title: 'Sound (m key or the note button)', items: [
     { key: 'volume', label: 'Volume', min: 0, max: 1, step: 0.01 },
-    { key: 'music', label: 'Pad', min: 0, max: 1, step: 0.05 },
-    { key: 'chimes', label: 'Bells', min: 0, max: 1, step: 0.05 },
-    { key: 'rainSound', label: 'Rain', min: 0, max: 1, step: 0.05 },
-    { key: 'formSound', label: 'Forms', min: 0, max: 1, step: 0.05,
+    { key: 'music', label: 'Pad', min: 0, max: 1, step: 0.05, viewer: 5 },
+    { key: 'chimes', label: 'Bells', min: 0, max: 1, step: 0.05, viewer: 6 },
+    { key: 'rainSound', label: 'Rain', min: 0, max: 1, step: 0.05, viewer: 7 },
+    { key: 'formSound', label: 'Forms', min: 0, max: 1, step: 0.05, viewer: 8,
       hint: 'The voice each form of light brings: the orb a low hum, the spiral a turning figure, the cloud a high shimmer, the ring a glassy tone, the veil a soft air' },
   ] },
 ];

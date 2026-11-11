@@ -537,8 +537,10 @@ function apply(key) {
   if (BEGIN[track]) BEGIN[track](episode[track]);
 }
 
+// Which panel: lab.html (data-page="lab") shows every setting, the viewer page a few.
 const tuner = createTuner({
-  schema: SCHEMA, settings: S, defaults: DEF, storageKey: STORAGE_KEY,
+  schema: SCHEMA, lab: document.documentElement.dataset.page === 'lab',
+  settings: S, defaults: DEF, storageKey: STORAGE_KEY,
   onChange: (key) => apply(key),
 });
 look = {

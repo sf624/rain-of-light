@@ -13,6 +13,8 @@
 //   click   [x, y] as shares of the view: a click, then `after` frames (default 20)
 //   keys    keys pressed after the frames, each followed by `after` frames
 //   ui      true: keep the page's buttons and panel in the picture
+//   page    the page loaded, default index.html (lab.html: the full panel)
+//   touch   true: as on a phone's touch screen
 //   w, h    a size of its own
 //   crop    [x0, y0, x1, y1] as shares of the shot: doc-images.py shows only that part
 // OUT_DIR/<figure>/cells.json keeps the labels (for doc-images.py) and the
@@ -40,7 +42,8 @@ for (const { f, c, i, warm } of jobs) {
   for (const part of [cfg.base, f.base, c.q]) for (const [k, v] of new URLSearchParams(part ?? '')) params.set(k, v);
   const query = params.toString();
   if (!warm) queries.set(f, [...(queries.get(f) ?? []), query]);
-  const page = await browser.open(query, { w, h, seed: c.seed ?? 1, ui: !!c.ui });
+  const page = await browser.open(query, { w, h, seed: c.seed ?? 1, ui: !!c.ui,
+    page: c.page ?? f.page, touch: !!(c.touch ?? f.touch) });
   await page.preroll(warm ? 2 : c.pre ?? f.pre ?? 60);
   await page.step(warm ? 2 : c.frames ?? f.frames ?? 40, c.ms ?? 50);
   const after = c.after ?? 20;

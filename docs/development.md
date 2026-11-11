@@ -21,10 +21,12 @@ reload.
 
 | File | What |
 | --- | --- |
-| `index.html`, `style.css` | the page |
+| `index.html`, `style.css` | the viewer page, with a small settings panel |
+| `lab.html` | the lab: the same page, with every setting in its panel (`data-page="lab"`) |
+| `boot.js` | shows any error on the page, and registers the service worker |
 | `main.js` | the frame loop: puts the directors' choices to work, the camera, the drawing |
 | `director.js` | the rain's director: which weather, colour mode, density and camera move come when, from the seed; and the colour story's mood |
-| `config.js` | palettes, colour modes, weathers, camera moves, forms, passages, the room, default settings and the panel's layout |
+| `config.js` | palettes, colour modes, weathers, camera moves, forms, passages, the room, default settings and the panel's layout (`viewer: n` marks the viewer page's settings) |
 | `show.js` | the show's director: the timeline of passages, how much rain falls and which way, which forms of light show, and how bright |
 | `direction.js` | a change of the rain's direction: the old drops stop coming and fade out before the new ones set out |
 | `forms.js` | how each form of light moves through its life: where it is, how large and how turned |
@@ -70,9 +72,14 @@ frame loop that stops, or a black canvas. It visits:
   changes the scene in the panel (the page must not reload) and checks that
   Reset brings back the mix;
 - every colour mode;
-- the panel (`#tune`): the repository link and the commit link from a fake
-  `version.json`, and that the sliders let a finger scroll;
-- the pinned scenes (`rain`, `crystal`), a time part-way through the show
+- both panels, the lab's (`lab.html#tune`) and then the viewer page's
+  (`#tune`): the repository link and the commit link from a fake
+  `version.json`, that the sliders let a finger scroll, which settings
+  each panel shows (the viewer page: the items marked `viewer` in
+  `config.js`), the link to the other page, and that the viewer page sees
+  a setting the lab saved and its Reset clears it;
+- the pinned scenes (`rain` in the lab, `crystal`, both with the click,
+  keys and Reset), a time part-way through the show
   (with and without the colour story), the ring and the veil held, and
   `?jitter=pitch`.
 
@@ -99,8 +106,8 @@ limits.
 The capture tools load the page in Chrome on a fake clock: a seeded
 `Math.random`, and a `performance.now` and `requestAnimationFrame` that move
 only when the tool steps them. So a run is repeatable. `tools/page.mjs`
-holds what they share: it serves the repo, starts Chrome, opens the page and
-hides the page's buttons.
+holds what they share: it serves the repo, starts Chrome, opens the page
+(`index.html`, or `lab.html`) and hides the page's buttons.
 
 By default Chrome runs with a window, on the GPU (written for WSLg on WSL2
 with an NVIDIA card: about 50 ms per frame). `CAP_MODE=swiftshader` uses
@@ -140,7 +147,8 @@ After a change that shows, make the pictures again and look at each one:
 a form or a passage may then be off screen at the time a cell names.
 `show.cast(t)` (see `tools/story-stats.mjs` for how to load `show.js` in
 Node) tells which passage and forms show at a time of a seed. A cell can
-also give `click`, `keys`, `crop` and `ui` (keep the buttons); the top of
+also give `click`, `keys`, `crop`, `ui` (keep the buttons), `page`
+(`lab.html` for the full panel) and `touch` (as on a phone); the top of
 `tools/doc-shots.mjs` lists them. `DOC_SHOTS=other.json` tries out another
 list.
 

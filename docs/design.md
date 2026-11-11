@@ -652,15 +652,33 @@ Colour, Camera, Ripples, Meditation, Sound). An item with `options` is a
 select; one with `min`, `max` and `step` is a slider. The per-setting guide
 is [settings.md](settings.md).
 
+Two pages run the same app, with two panels:
+
+- `index.html`, the viewer page, shows a small panel: the items marked
+  `viewer: n` in `SCHEMA`, in that order, each under its `short` label if
+  it has one (`tuner.js: viewerSchema`). Its rows put each name beside its
+  control. A group keeps its heading only where it brings more than one
+  item: the four sound levels sit under Sound, the other four have no
+  heading. In a short landscape view the sound stands beside them.
+- `lab.html`, the lab, shows every item of `SCHEMA`, and a Copy button. It
+  differs from `index.html` only in `data-page="lab"` on `<html>` (read by
+  `main.js`), its title and its share tags.
+
+Each panel links to the other page with the same URL query and `#tune`.
+Both pages read and save the same settings (`STORAGE_KEY`): a setting
+changed in the lab stays changed on the viewer page, which does not show
+it, and the viewer page's Reset sets it back with every other one. So a
+viewer can always return to the defaults.
+
 Where a value comes from (`tuner.js: loadSettings`): the default, then what
 this browser saved (`localStorage`, key `STORAGE_KEY`), then the URL
 (`?key=value`). The URL wins. `main.js` then checks every value: an unknown
 option falls back to its default; a number is clamped to its range.
 
 The panel (`tuner.js: createTuner`) opens with the gear button, the `p` key
-or a link ending in `#tune`. It saves only values changed in the panel, not
-ones given in the URL. Reset returns every setting to its default. Copy
-copies the settings as JSON. On a touch screen a slider moves only on a
+or a link ending in `#tune`. It saves only values changed in the panel (or
+by a key), not ones given in the URL. Reset returns every setting to its
+default, also on the viewer page. Copy copies the settings as JSON. On a touch screen a slider moves only on a
 sideways drag, so a vertical drag scrolls the panel (`touchSlider`).
 
 A change applies at once (`main.js: apply`): the lattice is rebuilt for its
@@ -670,7 +688,7 @@ The show reads the scene, form and layer settings every frame and blends
 into a change.
 
 Besides the settings, the URL takes `?seed=`, `?t=` and `?dpr=` (the
-highest pixel ratio, default 2).
+highest pixel ratio, default 2). Both pages take every parameter.
 
 ### Keys and controls
 
@@ -686,7 +704,9 @@ highest pixel ratio, default 2).
 | `m` | sound on and off |
 
 With a setting at `auto`, `w`, `c` and `v` move on to the next episode;
-otherwise they step to the next choice (`main.js: step`). `c` also moves
+otherwise they step to the next choice (`main.js: step`). The keys are the
+same on both pages; `w`, `d` and `v` set settings that only the lab's panel
+shows. `c` also moves
 every form to its next palette (`show.js: createShow`, `recolor`).
 
 A mouse click rings a ripple at once. A finger rings one only on a tap
@@ -746,15 +766,16 @@ Quality `full` keeps the full scale. The largest LED size in pixels
 
 ### Errors and a lost context
 
-An inline script in `index.html` (`showError`) shows any error on the page,
-so a black screen is never silent. Without WebGL2 a fallback message shows.
-A lost WebGL context stops the loop; when the browser gives it back, the
-page reloads.
+A classic script that runs before the module (`boot.js: showError`) shows
+any error on the page, so a black screen is never silent. Without WebGL2 a
+fallback message shows. A lost WebGL context stops the loop; when the
+browser gives it back, the page reloads.
 
 ### Offline (PWA)
 
 `manifest.webmanifest` makes the page installable (full screen, any
-orientation). `index.html` registers `sw.js` on https and on localhost.
+orientation) and opens the viewer page. `boot.js` registers `sw.js` on
+https and on localhost.
 
 `sw.js` fetches from the network first, and falls back to the cache. So
 online visitors always get the newest files (there is no build step and no
@@ -775,11 +796,13 @@ GitHub link shows.
 
 | File | What it holds |
 | --- | --- |
-| `index.html` | The canvas, the overlay, the fallback, the error script, the service worker registration. |
-| `style.css` | The page, the buttons, the panel, the turned picture (`body.turned`), the idle state. |
+| `index.html` | The viewer page: the canvas, the overlay, the fallback; it loads `boot.js` and `main.js`. |
+| `lab.html` | The lab: the same page with `data-page="lab"`, so the panel shows every setting. |
+| `boot.js` | The error script (`showError`) and the service worker registration, before the module. |
+| `style.css` | The page, the buttons, both panels (`.tuner.basic`: the viewer page's), the turned picture (`body.turned`), the idle state. |
 | `main.js` | The entry point: settings check, render targets, adaptive quality, input, the camera, the director's episodes, easing, uniforms, draws and post passes. |
 | `shaders.js` | All GLSL: `POINT_VS` (every LED's light), `POINT_FS`, `WIRE_FS`, `RAY_FS`, and the full-screen passes `QUAD_VS`, `DOWN_FS`, `BLUR_FS`, `COMPOSITE_FS`. |
-| `config.js` | Static data: palettes, weather, colour modes, sets, sky, cameras, forms, room, passages; `DEFAULTS` and `SCHEMA`. |
+| `config.js` | Static data: palettes, weather, colour modes, sets, sky, cameras, forms, room, passages; `DEFAULTS` and `SCHEMA` (with the viewer panel's marks). |
 | `lattice.js` | The point and wire buffers, and their build: strand places, LED spacing, thinning ranks. |
 | `show.js` | The show's timeline of passages, fades, casting into slots, form colours, the rain's direction over time. |
 | `forms.js` | How each form moves through its life: centre, size, turn, tilt, its own measures, reach. |
@@ -787,7 +810,7 @@ GitHub link shows.
 | `direction.js` | The change of the rain's direction: weights and gates per direction. |
 | `audio.js` | The generative music: pad, bells, rain, form voices, reverb. |
 | `sway.js` | 1/f fluctuation: smooth random curves, one per octave, added up. |
-| `tuner.js` | The settings panel, saving, and `loadSettings`. |
+| `tuner.js` | The settings panel (the viewer page's few or the lab's all: `viewerSchema`), saving, and `loadSettings`. |
 | `controls.js` | The sound button, the volume bar, the full-screen button. |
 | `rotate.js` | Landscape or portrait on demand; `view` maps pointer positions. |
 | `wakelock.js` | Keeps the screen awake. |
@@ -835,10 +858,12 @@ Details and commands are in [development.md](development.md).
   (software GL) over the DevTools protocol. It fails on any error, on a
   shown fallback, on a frame loop that stalls, or on a black canvas. It
   visits the default page (with a click, the keys, turning the picture, a
-  scene change without a reload, and Reset), every colour mode, the panel
-  (`#tune`: the GitHub link and the commit link from a fake
-  `version.json`, and the sliders' `touch-action`), the rain and crystal
-  scenes, a seeded time with and without the story, the ring and the veil
+  scene change without a reload, and Reset), every colour mode, both panels
+  (`lab.html#tune` and `#tune`: the GitHub link and the commit link from a
+  fake `version.json`, the sliders' `touch-action`, which settings each
+  shows, the link to the other page, and the shared saved settings that
+  the viewer page's Reset clears), the rain scene in the lab and the
+  crystal scene (with the same click, keys and Reset), a seeded time with and without the story, the ring and the veil
   held, and `?jitter=pitch`. It then renders the sound: a held orb must be
   audible, a still room at least 3 dB quieter, and neither may clip. The
   `test` workflow runs it on every pull request and push to main.

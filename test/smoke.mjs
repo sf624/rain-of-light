@@ -157,6 +157,7 @@ const COUNT_RAF = `(() => { window.__frames = 0; const r = window.requestAnimati
   window.requestAnimationFrame = (cb) => r((t) => { window.__frames++; cb(t); }); })()`;
 
 async function visit(cdp, base, query, interact) {
+  const lab = query.startsWith('lab.html');
   const label = query || '(default)';
   const errors = [];
   const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
@@ -200,7 +201,7 @@ async function visit(cdp, base, query, interact) {
   check('while loading');
   const state = await evalJs(`({ fb: !document.getElementById('fallback').hidden, text: document.getElementById('fallback').textContent, f: window.__frames })`);
   if (state.fb) fail(`[${label}] #fallback is visible: ${state.text}`);
-  if (query === '#tune') { // the panel's footer: the repository link, and the commit from version.json
+  if (query.endsWith('#tune')) { // the panel's footer: the repository link, and the commit from version.json
     const foot = await poll(`the panel footer with the commit link [${label}] ${pageUrl}`, async () => {
       const f = await evalJs(`(() => { const a = [...document.querySelectorAll('.tuner-foot a')];
         return { gh: a[0]?.href, rel: a[0]?.rel, sha: a[1]?.textContent, href: a[1]?.href }; })()`);
@@ -211,6 +212,30 @@ async function visit(cdp, base, query, interact) {
     // a vertical drag that starts on a slider must scroll the panel, not move the slider
     const ta = await evalJs(`getComputedStyle(document.querySelector('.tuner input[type=range]')).touchAction`);
     if (ta !== 'pan-y') fail(`[${label}] the panel's sliders have touch-action ${ta}, not pan-y`);
+    // The viewer page's panel has only the items marked `viewer` (in their order), the lab's every
+    // item; each links to the other page, with the panel open there. Both keep one set of saved
+    // settings: the lab saves a setting the viewer panel does not show, and the viewer's Reset clears it.
+    const panel = await evalJs(`(() => ({ keys: [...document.querySelectorAll('.tuner-row')].map((r) => r.dataset.key),
+      buttons: [...document.querySelectorAll('.tuner-buttons button')].map((b) => b.textContent),
+      other: document.querySelector('.tuner-page a')?.href, saved: localStorage.getItem(${JSON.stringify(STORAGE_KEY)}) }))()`);
+    const want = lab ? schema.all : schema.viewer;
+    if (panel.keys.join() !== want.join()) fail(`[${label}] the panel shows ${panel.keys.join()}, not ${want.join()}`);
+    if (!lab && (panel.keys.includes('jitter') || want.length > 8)) fail(`[${label}] the viewer panel has lab settings: ${panel.keys.join()}`);
+    const buttons = lab ? 'Copy,Reset,×' : 'Reset,×';
+    if (panel.buttons.join() !== buttons) fail(`[${label}] the panel's buttons are ${panel.buttons.join()}, not ${buttons}`);
+    const other = lab ? `${base}#tune` : `${base}lab.html#tune`;
+    if (panel.other !== other) fail(`[${label}] the link to the other page is ${panel.other}, not ${other}`);
+    if (lab) {
+      await evalJs(`(() => { const s = document.querySelector('.tuner-row[data-key="story"] select'); s.value = 'off';
+        s.dispatchEvent(new Event('change')); })()`);
+      const saved = await evalJs(`localStorage.getItem(${JSON.stringify(STORAGE_KEY)})`);
+      if (JSON.parse(saved || '{}').story !== 'off') fail(`[${label}] the lab did not save story=off: ${saved}`);
+    } else {
+      if (JSON.parse(panel.saved || '{}').story !== 'off') fail(`[${label}] the viewer page does not see the lab's saved settings: ${panel.saved}`);
+      const saved = await evalJs(`(() => { [...document.querySelectorAll('.tuner-buttons button')].find((b) => b.textContent === 'Reset').click();
+        return localStorage.getItem(${JSON.stringify(STORAGE_KEY)}); })()`);
+      if (saved !== '{}') fail(`[${label}] the viewer's Reset left saved settings: ${saved}`);
+    }
   }
   // wait for MIN_FRAMES frames, and for more frames after the check above
   const f2 = await poll(`the frame loop to advance (>= ${MIN_FRAMES} frames, 3 more than ${state.f}) [${label}] ${pageUrl}`, async () => {
@@ -271,22 +296,27 @@ const base = `http://127.0.0.1:${port}/`;
 const cdp = connect(await startChrome());
 await cdp.opened;
 
-// Colour modes come from config.js (it reads `innerWidth`, so import it in the page, not in Node).
+// Colour modes and the panels' items come from config.js (it reads `innerWidth`, so import it in the page, not in Node).
 const { targetId } = await cdp.send('Target.createTarget', { url: `${base}index.html` });
 const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
 await poll(`index.html to load before reading config.js (${base}index.html)`, async () =>
   (await cdp.send('Runtime.evaluate', { expression: `location.href.startsWith(${JSON.stringify(base)}) && document.readyState === 'complete'`, returnByValue: true }, sessionId)).result.value === true);
-const r = await cdp.send('Runtime.evaluate', { expression: `import('./config.js').then((c) => c.COLOR_MODES.map((m) => m.name))`,
+const r = await cdp.send('Runtime.evaluate', { expression: `import('./config.js').then((c) => {
+  const items = c.SCHEMA.flatMap((g) => g.items);
+  return { modes: c.COLOR_MODES.map((m) => m.name), storageKey: c.STORAGE_KEY, all: items.map((i) => i.key),
+    viewer: items.filter((i) => i.viewer).sort((a, b) => a.viewer - b.viewer).map((i) => i.key) }; })`,
   awaitPromise: true, returnByValue: true }, sessionId);
-if (r.exceptionDetails || !Array.isArray(r.result.value)) fail(`could not read COLOR_MODES from config.js: ${r.exceptionDetails?.exception?.description || r.exceptionDetails?.text}`);
-const modes = r.result.value;
+if (r.exceptionDetails || !Array.isArray(r.result.value?.modes)) fail(`could not read config.js: ${r.exceptionDetails?.exception?.description || r.exceptionDetails?.text}`);
+const { modes, storageKey: STORAGE_KEY, ...schema } = r.result.value;
 await cdp.send('Target.closeTarget', { targetId });
 
 await visit(cdp, base, '', true);
 for (const m of modes) await visit(cdp, base, `?color=${encodeURIComponent(m)}`, false);
+// The lab's panel, then the viewer page's (in this order: the second reads what the first saved).
+await visit(cdp, base, 'lab.html#tune', false);
 await visit(cdp, base, '#tune', false);
-// The pinned scenes, and the mix part-way through (a form, rain going or coming).
-await visit(cdp, base, '?scene=rain', true);
+// The pinned scenes (the rain in the lab), and the mix part-way through (a form, rain going or coming).
+await visit(cdp, base, 'lab.html?scene=rain', true);
 await visit(cdp, base, '?scene=crystal', true);
 await visit(cdp, base, '?seed=7&t=100', false);
 await visit(cdp, base, '?seed=7&t=100&story=off', false);   // without the colour story

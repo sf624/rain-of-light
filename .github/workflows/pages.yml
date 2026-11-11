@@ -31,7 +31,7 @@ jobs:
         run: |
           mkdir _site
           # Only what the page, the manifest and the service worker load.
-          cp index.html style.css manifest.webmanifest favicon.svg og-image.jpg sw.js ./*.js _site/
+          cp index.html lab.html style.css manifest.webmanifest favicon.svg og-image.jpg sw.js ./*.js _site/
           cp -r icons _site/icons
           printf '{"sha":"%s","date":"%s"}\n' "$GITHUB_SHA" \
             "$(git log -1 --format=%cI "$GITHUB_SHA")" > _site/version.json

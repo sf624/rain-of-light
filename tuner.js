@@ -1,9 +1,10 @@
 // A small panel of sliders and selects bound to a settings object.
 // Settings are saved in this browser, so tuning survives a reload.
+// The viewer page (index.html) shows a few of them; the lab (lab.html), all.
 
 import { view } from './rotate.js';
 
-export function createTuner({ schema, settings, defaults, storageKey, onChange }) {
+export function createTuner({ schema, lab = false, settings, defaults, storageKey, onChange }) {
   const toggle = document.createElement('button');
   toggle.className = 'tuner-toggle';
   toggle.type = 'button';
@@ -12,18 +13,18 @@ export function createTuner({ schema, settings, defaults, storageKey, onChange }
   toggle.textContent = '⚙';
 
   const root = document.createElement('aside');
-  root.className = 'tuner';
+  root.className = lab ? 'tuner' : 'tuner basic';
   root.hidden = true;
 
   const head = document.createElement('div');
   head.className = 'tuner-head';
-  head.innerHTML = '<strong>Settings</strong>';
+  head.innerHTML = `<strong>${lab ? 'All settings' : 'Settings'}</strong>`;
   const buttons = document.createElement('div');
   buttons.className = 'tuner-buttons';
   const copyBtn = button('Copy', 'Copy the settings as JSON');
-  const resetBtn = button('Reset', 'Back to the defaults');
+  const resetBtn = button('Reset', 'Every setting back to its default');
   const closeBtn = button('×', 'Close (p)');
-  buttons.append(copyBtn, resetBtn, closeBtn);
+  buttons.append(...(lab ? [copyBtn] : []), resetBtn, closeBtn);
   head.append(buttons);
   root.append(head);
 
@@ -33,14 +34,17 @@ export function createTuner({ schema, settings, defaults, storageKey, onChange }
   let kept = {};
   try { kept = JSON.parse(localStorage.getItem(storageKey) || '{}') || {}; } catch { /* storage blocked */ }
 
-  for (const group of schema) {
+  for (const group of lab ? schema : viewerSchema(schema)) {
     const section = document.createElement('section');
-    const h = document.createElement('h3');
-    h.textContent = group.title;
-    section.append(h);
+    if (group.title) {
+      const h = document.createElement('h3');
+      h.textContent = group.title;
+      section.append(h);
+    }
     for (const item of group.items) {
       const row = document.createElement('label');
       row.className = 'tuner-row';
+      row.dataset.key = item.key;
       const name = document.createElement('span');
       name.className = 'tuner-name';
       name.textContent = item.label;
@@ -73,8 +77,16 @@ export function createTuner({ schema, settings, defaults, storageKey, onChange }
     root.append(section);
   }
 
+  // The other page, with the same URL settings and the panel open.
+  const other = document.createElement('p');
+  other.className = 'tuner-page';
+  const link = document.createElement('a');
+  link.href = `${lab ? './' : 'lab.html'}${location.search}#tune`;
+  link.textContent = lab ? 'Fewer settings' : 'All settings';
+  link.title = lab ? 'The viewer page' : 'The lab: every setting';
+  other.append(link);
   const foot = footer();
-  root.append(foot);
+  root.append(other, foot);
   document.body.append(toggle, root);
   refresh();
   let versionAsked = false;
@@ -225,6 +237,23 @@ export function createTuner({ schema, settings, defaults, storageKey, onChange }
     refresh,
     set,
   };
+}
+
+// The viewer page's panel: the items marked `viewer: n`, in that order, each
+// under its `short` label if it has one. A group keeps its heading where it
+// brings more than one item; the others share a section without one.
+export function viewerSchema(schema) {
+  const picked = schema.flatMap((group) => group.items.filter((item) => item.viewer)
+    .map((item) => ({ group, item: { ...item, label: item.short ?? item.label } })))
+    .sort((a, b) => a.item.viewer - b.item.viewer);
+  const sections = [];
+  for (const { group, item } of picked) {
+    const title = picked.filter((p) => p.group === group).length > 1 ? group.title : '';
+    const last = sections.at(-1);
+    if (last && last.title === title) last.items.push(item);
+    else sections.push({ title, items: [item] });
+  }
+  return sections;
 }
 
 // Defaults, then what this browser saved, then the URL (?key=value).

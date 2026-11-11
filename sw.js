@@ -6,7 +6,7 @@ const CACHE = 'rain-of-light';
 // Precached on install, so that one visit is enough to work offline.
 // Add new modules and assets here.
 const CORE = [
-  './', 'index.html', 'style.css', 'manifest.webmanifest', 'favicon.svg',
+  './', 'index.html', 'lab.html', 'boot.js', 'style.css', 'manifest.webmanifest', 'favicon.svg',
   'main.js', 'config.js', 'shaders.js', 'lattice.js', 'gl.js', 'show.js', 'forms.js', 'director.js', 'direction.js',
   'controls.js', 'audio.js', 'sway.js', 'tuner.js', 'wakelock.js', 'rotate.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png',
