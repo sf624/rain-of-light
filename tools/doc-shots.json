@@ -34,7 +34,10 @@
       {"q": "form=cloud", "label": "form=cloud"},
       {"q": "form=ring", "label": "form=ring"},
       {"q": "form=veil", "label": "form=veil"},
-      {"q": "form=none", "label": "form=none"}
+      {"q": "form=solid&t=50", "label": "form=solid"},
+      {"q": "form=attractor&t=55", "label": "form=attractor"},
+      {"q": "form=knot&t=50", "label": "form=knot"},
+      {"q": "form=fractal&t=60", "label": "form=fractal"}
     ] },
     { "name": "layer", "cols": 3, "base": "scene=crystal&t=30", "cells": [
       {"q": "form=orb&layer=off", "label": "form=orb&layer=off"},

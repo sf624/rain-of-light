@@ -17,6 +17,7 @@ import { createDirection } from './direction.js';
 import { FLOW_WRAP, RAY_CAP, POINT_VS, POINT_FS, WIRE_FS, QUAD_VS, DOWN_FS, BLUR_FS, COMPOSITE_FS } from './shaders.js';
 import { createGL, sub, cross, dot, norm, perspective, lookAt } from './gl.js';
 import { createLattice, fillLattice } from './lattice.js';
+import { lorenzField } from './lorenz.js';
 import { createControls } from './controls.js';
 import { keepAwake } from './wakelock.js';
 import { view, createRotation } from './rotate.js';
@@ -96,7 +97,7 @@ function viewFit() {
 }
 const fovRad = () => viewFit().fov;
 
-const { program, target, freeTarget } = createGL(gl);
+const { program, target, freeTarget, field } = createGL(gl);
 
 // ---------- the lattice ----------
 const pointProg = program(POINT_VS, POINT_FS);
@@ -105,6 +106,18 @@ const downProg = program(QUAD_VS, DOWN_FS);
 const blurProg = program(QUAD_VS, BLUR_FS);
 const compProg = program(QUAD_VS, COMPOSITE_FS);
 const MAX_POINT = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1]; // the largest sprite this GPU draws
+// The attractor's path as a field, on a texture unit of its own (the glow's
+// passes use the first four). It is worked out when an attractor first
+// comes, still unseen; until then an empty field stands in.
+const PATH_UNIT = 4;
+let pathTex = field(PATH_UNIT, 1, new Float32Array(4)), pathReady = false;
+function pathField() {
+  if (pathReady) return;
+  pathReady = true;
+  gl.deleteTexture(pathTex);
+  const { cells, data } = lorenzField();
+  pathTex = field(PATH_UNIT, cells, data);
+}
 
 const lattice = createLattice(gl);
 let count = 0, GRID = 0, ROWS = 0, wireCount = 0;
@@ -686,6 +699,7 @@ function frame(now) {
   for (const f of shown.forms) f.pan = panOf(f.at);
   sound.forms(shown.forms);
 
+  if (shown.forms.some((f) => f.name === 'attractor')) pathField();
   // Points.
   gl.bindFramebuffer(gl.FRAMEBUFFER, hasFloat ? scene.fb : null);
   if (hasFloat) gl.drawBuffers(BOTH);
@@ -773,6 +787,7 @@ function frame(now) {
   gl.uniform3fv(u.uFormC, shown.C);
   gl.uniform3fv(u.uFormD, shown.D);
   gl.uniform3fv(u.uTint, shown.tint);
+  gl.uniform1i(u.uPath, PATH_UNIT);
   gl.uniform1f(u.uTwinkle, S.twinkle);
   gl.uniform4fv(u.uCopy, copies);
   gl.uniform1fv(u.uCopyGain, copyGain);

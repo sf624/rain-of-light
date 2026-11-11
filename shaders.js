@@ -1,6 +1,8 @@
 // The GLSL sources: a vertex and fragment pair for the points, and three
 // full-screen passes (downsample, blur, composite) that share QUAD_VS.
 
+import { LORENZ } from './lorenz.js';
+
 // The falling time wraps at this many flow units (see drop() in POINT_VS).
 export const FLOW_WRAP = 1000;
 // A light ray is at most this many times the Ray length setting (see POINT_VS: rayK).
@@ -8,6 +10,7 @@ export const RAY_CAP = 2.5;
 
 export const POINT_VS = `#version 300 es
 precision highp float;
+precision highp sampler3D;
 layout(location = 0) in vec4 aData; // x, u (0 top .. 1 bottom), z, seed
 layout(location = 1) in vec3 aRank; // order in which strands and LEDs go dark when thinning; the LED's gain
 uniform mat4 uProj;
@@ -68,7 +71,7 @@ uniform float uRainShare; // share of strands (or lanes across the flow) that ca
 // The show: how much of the rain's look there is, forms of light, and the mirrors.
 uniform float uRainMix;   // 0: the still room's look (pale drops, the room's tint) .. 1: the rain's colours
 uniform float uStorm;     // 0 .. 1: how much rain falls through a form (the rain gives way to it)
-uniform vec4 uFormA[3];   // per form: type (0 orb, 1 spiral, 2 layer, 3 cloud, 4 ring, 5 veil), weight 0..1, size, turn
+uniform vec4 uFormA[3];   // per form: type (see FORMS and LAYER in config.js), weight 0..1, size, turn
 uniform vec4 uFormB[3];   // centre (the layer: its height in y), tilt
 uniform vec4 uFormE[3];   // how much it comes and goes from the top down (0: LED by LED), 1 coming / -1 going,
                           // the way the tilt leans (yaw), how far it has risen away as points (0 .. 1)
@@ -76,6 +79,7 @@ uniform vec4 uFormF[3];   // the form's own measures (see forms.js), and how far
 uniform vec3 uFormC[3];   // the form's colour
 uniform vec3 uFormD[3];   // its second colour
 uniform vec3 uTint;       // the colour of the room: of the forms shown now
+uniform sampler3D uPath;  // the attractor's path as a field (see lorenz.js)
 uniform float uTwinkle;
 uniform vec3 uMirror;     // floor height, reflection gain (> 0: drawing the reflection), its fade length
 uniform vec4 uCopy[9];    // wall mirrors, per instance: x sign, x offset, z sign, z offset
@@ -421,6 +425,163 @@ vec3 veilLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
   return vec3(light, hem * 0.35, clamp(y / tall * 1.7, 0.0, 1.0));
 }
 
+// The forms drawn as lines (a solid's edges, a knot): a bright thread in a
+// soft sheath, like the ring's, from the squared distance to the line (in
+// strand gaps, see fineness).
+float lineGlow(float d2) { return exp(-d2 * 12.0) + 0.22 * exp(-d2 * 3.0); }
+// Light running along a line: how bright a place is that lies a way (back) behind
+// the running head (0 .. 1 of the way to the head after it): a head, a trail
+// that fades over a length (trail), and a short rise before the head, never lit at once.
+float runner(float back, float trail) { return exp(-back / trail) + exp(-(1.0 - back) / (trail * 0.06)); }
+
+// A solid: the edges of a regular solid as lines of light, a star at each
+// corner, slowly tumbling (yaw, tilt, and a.w about its own axis): a
+// tetrahedron or an octahedron (f.x: which, see SOLID), their corners a.z
+// from the centre. The edges are drawn out from the
+// corners (f.y: how far, 0 .. 1).
+const float H3 = 0.57735;                            // 1 / sqrt(3)
+const vec3 CORNER[10] = vec3[10](
+  vec3(H3, H3, H3), vec3(H3, -H3, -H3), vec3(-H3, H3, -H3), vec3(-H3, -H3, H3),
+  vec3(1.0, 0.0, 0.0), vec3(-1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), vec3(0.0, -1.0, 0.0), vec3(0.0, 0.0, 1.0), vec3(0.0, 0.0, -1.0));
+const ivec2 EDGE[18] = ivec2[18](
+  ivec2(0, 1), ivec2(0, 2), ivec2(0, 3), ivec2(1, 2), ivec2(1, 3), ivec2(2, 3),
+  ivec2(4, 6), ivec2(4, 7), ivec2(4, 8), ivec2(4, 9), ivec2(5, 6), ivec2(5, 7), ivec2(5, 8), ivec2(5, 9), ivec2(6, 8), ivec2(6, 9), ivec2(7, 8), ivec2(7, 9));
+const ivec4 SOLID[2] = ivec4[2](ivec4(0, 6, 0, 4), ivec4(6, 12, 4, 6));   // first edge, edges, first corner, corners
+vec3 solidLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
+  float cs = cos(a.w), sn = sin(a.w);
+  vec3 q = turned(p - b.xyz, yaw, b.w) / a.z;
+  vec3 up = turned(vec3(0.0, 1.0, 0.0), 0.0, b.w);   // the vertical, as the solid sees it
+  q = vec3(cs * q.x - sn * q.z, q.y, sn * q.x + cs * q.z);
+  up = vec3(cs * up.x - sn * up.z, up.y, sn * up.x + cs * up.z);
+  float fine = fineness() * a.z * a.z;
+  ivec4 which = SOLID[int(f.x + 0.5)];
+  float light = 0.0, hot = 0.0, along = 0.0;
+  for (int e = 0; e < 12; e++) {
+    if (e >= which.y) break;
+    ivec2 ends = EDGE[which.x + e];
+    vec3 A = CORNER[ends.x], ba = CORNER[ends.y] - A;
+    vec3 pa = q - A;
+    float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+    vec3 off = pa - ba * h;
+    float m = min(h, 1.0 - h);                       // 0 at a corner .. 0.5 at the middle of the edge
+    float drawn = 1.0 - smoothstep(f.y * 0.56 - 0.06, f.y * 0.56, m);
+    // (An edge that runs level crosses each strand at a few LEDs only: it glows more, like the ring.)
+    float level = 1.0 - abs(dot(normalize(ba), up));
+    float g = lineGlow(dot(off, off) * fine) * drawn * (0.6 + 1.1 * level * level);
+    light += g;
+    along += g * m * 2.0;
+  }
+  for (int v = 0; v < 6; v++) {
+    if (v >= which.w) break;
+    vec3 d = q - CORNER[which.z + v];
+    hot += exp(-dot(d, d) * fine * 7.0);
+  }
+  return vec3(light * 9.0 + hot * 8.0, hot * 0.45, along / max(light, 1e-4));
+}
+
+// An attractor: the path of the Lorenz equations, two wings that the path
+// winds round in turn, never the same way twice. The whole path glows
+// faintly; lights travel along it, each a head with a fading trail. They
+// travel in pairs that set out as one and part (see lorenz.js). a.w: where
+// the heads are along the path; f.x .. f.y: the part of the path that shows.
+const float PATH_HALF = ${LORENZ.half.toFixed(3)};
+const float PATH_CELLS = ${LORENZ.cells.toFixed(1)};
+const vec3 PATH_REACH = vec3(0.85, 0.9, 1.08);       // how far the path reaches from the centre, and its glow
+const float PATH_HEADS = 3.0;                        // lights on each path, evenly apart
+const float PATH_TRAIL = ${(0.8 / LORENZ.loops).toFixed(4)};   // the trail: most of a turn round a wing
+vec3 attractorLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
+  vec3 q = turned(p - b.xyz, yaw, b.w) / a.z;
+  if (any(greaterThan(abs(q), PATH_REACH))) return vec3(0.0);   // the path comes nowhere near
+  vec3 uvw = q / PATH_HALF * 0.5 + 0.5;
+  vec4 near = texture(uPath, uvw);                   // how near each path is: smooth
+  vec4 cell = texelFetch(uPath, ivec3(min(uvw * PATH_CELLS, PATH_CELLS - 1.0)), 0);   // where along it: of this cell
+  float faint = 0.0, lights = 0.0, heads = 0.0;
+  for (int i = 0; i < 2; i++) {
+    float d = i == 0 ? near.r : near.b, s = i == 0 ? cell.g : cell.a;
+    d *= smoothstep(f.x, f.x + 0.03, s) * (1.0 - smoothstep(f.y - 0.03, f.y, s));
+    float back = fract((a.w - s) * PATH_HEADS);      // behind the head ahead (0 .. 1 of the way to the next)
+    float head = s + back / PATH_HEADS;              // where that head is: past the end, there is none
+    float lives = smoothstep(0.0, 0.04, head) * (1.0 - smoothstep(0.95, 1.0, head));
+    float run = runner(back, PATH_TRAIL * PATH_HEADS) * lives;
+    faint += d;
+    lights += d * run;
+    heads += d * run * run * run;
+  }
+  // (Where the two paths still run together their lights are one: no brighter than one.)
+  float both = 1.0 / (1.0 + min(near.r, near.b));
+  float light = (faint * 2.2 + lights * 20.0 + heads * 30.0) * both;
+  return vec3(light, heads * 0.8 * both, clamp(lights * 1.2, 0.0, 1.0));
+}
+
+// A knot: a Lissajous curve in three dimensions, x = sin(u t + a.w),
+// y = sin(v t), z = sin(w t + phase), a closed line that is knotted anew as
+// its phases drift. Two lights run round it. f.z: which frequencies
+// (KNOT); f.x .. f.y: the part of the curve that shows (0 .. 1 of the way round).
+// The curve passes the LED's height at 2 v places: the nearest place on it
+// is sought from each (one step along the curve), so the cost does not grow
+// with the curve's length.
+const vec3 KNOT[2] = vec3[2](vec3(3.0, 2.0, 1.0), vec3(2.0, 3.0, 1.0));
+const vec3 KNOT_BOX = vec3(1.0, 0.9, 0.4);          // its half width, height and depth, in units of its size: its broad side shows the figure
+vec3 knotLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
+  const float TAU = 6.2831853;
+  vec3 w = KNOT[int(f.z + 0.5)];
+  vec3 amp = a.z * KNOT_BOX;
+  vec3 ph = vec3(a.w, 0.0, a.w * 0.618 + 1.0);
+  vec3 q = turned(p - b.xyz, yaw, 0.0);
+  if (any(greaterThan(abs(q), amp + 1.2))) return vec3(0.0);   // the curve comes nowhere near
+  float ys = asin(clamp(q.y / amp.y, -1.0, 1.0));
+  float best = 1e9, at = 0.0, level = 0.0;
+  for (int i = 0; i < 6; i++) {
+    float k = float(i / 2);
+    if (k >= w.y) break;
+    float t = ((i % 2 == 0 ? ys : 3.14159265 - ys) + TAU * k) / w.y;
+    vec3 ang = w * t + ph;
+    vec3 c = amp * sin(ang), T = amp * w * cos(ang);
+    t += clamp(dot(q - c, T) / max(dot(T, T), 1e-4), -0.3, 0.3);
+    vec3 d = q - amp * sin(w * t + ph);
+    float d2 = dot(d, d);
+    if (d2 < best) { best = d2; at = t; level = 1.0 - abs(T.y) / max(length(T), 1e-4); }
+  }
+  float s = fract(at / TAU);
+  float shown = smoothstep(f.x, f.x + 0.04, s) * (1.0 - smoothstep(f.y - 0.04, f.y, s));
+  float run = runner(fract((uTime * 0.021 - s) * 2.0), 0.3);
+  float g = lineGlow(best * fineness()) * shown * (0.4 + 1.9 * level * level);
+  return vec3(g * (9.0 + 8.0 * run), g * run * run * 0.2, clamp(run * 1.3, 0.0, 1.0));
+}
+
+// A fractal: a Sierpinski tetrahedron standing on its base, a pyramid made
+// of four pyramids half its size, each made of four again. Its LEDs are lit
+// inside it, its faces brighter. f.x: how many times it has been divided
+// (between two whole numbers the hollows of the next division fade out).
+// The point is folded onto one corner's pyramid at each division, so one
+// distance serves all the small pyramids.
+const mat3 STAND = mat3(0.70711, -0.70711, 0.0, 0.57735, 0.57735, 0.57735, -0.40825, -0.40825, 0.81650);
+vec3 fractalLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f, float id) {
+  vec3 w = turned(p - b.xyz, yaw, 0.0);
+  float unit = a.z * 0.57735;                        // its corners are at (1, 1, 1) and so on, in these units
+  vec3 q = STAND * w / unit;
+  float inside = 0.0, face = 0.0;
+  for (int i = 0; i < 6; i++) {
+    float share = max(0.0, 1.0 - abs(f.x - float(i)));
+    if (share > 0.0 || i == 0) {
+      float d = (max(max(-q.x - q.y - q.z, q.x + q.y - q.z), max(-q.x + q.y + q.z, q.x - q.y + q.z)) - 1.0) * unit * 0.57735;
+      if (i == 0 && d > 0.5) return vec3(0.0);       // outside the whole pyramid
+      inside += share * (1.0 - smoothstep(-0.06, 0.06, d));
+      face += share * exp(-d * d * 30.0);
+    }
+    if (float(i) >= f.x) break;
+    if (q.x + q.y < 0.0) q.xy = -q.yx;
+    if (q.x + q.z < 0.0) q.xz = -q.zx;
+    if (q.y + q.z < 0.0) q.yz = -q.zy;
+    q = 2.0 * q - 1.0;
+    unit *= 0.5;
+  }
+  float high = clamp(w.y / a.z * 0.75 + 0.25, 0.0, 1.0);   // 0 at its base .. 1 at its top
+  float tw = 0.75 + 0.25 * sin(uTime * (0.3 + 0.4 * hash(id + 7.1)) + hash(id + 41.3) * 40.0);
+  float light = inside * (6.0 + 9.0 * face) * tw * (0.7 + 0.9 * high);
+  return vec3(light, face * inside * 0.12 + 0.25 * high * high * inside, 1.0 - high);
+}
+
 // The light of the forms at p (v: 0 at the top .. 1 at the floor). Each comes
 // and goes LED by LED in a random order, or, while rain falls, from the top down.
 // A form that rises away as points (e.w) is seen by each LED a random way
@@ -465,13 +626,17 @@ vec3 formsAt(vec3 p, float id, float v, out vec3 thread, out float around) {
     }
     else if (type == 3) f = cloudLight(q, a, b, e.z, ff, id);
     else if (type == 4) f = ringLight(q, a, b, e.z, ff);
-    else f = veilLight(q, a, b, e.z, ff);
+    else if (type == 5) f = veilLight(q, a, b, e.z, ff);
+    else if (type == 6) f = solidLight(q, a, b, e.z, ff);
+    else if (type == 7) f = attractorLight(q, a, b, e.z, ff);
+    else if (type == 8) f = knotLight(q, a, b, e.z, ff);
+    else f = fractalLight(q, a, b, e.z, ff, id);
     if (type != 2) f.x *= FORM_BODY;
     float order = mix(hash(id + float(k) * 7.7), e.y > 0.0 ? v : 1.0 - v, e.x * 0.8);
     float on = clamp((a.y * 1.25 - order) / 0.25, 0.0, 1.0) * smoothstep(0.0, 0.4, a.y);
     vec3 light = mix(mix(uFormC[k], uFormD[k], f.z), WHITE_HOT, clamp(f.y, 0.0, 1.0)) * f.x * on * keep;
     c += light;
-    thread += light * (type == 3 ? 0.25 : type == 2 || type == 4 ? 0.5 : 1.0);   // a cloud is points, hardly threads; a hoop is not its strands
+    thread += light * (type == 3 || type == 9 ? 0.25 : type == 2 || type == 4 || type >= 6 ? 0.5 : 1.0);   // a cloud is points, hardly threads; a hoop or a line is not its strands
   }
   return c;
 }
