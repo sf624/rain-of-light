@@ -119,20 +119,23 @@ function veil(age, leave, ph, face) {
   };
 }
 
-// A solid: stars come first, the corners of a regular solid; its edges are
-// drawn out from them until they meet. It tumbles slowly. It goes as its
-// edges draw back into the corners. Each time it is one of two, for its
-// whole life: a tetrahedron or an octahedron (SOLID in shaders.js).
+// A solid: bright points come first, the corners of a regular solid; its
+// edges are drawn out from them until they meet. It stands on the axis of
+// a corner, leaning a little, and turns slowly about that axis, while the
+// way it leans goes slowly round: no edge ever runs along a strand. It goes
+// as its edges draw back into the corners. Each time it is one of two, for
+// its whole life: a tetrahedron, point up, or an octahedron on its point
+// (SOLID in shaders.js).
 // f[0]: which solid; f[1]: how far the edges are drawn (0 .. 1).
-const SOLIDS = [4.4, 3.8];                     // how far its corners are from its centre, per solid
+const SOLIDS = [{ size: 5.0, y: -3.7 }, { size: 4.5, y: -3.0 }];   // per solid: how far its corners are from its centre, and how high that is
 function solid(age, leave, ph) {
   const which = Math.floor(ph / TAU * 7 * SOLIDS.length) % SOLIDS.length;
-  const size = SOLIDS[which], drift = 1.5;
+  const { size, y } = SOLIDS[which], drift = 1.3;
   return {
-    centre: [drift * Math.sin(0.024 * age + ph), -2.9 + 0.4 * Math.sin(0.027 * age + ph), drift * Math.cos(0.019 * age + ph)],
-    size, turn: 0.085 * age + ph,
-    yaw: 0.05 * age + 2 * ph,
-    tilt: 0.037 * age + 3 * ph,
+    centre: [drift * Math.sin(0.024 * age + ph), y + 0.3 * Math.sin(0.027 * age + ph), drift * Math.cos(0.019 * age + ph)],
+    size, turn: 0.055 * age + ph,
+    yaw: 0.04 * age + 2 * ph,
+    tilt: 0.3 + 0.1 * Math.sin(0.05 * age + 3 * ph),
     f: [which, smooth((age - 5) / 17) * (1 - smooth(leave * 1.25)), 0],
     bound: size + 1.2,
   };

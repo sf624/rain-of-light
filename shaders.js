@@ -429,19 +429,22 @@ vec3 veilLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
 // soft sheath, like the ring's, from the squared distance to the line (in
 // strand gaps, see fineness).
 float lineGlow(float d2) { return exp(-d2 * 12.0) + 0.22 * exp(-d2 * 3.0); }
+// A bolder line: a rod of even light with a clean edge and nothing around
+// it, wide enough that two strands catch it wherever it runs.
+float rod(float d2) { return 1.0 - smoothstep(0.13, 0.25, d2); }
 // Light running along a line: how bright a place is that lies a way (back) behind
 // the running head (0 .. 1 of the way to the head after it): a head, a trail
 // that fades over a length (trail), and a short rise before the head, never lit at once.
 float runner(float back, float trail) { return exp(-back / trail) + exp(-(1.0 - back) / (trail * 0.06)); }
 
-// A solid: the edges of a regular solid as lines of light, a star at each
-// corner, slowly tumbling (yaw, tilt, and a.w about its own axis): a
-// tetrahedron or an octahedron (f.x: which, see SOLID), their corners a.z
-// from the centre. The edges are drawn out from the
-// corners (f.y: how far, 0 .. 1).
-const float H3 = 0.57735;                            // 1 / sqrt(3)
+// A solid: the edges of a regular solid as rods of light, a bright point at
+// each corner: a tetrahedron or an octahedron (f.x: which, see SOLID), their
+// corners a.z from the centre. It stands on a corner's axis (the solid's y),
+// leaning a little (tilt, towards yaw) and turning about that axis (a.w), so
+// its edges run aslant or level, never along a strand. The edges are drawn
+// out from the corners (f.y: how far, 0 .. 1).
 const vec3 CORNER[10] = vec3[10](
-  vec3(H3, H3, H3), vec3(H3, -H3, -H3), vec3(-H3, H3, -H3), vec3(-H3, -H3, H3),
+  vec3(0.0, 1.0, 0.0), vec3(0.94281, -0.33333, 0.0), vec3(-0.47140, -0.33333, 0.81650), vec3(-0.47140, -0.33333, -0.81650),
   vec3(1.0, 0.0, 0.0), vec3(-1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), vec3(0.0, -1.0, 0.0), vec3(0.0, 0.0, 1.0), vec3(0.0, 0.0, -1.0));
 const ivec2 EDGE[18] = ivec2[18](
   ivec2(0, 1), ivec2(0, 2), ivec2(0, 3), ivec2(1, 2), ivec2(1, 3), ivec2(2, 3),
@@ -467,16 +470,16 @@ vec3 solidLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
     float drawn = 1.0 - smoothstep(f.y * 0.56 - 0.06, f.y * 0.56, m);
     // (An edge that runs level crosses each strand at a few LEDs only: it glows more, like the ring.)
     float level = 1.0 - abs(dot(normalize(ba), up));
-    float g = lineGlow(dot(off, off) * fine) * drawn * (0.6 + 1.1 * level * level);
+    float g = rod(dot(off, off) * fine) * drawn * (0.75 + 0.6 * level * level);
     light += g;
     along += g * m * 2.0;
   }
   for (int v = 0; v < 6; v++) {
     if (v >= which.w) break;
     vec3 d = q - CORNER[which.z + v];
-    hot += exp(-dot(d, d) * fine * 7.0);
+    hot += rod(dot(d, d) * fine * 0.45);
   }
-  return vec3(light * 9.0 + hot * 8.0, hot * 0.45, along / max(light, 1e-4));
+  return vec3(min(light, 1.6) * 8.0 + hot * 9.0, hot * 0.5, along / max(light, 1e-4));
 }
 
 // An attractor: the path of the Lorenz equations, two wings that the path

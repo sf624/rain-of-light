@@ -233,10 +233,11 @@ Each form moves slowly in its own way, and the floor shows each move:
 Four forms come from mathematics. They come a little less often than the
 five above:
 
-- **solid**: the edges of a regular solid as lines of light, a tetrahedron
-  or an octahedron (one of the two for its whole life; the seed chooses).
-  Its corners come first, as stars; the edges are drawn out from them until
-  they meet. It tumbles slowly, and goes as the edges draw back.
+- **solid**: the edges of a regular solid as rods of light: a tetrahedron,
+  point up, or an octahedron standing on its point (one of the two for its
+  whole life; the seed chooses). Its corners come first, as bright points;
+  the edges are drawn out from them until they meet. It leans a little and
+  turns slowly about its upright axis, and goes as the edges draw back.
 - **attractor**: the path of the Lorenz equations, the butterfly of chaos:
   two wings that the path winds round in turn, never the same way twice.
   The whole path glows faintly, and lights travel along it, each with a
