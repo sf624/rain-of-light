@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en" data-page="lab">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Rain of Light: lab</title>
+  <meta name="description" content="The lab of Rain of Light: the same room of light, with every setting in its panel.">
+  <meta name="theme-color" content="#000000">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Rain of Light">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Rain of Light: lab">
+  <meta property="og:description" content="The lab of Rain of Light: the same room of light, with every setting in its panel.">
+  <meta property="og:url" content="https://sf624.github.io/rain-of-light/lab.html">
+  <meta property="og:image" content="https://sf624.github.io/rain-of-light/og-image.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="stage" role="img" aria-label="Points of light falling like rain"></canvas>
+
+  <div class="overlay" id="overlay">
+    <h1>Rain of Light</h1>
+    <p>Click or tap for a ripple of light and sound</p>
+  </div>
+
+  <noscript><p class="fallback">This page needs JavaScript and WebGL.</p></noscript>
+  <p class="fallback" id="fallback" hidden>This browser does not support WebGL2.</p>
+
+  <script src="boot.js"></script>
+  <script type="module" src="main.js"></script>
+</body>
+</html>

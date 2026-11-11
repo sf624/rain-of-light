@@ -50,8 +50,12 @@ Inspired by teamLab's *Light Sculpture - Point*.
   | `f` | full screen |
   | `r` | landscape / portrait |
 
-The settings panel keeps what you change in this browser; Reset brings back
-the defaults. Any setting can also go in the URL. A few that people use:
+The settings panel (⚙ or `p`) has a few settings: the scene, the colour,
+the brightness, the quality and the sound's levels. Its link **All
+settings** opens the lab, [`lab.html`](https://sf624.github.io/rain-of-light/lab.html):
+the same page with every setting in its panel. Both pages keep what you
+change in this browser; Reset brings back every default. Any setting can
+also go in the URL, on either page. A few that people use:
 
 | URL | Shows |
 | --- | --- |
@@ -62,6 +66,7 @@ the defaults. Any setting can also go in the URL. A few that people use:
 | `?seed=7&t=120` | one order of the show, from 2 minutes in |
 | `?breath=off` | no breathing swell of the light |
 | `#tune` | the page with the settings panel open |
+| `lab.html#tune` | the lab with its full panel open |
 
 Every setting, key and URL parameter, with pictures:
 [docs/settings.md](docs/settings.md).

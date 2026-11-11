@@ -4,12 +4,16 @@ This guide shows what each setting changes, with a picture where it can be
 seen. It also lists the keys and the URL parameters.
 
 - [Words used here](#words-used-here)
-- [Controls](#controls): buttons, panel, keys, URL parameters
-- Settings, in the panel's order: [Scene](#scene), [Display](#display),
+- [Controls](#controls): buttons, panels, keys, URL parameters
+- Settings, in the lab panel's order: [Scene](#scene), [Display](#display),
   [Density](#density), [LED](#led), [Light](#light), [Rain](#rain),
   [Colour](#colour), [Camera](#camera), [Ripples](#ripples),
   [Meditation](#meditation), [Sound](#sound)
 - [Not shown in pictures](#not-shown-in-pictures)
+
+In the tables below, a name in **bold** is also in the viewer page's
+panel; the other settings are only in the lab (see
+[The settings panels](#the-settings-panels)).
 
 How a design works inside is in [design.md](design.md).
 
@@ -84,24 +88,42 @@ really turning the phone also ends it.
 
 Query: `t=110`, with the page's buttons shown and a key pressed (cut out).
 
-### The settings panel
+### The settings panels
 
-![The settings panel open on the right of the picture: Scene, Form, Layer of light, the mirror sliders and more](img/panel.jpg)
+The site has two pages, with the same picture, keys and URL parameters:
 
-The gear button or the `p` key opens it; a link that ends in `#tune` opens
-the page with it. A change shows at once, without a reload.
+- **The viewer page** (`index.html`, the address of the site) has a small
+  panel: Scene, Colour mode, Brightness (the Exposure setting), Quality,
+  and the levels of the sound (Pad, Bells, Rain, Forms). The volume is the
+  bar by the buttons. Its link **All settings** opens the lab.
+- **The lab** (`lab.html`) has every setting in its panel, in groups. Its
+  link **Fewer settings** opens the viewer page.
 
-- The panel keeps what you change in this browser.
-- **Reset** brings back every default.
-- **Copy** copies the settings as JSON.
+![The viewer page's small panel at the lower right: Scene, Colour mode, Brightness, Quality and four sound levels, a link to all settings, and the GitHub link](img/viewer-panel.jpg)
+
+![The lab's panel open on the right of the picture: Scene, Form, Layer of light, the mirror sliders and more](img/panel.jpg)
+
+The gear button or the `p` key opens the panel; a link that ends in
+`#tune` opens the page with it (`lab.html#tune`: the lab with its panel
+open). A link to the other page keeps the URL query, and opens its panel.
+A change shows at once, without a reload.
+
+- Both pages keep what you change in this browser, in one set of saved
+  settings: a setting changed in the lab also holds on the viewer page,
+  where the panel does not show it.
+- **Reset** brings back every default, also on the viewer page: there it
+  also resets the settings that only the lab shows.
+- **Copy** (in the lab) copies the settings as JSON.
 - On a touch screen the panel scrolls with a finger anywhere, also over a
   slider: a slider moves only when you drag it sideways, and a tap on it
   does nothing. In portrait the panel is a sheet over the lower part, so the
-  picture stays in view.
+  picture stays in view. On a phone held sideways, the viewer page's panel
+  puts the sound beside the other settings.
 - The bottom of the panel links to the repository and names the commit
   being served (see [development.md](development.md#version)).
 
-Query: `t=110`, with the page's buttons shown and `p` pressed.
+Query: `t=110`, with the page's buttons shown and `p` pressed, on
+`index.html` and on `lab.html`.
 
 ### Pointer and keys
 
@@ -121,7 +143,8 @@ Query: `t=110`, with the page's buttons shown and `p` pressed.
 | `f` | full screen |
 | `r` | landscape / portrait |
 
-`c`, `w` and `v` work on the Colour mode, Weather and Move settings. While
+The keys are the same on both pages. `c`, `w` and `v` work on the Colour
+mode, Weather and Move settings. While
 a setting is `auto`, the key moves the show on to its next choice. Otherwise
 it sets the next value in the list. `d` sets Direction to `down` or `across`.
 
@@ -130,20 +153,21 @@ it sets the next value in the list. `d` sets Direction to `down` or `across`.
 Every setting below can be given in the URL with its key, such as
 `?color=cloud&weather=drizzle`. A URL value wins over a saved one. A value
 that does not exist falls back to the default; a number is kept within the
-slider's range. The URL also takes four things that are not in the panel:
+slider's range. Both pages take every parameter. The URL also takes four
+things that are not in the panel:
 
 | Parameter | Values | Default | Does |
 | --- | --- | --- | --- |
 | `seed` | any number | random | One order of the show: its passages, forms, weather, colours, direction and density. The same seed gives the same show. |
 | `t` | seconds | `0` | Starts the show at that time of its order. The camera starts there too, so a time shows one view. |
 | `dpr` | a number, such as `1` or `1.5` | `2` | The highest pixel ratio drawn. A screen with a higher ratio is drawn at this one. |
-| `#tune` | (a hash, not a parameter) | | Opens the settings panel. |
+| `#tune` | (a hash, not a parameter) | | Opens the settings panel: `#tune` the viewer page's, `lab.html#tune` the lab's. |
 
 ## Scene
 
 | Panel | URL key | Values | Default | What you see |
 | --- | --- | --- | --- | --- |
-| Scene | `scene` | `mix`, `rain`, `crystal` | `mix` | `mix`: the whole show, rain and forms come and go and blend. `rain`: only the rain, which never ends. `crystal`: only the forms of light. |
+| **Scene** | `scene` | `mix`, `rain`, `crystal` | `mix` | `mix`: the whole show, rain and forms come and go and blend. `rain`: only the rain, which never ends. `crystal`: only the forms of light. |
 | Form | `form` | `auto`, `orb`, `spiral`, `cloud`, `ring`, `veil`, `none` | `auto` | `auto`: as the scene brings them. A name holds that form for good. `none`: no form. |
 | Layer of light | `layer` | `auto`, `on`, `off` | `auto` | `auto`: the layer comes and goes with the show (about 70% of the time). `on` holds it, `off` removes it. |
 | Floor mirror (0: off) | `mirror` | 0 to 1 | `0.6` | How bright the image in the floor is. |
@@ -261,7 +285,7 @@ about a third, so the form shows.
 
 | Panel | URL key | Values | Default | What you see |
 | --- | --- | --- | --- | --- |
-| Quality | `quality` | `auto`, `full` | `auto` | `auto`: if frames are slow, the picture is drawn at a lower resolution (down to half), and raised again when the device keeps up. `full`: always as sharp as the screen allows (up to `?dpr=`). |
+| **Quality** | `quality` | `auto`, `full` | `auto` | `auto`: if frames are slow, the picture is drawn at a lower resolution (down to half), and raised again when the device keeps up. `full`: always as sharp as the screen allows (up to `?dpr=`). |
 
 No picture: a fast machine draws both the same.
 
@@ -353,7 +377,7 @@ with `wire=0`, `wire=0.2`, `wire=2`.
 | --- | --- | --- | --- | --- |
 | Trail brightness | `rainGain` | 0 to 12 | `4` | How bright the trail behind each drop is. |
 | Head brightness | `tipGain` | 0 to 15 | `5` | How bright the head of each drop is. |
-| Exposure | `exposure` | 0.2 to 4 | `1.8` | The brightness of the whole picture. |
+| **Exposure** (viewer page: Brightness) | `exposure` | 0.2 to 4 | `1.8` | The brightness of the whole picture. |
 | Glow | `bloom` | 0 to 2 | `0.8` | The soft glow around bright light. |
 | Visible distance | `fog` | 6 to 40 | `34` | How far into the room you see before light fades out. While rain falls, the room closes in a little. |
 | Light rays | `rays` | `off`, `2`, `4`, `6`, `8` | `2` | Star-like rays from the brightest drop heads, while rain falls (forms cast none). `2` is up and down only. |
@@ -448,7 +472,7 @@ Query: `t=30` with `scene=rain&flow=down`, `scene=rain&flow=across`; and
 
 | Panel | URL key | Values | Default | What you see |
 | --- | --- | --- | --- | --- |
-| Colour mode | `color` | `auto` and the 11 modes below | `auto` | How the rain is coloured. `auto` moves between them on its own. |
+| **Colour mode** | `color` | `auto` and the 11 modes below | `auto` | How the rain is coloured. `auto` moves between them on its own. |
 | Colour story | `story` | `on`, `off` | `on` | `on`: the colours of the rain and the forms drift slowly together, from cool to warm and back. `off`: each is chosen on its own. |
 | Rainbow style | `rainbow` | `drop`, `led`, `bands` | `drop` | For the `rainbow` mode: a random hue per drop, per LED, or flowing bands. |
 | Palette | `palette` | `auto`, `ice`, `amber`, `sakura`, `aurora`, `deep sea`, `candle` | `auto` | The palette the rain uses, in the modes that use one (such as `mono`, `gradient`, `comet`, `accent`). |
@@ -611,10 +635,10 @@ is 10 seconds). The default depth, 0.3, is gentler.
 | Panel | URL key | Values | Default | What you hear |
 | --- | --- | --- | --- | --- |
 | Volume | `volume` | 0 to 1 | `0.8` | The whole sound. The volume bar by the buttons is the same setting. |
-| Pad | `music` | 0 to 1 | `0.6` | The slow pad in D major. |
-| Bells | `chimes` | 0 to 1 | `0.6` | The ripples' bells, and the still room's high notes. |
-| Rain | `rainSound` | 0 to 1 | `0.3` | The hush of rain. |
-| Forms | `formSound` | 0 to 1 | `0.4` | The voice each form brings: the orb a low hum, the spiral a turning figure, the cloud a high shimmer, the ring a glassy tone, the veil a soft air. |
+| **Pad** | `music` | 0 to 1 | `0.6` | The slow pad in D major. |
+| **Bells** | `chimes` | 0 to 1 | `0.6` | The ripples' bells, and the still room's high notes. |
+| **Rain** | `rainSound` | 0 to 1 | `0.3` | The hush of rain. |
+| **Forms** | `formSound` | 0 to 1 | `0.4` | The voice each form brings: the orb a low hum, the spiral a turning figure, the cloud a high shimmer, the ring a glassy tone, the veil a soft air. |
 
 `m` or the note button turns the sound on and off. Browsers start sound
 only after a click or a key, so the music begins with your first one
