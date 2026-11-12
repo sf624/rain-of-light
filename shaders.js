@@ -1,8 +1,6 @@
 // The GLSL sources: a vertex and fragment pair for the points, and three
 // full-screen passes (downsample, blur, composite) that share QUAD_VS.
 
-import { LORENZ } from './lorenz.js';
-
 // The falling time wraps at this many flow units (see drop() in POINT_VS).
 export const FLOW_WRAP = 1000;
 // A light ray is at most this many times the Ray length setting (see POINT_VS: rayK).
@@ -79,7 +77,6 @@ uniform vec4 uFormF[3];   // the form's own measures (see forms.js), and how far
 uniform vec3 uFormC[3];   // the form's colour
 uniform vec3 uFormD[3];   // its second colour
 uniform vec3 uTint;       // the colour of the room: of the forms shown now
-uniform sampler3D uPath;  // the attractor's path as a field (see lorenz.js)
 uniform float uTwinkle;
 uniform vec3 uMirror;     // floor height, reflection gain (> 0: drawing the reflection), its fade length
 uniform vec4 uCopy[9];    // wall mirrors, per instance: x sign, x offset, z sign, z offset
@@ -444,40 +441,6 @@ vec3 solidLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
   return vec3(min(light, 1.6) * 8.0 + hot * 9.0, hot * 0.5, along / max(light, 1e-4));
 }
 
-// An attractor: the path of the Lorenz equations, two wings that the path
-// winds round in turn, never the same way twice. The whole path glows
-// faintly; lights travel along it, each a head with a fading trail. They
-// travel in pairs that set out as one and part (see lorenz.js). a.w: where
-// the heads are along the path; f.x .. f.y: the part of the path that shows.
-const float PATH_HALF = ${LORENZ.half.toFixed(3)};
-const float PATH_CELLS = ${LORENZ.cells.toFixed(1)};
-const vec3 PATH_REACH = vec3(0.85, 0.9, 1.08);       // how far the path reaches from the centre, and its glow
-const float PATH_HEADS = 3.0;                        // lights on each path, evenly apart
-const float PATH_TRAIL = ${(0.8 / LORENZ.loops).toFixed(4)};   // the trail: most of a turn round a wing
-vec3 attractorLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
-  vec3 q = turned(p - b.xyz, yaw, b.w) / a.z;
-  if (any(greaterThan(abs(q), PATH_REACH))) return vec3(0.0);   // the path comes nowhere near
-  vec3 uvw = q / PATH_HALF * 0.5 + 0.5;
-  vec4 near = texture(uPath, uvw);                   // how near each path is: smooth
-  vec4 cell = texelFetch(uPath, ivec3(min(uvw * PATH_CELLS, PATH_CELLS - 1.0)), 0);   // where along it: of this cell
-  float faint = 0.0, lights = 0.0, heads = 0.0;
-  for (int i = 0; i < 2; i++) {
-    float d = i == 0 ? near.r : near.b, s = i == 0 ? cell.g : cell.a;
-    d *= smoothstep(f.x, f.x + 0.03, s) * (1.0 - smoothstep(f.y - 0.03, f.y, s));
-    float back = fract((a.w - s) * PATH_HEADS);      // behind the head ahead (0 .. 1 of the way to the next)
-    float head = s + back / PATH_HEADS;              // where that head is: past the end, there is none
-    float lives = smoothstep(0.0, 0.04, head) * (1.0 - smoothstep(0.95, 1.0, head));
-    float run = runner(back, PATH_TRAIL * PATH_HEADS) * lives;
-    faint += d;
-    lights += d * run;
-    heads += d * run * run * run;
-  }
-  // (Where the two paths still run together their lights are one: no brighter than one.)
-  float both = 1.0 / (1.0 + min(near.r, near.b));
-  float light = (faint * 2.2 + lights * 20.0 + heads * 30.0) * both;
-  return vec3(light, heads * 0.8 * both, clamp(lights * 1.2, 0.0, 1.0));
-}
-
 // A knot: a Lissajous curve in three dimensions, x = sin(u t + a.w),
 // y = sin(v t), z = sin(w t + phase), a closed line whose loops open and
 // close a little as its phase sways. It swings twice across while it goes
@@ -512,39 +475,6 @@ vec3 knotLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
   float run = runner(fract((uTime * 0.021 - s) * 2.0), 0.3);
   float g = rod(best * fineness()) * shown * (0.75 + 0.6 * level * level);
   return vec3(g * (7.0 + 9.0 * run), g * run * run * 0.3, clamp(run * 1.3, 0.0, 1.0));
-}
-
-// A fractal: a Sierpinski tetrahedron standing on its base, a pyramid made
-// of four pyramids half its size, each made of four again. Its LEDs are lit
-// inside it, its faces brighter. f.x: how many times it has been divided
-// (between two whole numbers the hollows of the next division fade out).
-// The point is folded onto one corner's pyramid at each division, so one
-// distance serves all the small pyramids.
-const mat3 STAND = mat3(0.70711, -0.70711, 0.0, 0.57735, 0.57735, 0.57735, -0.40825, -0.40825, 0.81650);
-vec3 fractalLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f, float id) {
-  vec3 w = turned(p - b.xyz, yaw, 0.0);
-  float unit = a.z * 0.57735;                        // its corners are at (1, 1, 1) and so on, in these units
-  vec3 q = STAND * w / unit;
-  float inside = 0.0, face = 0.0;
-  for (int i = 0; i < 6; i++) {
-    float share = max(0.0, 1.0 - abs(f.x - float(i)));
-    if (share > 0.0 || i == 0) {
-      float d = (max(max(-q.x - q.y - q.z, q.x + q.y - q.z), max(-q.x + q.y + q.z, q.x - q.y + q.z)) - 1.0) * unit * 0.57735;
-      if (i == 0 && d > 0.5) return vec3(0.0);       // outside the whole pyramid
-      inside += share * (1.0 - smoothstep(-0.06, 0.06, d));
-      face += share * exp(-d * d * 30.0);
-    }
-    if (float(i) >= f.x) break;
-    if (q.x + q.y < 0.0) q.xy = -q.yx;
-    if (q.x + q.z < 0.0) q.xz = -q.zx;
-    if (q.y + q.z < 0.0) q.yz = -q.zy;
-    q = 2.0 * q - 1.0;
-    unit *= 0.5;
-  }
-  float high = clamp(w.y / a.z * 0.75 + 0.25, 0.0, 1.0);   // 0 at its base .. 1 at its top
-  float tw = 0.75 + 0.25 * sin(uTime * (0.3 + 0.4 * hash(id + 7.1)) + hash(id + 41.3) * 40.0);
-  float light = inside * (6.0 + 9.0 * face) * tw * (0.7 + 0.9 * high);
-  return vec3(light, face * inside * 0.12 + 0.25 * high * high * inside, 1.0 - high);
 }
 
 // The light of the forms at p (v: 0 at the top .. 1 at the floor). Each comes
@@ -592,15 +522,13 @@ vec3 formsAt(vec3 p, float id, float v, out vec3 thread, out float around) {
     else if (type == 3) f = ringLight(q, a, b, e.z, ff);
     else if (type == 4) f = veilLight(q, a, b, e.z, ff);
     else if (type == 5) f = solidLight(q, a, b, e.z, ff);
-    else if (type == 6) f = attractorLight(q, a, b, e.z, ff);
-    else if (type == 7) f = knotLight(q, a, b, e.z, ff);
-    else f = fractalLight(q, a, b, e.z, ff, id);
+    else f = knotLight(q, a, b, e.z, ff);
     if (type != 2) f.x *= FORM_BODY;
     float order = mix(hash(id + float(k) * 7.7), e.y > 0.0 ? v : 1.0 - v, e.x * 0.8);
     float on = clamp((a.y * 1.25 - order) / 0.25, 0.0, 1.0) * smoothstep(0.0, 0.4, a.y);
     vec3 light = mix(mix(uFormC[k], uFormD[k], f.z), WHITE_HOT, clamp(f.y, 0.0, 1.0)) * f.x * on * keep;
     c += light;
-    thread += light * (type == 8 ? 0.25 : type == 2 || type == 3 || type >= 5 ? 0.5 : 1.0);   // a fractal is points, hardly threads; a hoop or a line is not its strands
+    thread += light * (type == 2 || type == 3 || type >= 5 ? 0.5 : 1.0);   // a hoop or a line is not its strands
   }
   return c;
 }

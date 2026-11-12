@@ -47,20 +47,6 @@ export function createGL(gl) {
     return { tex, tex2, fb, w, h };
   }
 
-  // A field: a cube of n^3 cells of four numbers each (smooth between cells),
-  // bound to texture unit `unit` for good, for a shader to look up.
-  function field(unit, n, data) {
-    const tex = gl.createTexture();
-    gl.activeTexture(gl.TEXTURE0 + unit);
-    gl.bindTexture(gl.TEXTURE_3D, tex);
-    gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA16F, n, n, n, 0, gl.RGBA, gl.FLOAT, data);
-    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    for (const wrap of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T, gl.TEXTURE_WRAP_R]) gl.texParameteri(gl.TEXTURE_3D, wrap, gl.CLAMP_TO_EDGE);
-    gl.activeTexture(gl.TEXTURE0);
-    return tex;
-  }
-
   function freeTarget(t) {
     if (!t) return;
     gl.deleteTexture(t.tex);
@@ -68,7 +54,7 @@ export function createGL(gl) {
     gl.deleteFramebuffer(t.fb);
   }
 
-  return { compile, program, target, freeTarget, field };
+  return { compile, program, target, freeTarget };
 }
 
 // ---------- vector math (column-major 4x4) ----------

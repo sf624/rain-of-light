@@ -87,9 +87,7 @@ export const FORMS = [
   { name: 'ring',      type: 3, weight: 1,   palettes: ['amber', 'aurora', 'sakura', 'deep sea'] },
   { name: 'veil',      type: 4, weight: 1,   palettes: ['aurora', 'sakura', 'deep sea', 'amber'] },
   { name: 'solid',     type: 5, weight: 0.4, palettes: ['ice', 'amber', 'aurora', 'sakura'] },
-  { name: 'attractor', type: 6, weight: 0.4, palettes: ['sakura', 'deep sea', 'amber', 'aurora'] },
-  { name: 'knot',      type: 7, weight: 0.4, palettes: ['aurora', 'amber', 'sakura', 'deep sea'] },
-  { name: 'fractal',   type: 8, weight: 0.4, palettes: ['amber', 'deep sea', 'sakura', 'aurora'] },
+  { name: 'knot',      type: 6, weight: 0.4, palettes: ['aurora', 'amber', 'sakura', 'deep sea'] },
 ];
 export const LAYER = { name: 'layer', type: 2, palettes: ['deep sea', 'ice', 'aurora', 'sakura', 'amber'] };
 
@@ -246,6 +244,6 @@ export const SCHEMA = [
     { key: 'chimes', label: 'Bells', min: 0, max: 1, step: 0.05, viewer: 6 },
     { key: 'rainSound', label: 'Rain', min: 0, max: 1, step: 0.05, viewer: 7 },
     { key: 'formSound', label: 'Forms', min: 0, max: 1, step: 0.05, viewer: 8,
-      hint: 'The voice each form of light brings: the orb a low hum, the spiral a turning figure, the ring a glassy tone, the veil a soft air, the solid a chord of pure fifths, the attractor a wandering figure, the knot two beating tones, the fractal one fifth in every octave' },
+      hint: 'The voice each form of light brings: the orb a low hum, the spiral a turning figure, the ring a glassy tone, the veil a soft air, the solid a chord of pure fifths, the knot two beating tones' },
   ] },
 ];

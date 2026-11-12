@@ -40,7 +40,7 @@ pictures again (see [development.md](development.md#the-pictures-of-the-docs)).
 
 ## Words used here
 
-![Ten small pictures, one per word: a strand, an LED, a wire, rain, a passage, a form, the layer of light, an attractor, a ripple and a mirror image](img/glossary.jpg)
+![Ten small pictures, one per word: a strand, an LED, a wire, rain, a passage, a form, the layer of light, a knot, a ripple and a mirror image](img/glossary.jpg)
 
 | Word | What it is |
 | --- | --- |
@@ -49,9 +49,9 @@ pictures again (see [development.md](development.md#the-pictures-of-the-docs)).
 | **wire** | The thin line between two LEDs of a strand. It glows faintly with their light (Wire glow). |
 | **rain** | Light that runs down the strands, drop after drop: a bright head and a fading trail. |
 | **passage** | One stretch of the show: rain, a form, rain through a form (storm), a still room, or sideways rain (drift). Each lasts from about 20 seconds to over a minute. |
-| **form** | A large shape of light that gathers in the room: an orb, a spiral, a ring or a veil; or a solid, an attractor, a knot or a fractal. |
+| **form** | A large shape of light that gathers in the room: an orb, a spiral, a ring or a veil; or a solid or a knot. |
 | **layer of light** | A sea of light near the floor. It comes and goes beside the forms. |
-| **attractor** | The form that follows the Lorenz equations: a path round two wings, with lights travelling along it. |
+| **knot** | The form drawn as one closed line, a figure of eight woven in depth, with two lights running round it. |
 | **ripple** | A wave of light from a click or a tap, or from the show itself. It also rings a bell. |
 | **mirror image** | The room seen again, upside down, in the dark mirror floor. A thin dark line parts each strand from its image. |
 
@@ -62,7 +62,7 @@ with `wire=1&rest=0.1` (strand), `wire=0&rest=0.1&size=0.03` (LED, cut out),
 `t=60` (a storm passage of the whole show);
 `scene=crystal&form=orb&layer=off&t=30` (form);
 `scene=crystal&form=none&layer=on&t=30` (layer);
-`scene=crystal&form=attractor&layer=off&t=55` (attractor);
+`scene=crystal&form=knot&layer=off&t=50` (knot);
 `scene=crystal&form=none&layer=off&t=30` and a click (ripple);
 `scene=crystal&form=orb&layer=off&t=30&mirror=1` (mirror image, lower half).
 
@@ -168,7 +168,7 @@ things that are not in the panel:
 | Panel | URL key | Values | Default | What you see |
 | --- | --- | --- | --- | --- |
 | **Scene** | `scene` | `mix`, `rain`, `crystal` | `mix` | `mix`: the whole show, rain and forms come and go and blend. `rain`: only the rain, which never ends. `crystal`: only the forms of light. |
-| Form | `form` | `auto`, `orb`, `spiral`, `ring`, `veil`, `solid`, `attractor`, `knot`, `fractal`, `none` | `auto` | `auto`: as the scene brings them. A name holds that form for good. `none`: no form. |
+| Form | `form` | `auto`, `orb`, `spiral`, `ring`, `veil`, `solid`, `knot`, `none` | `auto` | `auto`: as the scene brings them. A name holds that form for good. `none`: no form. |
 | Layer of light | `layer` | `auto`, `on`, `off` | `auto` | `auto`: the layer comes and goes with the show (about 70% of the time). `on` holds it, `off` removes it. |
 | Floor mirror (0: off) | `mirror` | 0 to 1 | `0.6` | How bright the image in the floor is. |
 | Wall mirrors (copies per side) | `walls` | 0 or 1 | `0` | `1`: the room repeats beyond its walls, one copy on each side. Each copy draws the lattice again, so it is costly. |
@@ -179,10 +179,10 @@ things that are not in the panel:
 
 ### Scenes
 
-![The same moment in three scenes: mix shows a pink spiral in rain; rain shows only the rain; crystal shows only the spiral](img/scenes.jpg)
+![The same moment in three scenes: mix shows a pink orb in rain; rain shows only the rain; crystal, with passages of its own, shows a pink spiral](img/scenes.jpg)
 
 Query: `t=60` with `scene=mix`, `scene=rain`, `scene=crystal`. At this time
-of seed 1 the whole show has a storm passage: rain falls through a spiral.
+of seed 1 the whole show has a storm passage: rain falls through an orb.
 
 The whole show moves between five kinds of passage:
 
@@ -204,12 +204,11 @@ top down, as if rain gathered into it or ran off it as rain.
 
 ### Forms
 
-![The eight forms alone in the still room: an amber orb, a blue spiral, an amber ring, a green veil, a pale solid of lines, a pink attractor with two wings, a green knot and an amber fractal pyramid; the ninth picture, form=none, is the empty room](img/forms.jpg)
+![The six forms alone in the still room: an amber orb, a blue spiral, an amber ring, a green veil, a pale solid of lines and a green knot; the seventh picture, form=none, is the empty room](img/forms.jpg)
 
 Query: `scene=crystal&layer=off&t=30` with `form=orb`, `form=spiral`,
 `form=ring`, `form=veil`; a little later in their
-lives, `form=solid&t=50`, `form=attractor&t=55`, `form=knot&t=50`,
-`form=fractal&t=60`; and `form=none`.
+lives, `form=solid&t=50`, `form=knot&t=50`; and `form=none`.
 
 Each form moves slowly in its own way, and the floor shows each move:
 
@@ -227,7 +226,7 @@ Each form moves slowly in its own way, and the floor shows each move:
   hem is a bright line that rises and falls, with rays of many heights
   above it. It goes by lifting away upward.
 
-Four forms come from mathematics. They come a little less often than the
+Two forms come from mathematics. They come a little less often than the
 four above:
 
 - **solid**: the edges of a regular solid as rods of light: a tetrahedron,
@@ -235,24 +234,11 @@ four above:
   whole life; the seed chooses). Its corners come first, as bright points;
   the edges are drawn out from them until they meet. It leans a little and
   turns slowly about its upright axis, and goes as the edges draw back.
-- **attractor**: the path of the Lorenz equations, the butterfly of chaos:
-  two wings that the path winds round in turn, never the same way twice.
-  The whole path glows faintly, and lights travel along it, each with a
-  fading trail. The lights set out in pairs, as one; after a few turns each
-  pair parts, and its two lights go separate ways: a small difference has
-  grown large. The path is drawn along its course as it comes, and fades
-  from its start as it goes.
 - **knot**: a Lissajous curve, a closed rod of light that swings three
   ways at once: twice across while it goes once up and down, and three
   times in depth. Its broad side faces the room, a figure of eight; its
   phase sways, so the loops open and close a little, and two lights run
   round it. It is drawn once round as it comes, and undone as it goes.
-- **fractal**: a Sierpinski pyramid. A whole pyramid rises out of the
-  floor, point to point with its image; then it is divided into four
-  pyramids, and each of those into four, more and less finely as it
-  breathes, turning slowly. It goes by being divided on and on, into dust
-  that rises away.
-
 Each form takes its colours from a few palettes of its own
 (`config.js: FORMS`). The forms keep a little beyond the middle of the room
 as you look at them.
@@ -421,9 +407,9 @@ Query: `scene=rain&flow=down&t=30&color=mono&palette=aurora` with
 
 ### Exposure
 
-![A ring over the layer, darker, as by default, and brighter](img/exposure.jpg)
+![A veil over the layer, darker, as by default, and brighter](img/exposure.jpg)
 
-Query: `t=110` (a ring passage of the whole show) with `exposure=0.8`,
+Query: `t=110` (a veil passage of the whole show) with `exposure=0.8`,
 `exposure=1.8`, `exposure=3.5`.
 
 ### Glow
@@ -540,7 +526,7 @@ The palette and the set are as seed 1 has them at that time.
 
 ### Colour story
 
-![Five moments of the same show, in two rows: with the story the colours stay near one family (pink, blue, violet); without it they jump between green, amber, blue and white](img/story.jpg)
+![Five moments of the same show, in two rows: with the story the colours stay near one family (pink, blue, violet); without it they jump between blue, amber, white and pink](img/story.jpg)
 
 Query: `seed=1` with `story=on` (top) and `story=off` (bottom), at
 `t=60`, `t=180`, `t=360`, `t=480`, `t=840`.
@@ -618,7 +604,7 @@ the floor below.
 
 ### Moves
 
-![The same moment from each camera move: orbit sees a ring over the layer; walk and spin look elsewhere in the room; gaze tilts; rise looks from lower down](img/camera.jpg)
+![The same moment from each camera move: orbit sees a veil over the layer; walk and spin look elsewhere in the room; gaze tilts; rise looks from lower down](img/camera.jpg)
 
 Query: `t=110` with `camera=orbit`, `camera=walk`, `camera=spin`,
 `camera=gaze`, `camera=rise`. A still shows where each move has the eye at
@@ -669,7 +655,7 @@ is 10 seconds). The default depth, 0.3, is gentler.
 | **Pad** | `music` | 0 to 1 | `0.6` | The slow pad in D major. |
 | **Bells** | `chimes` | 0 to 1 | `0.6` | The ripples' bells, and the still room's high notes. |
 | **Rain** | `rainSound` | 0 to 1 | `0.3` | The hush of rain. |
-| **Forms** | `formSound` | 0 to 1 | `0.4` | The voice each form brings: the orb a low hum, the spiral a turning figure, the ring a glassy tone, the veil a soft air, the solid a chord of pure fifths, the attractor a wandering figure, the knot two beating tones, the fractal one fifth in every octave. |
+| **Forms** | `formSound` | 0 to 1 | `0.4` | The voice each form brings: the orb a low hum, the spiral a turning figure, the ring a glassy tone, the veil a soft air, the solid a chord of pure fifths, the knot two beating tones. |
 
 `m` or the note button turns the sound on and off. Browsers start sound
 only after a click or a key, so the music begins with your first one
@@ -684,10 +670,8 @@ fades:
   Each form has a voice that swells and fades with it, from the side where
   it is seen (it follows the form as it moves): the orb a warm, low hum, the
   spiral a slow figure of notes that climbs and turns, the ring a clear, glassy tone, the veil a soft, open air,
-  the solid a still chord of pure fifths, the attractor a figure of notes
-  that wanders between a low and a high wing and never repeats, the knot
-  two tones that beat against each other, the fractal one fifth in every
-  octave, each softer.
+  the solid a still chord of pure fifths, the knot two tones that beat
+  against each other.
   As it leaves, the harmony comes home to D.
 - **rain through a form**: both, fuller but not louder.
 - **a still room**: close to silence. The pad thins out, and now and then a

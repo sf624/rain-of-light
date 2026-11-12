@@ -26,9 +26,9 @@
       "q": "scene=crystal&form=spiral&layer=on&seed=5&t=96&orbit=0.05&grid=72&rows=96"
     },
     {
-      "name": "attractor",
+      "name": "knot",
       "seed": 1,
-      "q": "scene=crystal&form=attractor&layer=on&seed=1&t=40&orbit=0.05&grid=72&rows=96"
+      "q": "scene=crystal&form=knot&layer=on&seed=1&t=40&orbit=0.05&grid=72&rows=96"
     },
     {
       "name": "veil",
