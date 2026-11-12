@@ -34,6 +34,7 @@ reload.
 | `lattice.js` | the strands and LEDs, and the order in which they thin out |
 | `gl.js` | WebGL helpers and vector maths |
 | `controls.js` | the sound, volume and full-screen controls |
+| `clock.js` | the lab's show clock: pause, step, speed (see below) |
 | `rotate.js` | the landscape / portrait button |
 | `audio.js` | the music: pad, bells, rain, the forms' voices, reverb |
 | `sway.js` | 1/f fluctuation, used by the music and the rain |
@@ -81,7 +82,8 @@ frame loop that stops, or a black canvas. It visits:
 - the pinned scenes (`rain` in the lab, `crystal`, both with the click,
   keys and Reset), a time part-way through the show
   (with and without the colour story), four of the forms held, and
-  `?jitter=pitch`.
+  `?jitter=pitch`, and the lab's clock (opened paused, it stands still;
+  Space runs and stops it).
 
 It then renders a few seconds of sound offline and checks that a held orb
 sounds, a still room is much quieter, and nothing clips. GitHub Actions
@@ -100,6 +102,35 @@ over time as JSON). It runs the real page in headless Chrome on a fake
 clock, with an OfflineAudioContext in place of the AudioContext, so the show
 drives the sound exactly as it does live. The top of the file lists its
 limits.
+
+## The lab's clock
+
+The show runs on a clock that `main.js` advances by the time between frames.
+On `lab.html` a small bar at the top left (`clock.js`) sets how it advances,
+to tune settings on one moment or to reach a late part of the show:
+
+- **Pause** (`Space`): the show's clock stands still, and with it the drops,
+  the forms, the sway, the twinkle, the ripples, the camera, the breath and
+  the sky. Every frame is still drawn, so a change in the settings panel
+  shows at once on the frozen moment: the settings that ease (weather,
+  colours, direction, forms, camera move) settle in a moment instead of over
+  seconds. The picture's render scale also stays as it is. Sound keeps
+  running, following the frozen state.
+- **Step** (`.`): the show goes on by 0.1 s (times the speed) and stays
+  paused.
+- **Speed** (`[` slower, `]` faster, or the button): x1, x4, x12, x30. A frame
+  advances the show by at most 0.05 s times the speed. Above x4 the waves
+  that come by themselves ring no bell; the pad's chords change at most every
+  6 s as always.
+- **Time**: `t 123.4 s`, the show's clock. Clicking it copies a link to the
+  lab at that moment (`t=` and `pause=1`), to note it.
+
+`?pause=1` opens the lab paused, `?rate=12` opens it fast, and `?t=` sets the
+start time as on both pages. `t=` starts the show, the camera, the rain's
+fall and the sky from that time, so the link shows the same part of the
+show with the same seed; weather and colours that were easing at the moment
+of the click are at their goals instead. The viewer page has no clock; its
+frame loop is unchanged.
 
 ## Capturing the page
 

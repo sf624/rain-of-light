@@ -18,6 +18,7 @@ import { FLOW_WRAP, RAY_CAP, POINT_VS, POINT_FS, WIRE_FS, QUAD_VS, DOWN_FS, BLUR
 import { createGL, sub, cross, dot, norm, perspective, lookAt } from './gl.js';
 import { createLattice, fillLattice, latticeLight } from './lattice.js';
 import { createControls } from './controls.js';
+import { createClock } from './clock.js';
 import { keepAwake } from './wakelock.js';
 import { view, createRotation } from './rotate.js';
 
@@ -245,17 +246,19 @@ function adapt(rawDt, now) {
 // ---------- interaction ----------
 const ripples = new Float32Array(8 * 4).fill(-1e4);
 let rippleIndex = 0;
-function addRipple(x, y, z, t) {
+function addRipple(x, y, z, t, quiet = false) {
   ripples.set([x, y, z, t], rippleIndex * 4);
   rippleIndex = (rippleIndex + 1) % 8;
   // Every wave rings a bell, from the side where it is seen.
-  sound.ripple(panOf([x, y, z]));
+  if (!quiet) sound.ripple(panOf([x, y, z]));
 }
 // Left (-1) .. right (1): where a point in the room is seen, for the sound.
 const panOf = (p) => (camera ? dot(sub(p, camera.eye), camera.r) / 6 : 0);
 
 const rotation = createRotation();
 const sound = createAudio({ settings: S });
+const lab = document.documentElement.dataset.page === 'lab';
+const clock = createClock({ lab, params });
 const controls = createControls({
   sound, S,
   onVolume: (v) => { tuner.set('volume', v); tuner.refresh(); },
@@ -529,6 +532,7 @@ direct(time, true);
 // nothing here: the show reads them every frame and blends into the change.
 let rebuildTimer = 0;
 function apply(key) {
+  settle = 3;
   if (['leds', 'aspect', 'grid', 'rows', 'layout', 'jitter'].includes(key)) {
     clearTimeout(rebuildTimer);
     rebuildTimer = setTimeout(buildLattice, 250); // wait for the slider to settle
@@ -542,7 +546,7 @@ function apply(key) {
 
 // Which panel: lab.html (data-page="lab") shows every setting, the viewer page a few.
 const tuner = createTuner({
-  schema: SCHEMA, lab: document.documentElement.dataset.page === 'lab',
+  schema: SCHEMA, lab,
   settings: S, defaults: DEF, storageKey: STORAGE_KEY,
   onChange: (key) => apply(key),
 });
@@ -560,25 +564,25 @@ const rainSway = createSway({ fastest: 2, octaves: 6 });
 let sway = 0;
 
 // Ease the current look towards the targets, over about tau seconds.
-function ease(dt) {
-  const kw = 1 - Math.exp(-dt / 2.5);
-  const kc = 1 - Math.exp(-dt / 3.0);
+function ease(dt, edt = dt) {   // edt: the time the easings take (dt, or long when a change settles at once)
+  const kw = 1 - Math.exp(-edt / 2.5);
+  const kc = 1 - Math.exp(-edt / 3.0);
   sway = rainSway(dt);
   look.flowRate += (weather.flow * (1 + 0.22 * sway) - look.flowRate) * kw;
   look.rain += (weather.rain - look.rain) * kw;
-  if (direction.update(dt, flowOf(flowGoal), look.flow) === 1) {
+  if (direction.update(edt, flowOf(flowGoal), look.flow) === 1) {
     // (With the setting the way is the show's next one, or one from the seed.)
     const a = flowGoal.toward ? flowGoal.angle : hash(SEED * 5.3 + time) * Math.PI * 2;
     flowDir = [Math.cos(a), Math.sin(a)];
   }
-  const kd = 1 - Math.exp(-dt / 5.0); // density drifts slowly
+  const kd = 1 - Math.exp(-edt / 5.0); // density drifts slowly
   for (let i = 0; i < 2; i++) look.density[i] += (densityGoal[i] - look.density[i]) * kd;
   looks.forEach((l, n) => {
     for (const key of Object.keys(l)) {
       for (let i = 0; i < l[key].length; i++) l[key][i] += (goals[n][key][i] - l[key][i]) * kc;
     }
   });
-  sideNow = Math.max(0, Math.min(1, sideNow + Math.sign(side - sideNow) * dt / SWITCH));
+  sideNow = Math.max(0, Math.min(1, sideNow + Math.sign(side - sideNow) * edt / SWITCH));
   if (Math.abs(side - sideNow) < 1e-3) sideNow = side;
   skyClock = (skyClock + dt / Math.max(1, S.skyDay)) % 1;
   const advance = dt * look.flowRate * SPEED * S.speed;
@@ -613,22 +617,28 @@ function placeImages() {
 
 // ---------- frame ----------
 let last = performance.now();
+let settle = 0;   // frames left to settle the easings after a change while paused
 
 let checked = false;
 
 function frame(now) {
   const rawDt = (now - last) / 1000;
-  const dt = Math.min(0.05, Math.max(0, rawDt)); // rAF time may precede `last`
+  // rAF time may precede `last`. The lab's clock may stand the show still or run it faster.
+  const dt = clock.tick(Math.min(0.05, Math.max(0, rawDt)));
+  // A change in the panel while paused settles the easings at once (the show itself stays at its moment).
+  const edt = clock.paused && settle > 0 ? 1e3 : dt;
+  if (clock.paused && settle > 0) settle--;
   last = now;
-  adapt(rawDt, now);
+  if (!clock.paused) adapt(rawDt, now);   // a paused picture keeps its render scale
   time += dt;
+  clock.show(time);
   resize();
 
   // Camera: one of several moves, blended while one turns into the next.
   pointer.sx += (pointer.x - pointer.sx) * 0.03;
   pointer.sy += (pointer.y - pointer.sy) * 0.03;
   camClock += dt * SPEED * (S.orbit / DEFAULTS.orbit); // integrated: a new speed never jumps
-  camBlend = Math.min(1, camBlend + dt / CAMERA_BLEND);
+  camBlend = Math.min(1, camBlend + edt / CAMERA_BLEND);
   const kb = smooth(camBlend);
   let eye = [0, 0, 0], dir = [0, 0, 0];
   // The eye stands on the floor, with a little sway.
@@ -665,7 +675,7 @@ function frame(now) {
   // A wave now and then, somewhere in the field.
   if (S.ripples > 0 && time > nextAuto) {
     const where = (i) => hash(SEED + ++autoWaves * 5.71 + i) - 0.5;   // from the seed, like the rest of the show
-    addRipple(where(1) * SPAN * 0.6, where(2) * HEIGHT * 0.5, where(3) * SPAN * 0.6, time);
+    addRipple(where(1) * SPAN * 0.6, where(2) * HEIGHT * 0.5, where(3) * SPAN * 0.6, time, clock.rate > 4);   // a fast show rings no bells for them
     // While waves repaint the field, they come more often.
     // The gaps sway with 1/f fluctuation: about half to twice the setting.
     const every = colorMode.name === 'repaint' ? Math.min(S.ripples, 6) : S.ripples;
@@ -673,8 +683,8 @@ function frame(now) {
   }
 
   direct(time);
-  ease(dt);
-  const shown = show.update(time, dt, camera);
+  ease(dt, edt);
+  const shown = show.update(time, edt, camera);
   flowGoal = shown.flow;
   const rk = shown.rain;                 // how much rain falls now: 0 a still room .. 1 a rain passage
   placeImages();

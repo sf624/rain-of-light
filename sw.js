@@ -8,7 +8,7 @@ const CACHE = 'rain-of-light';
 const CORE = [
   './', 'index.html', 'lab.html', 'boot.js', 'style.css', 'manifest.webmanifest', 'favicon.svg',
   'main.js', 'config.js', 'shaders.js', 'lattice.js', 'gl.js', 'show.js', 'forms.js', 'director.js', 'direction.js',
-  'controls.js', 'audio.js', 'sway.js', 'tuner.js', 'wakelock.js', 'rotate.js',
+  'controls.js', 'clock.js', 'audio.js', 'sway.js', 'tuner.js', 'wakelock.js', 'rotate.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png',
   'icons/apple-touch-icon.png',
 ];
