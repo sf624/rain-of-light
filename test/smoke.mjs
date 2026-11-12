@@ -156,7 +156,11 @@ function nonBlackShare(png) {
 const COUNT_RAF = `(() => { window.__frames = 0; const r = window.requestAnimationFrame.bind(window);
   window.requestAnimationFrame = (cb) => r((t) => { window.__frames++; cb(t); }); })()`;
 
-async function visit(cdp, base, query, interact) {
+// The lattice of a visit that only checks that the page works, not how the full lattice looks: far fewer LEDs, so
+// software GL draws a frame in a fraction of the time. A visit passes `full` to keep the default lattice.
+const LITE = 'leds=20';
+const liteUrl = (query) => { const [q, hash] = query.split('#'); return `${q}${q.includes('?') ? '&' : '?'}${LITE}${hash === undefined ? '' : `#${hash}`}`; };
+async function visit(cdp, base, query, interact, full = false) {
   const lab = query.startsWith('lab.html');
   const label = query || '(default)';
   const errors = [];
@@ -185,7 +189,7 @@ async function visit(cdp, base, query, interact) {
   for (const d of ['Runtime', 'Log', 'Network', 'Page']) await s(`${d}.enable`);
   await s('Emulation.setDeviceMetricsOverride', { width: 480, height: 300, deviceScaleFactor: 1, mobile: false });
   await s('Page.addScriptToEvaluateOnNewDocument', { source: COUNT_RAF });
-  await s('Page.navigate', { url: `${base}${query}` });
+  await s('Page.navigate', { url: `${base}${full ? query : liteUrl(query)}` });
   const evalJs = async (expression) => {
     const r = await s('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
     if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);
@@ -195,7 +199,7 @@ async function visit(cdp, base, query, interact) {
     if (errors.length) fail(`[${label}] ${when}:\n  ${[...new Set(errors)].join('\n  ')}`);
   };
   // Ready = the document has loaded and the page's own #fallback element exists (the page script ran).
-  const pageUrl = `${base}${query}`;
+  const pageUrl = `${base}${full ? query : liteUrl(query)}`;
   await poll(`the page to load (#fallback present) [${label}] ${pageUrl}`,
     () => evalJs(`document.readyState === 'complete' && !!document.getElementById('fallback')`), { tick: () => check('while loading') });
   check('while loading');
@@ -223,7 +227,8 @@ async function visit(cdp, base, query, interact) {
     if (!lab && (panel.keys.includes('jitter') || want.length > 8)) fail(`[${label}] the viewer panel has lab settings: ${panel.keys.join()}`);
     const buttons = lab ? 'Copy,Reset,×' : 'Reset,×';
     if (panel.buttons.join() !== buttons) fail(`[${label}] the panel's buttons are ${panel.buttons.join()}, not ${buttons}`);
-    const other = lab ? `${base}#tune` : `${base}lab.html#tune`;
+    const search = full ? '' : `?${LITE}`; // the link carries the URL settings
+    const other = lab ? `${base}${search}#tune` : `${base}lab.html${search}#tune`;
     if (panel.other !== other) fail(`[${label}] the link to the other page is ${panel.other}, not ${other}`);
     if (lab) {
       await evalJs(`(() => { const s = document.querySelector('.tuner-row[data-key="story"] select'); s.value = 'off';
@@ -324,7 +329,7 @@ if (r.exceptionDetails || !Array.isArray(r.result.value?.modes)) fail(`could not
 const { modes, storageKey: STORAGE_KEY, ...schema } = r.result.value;
 await cdp.send('Target.closeTarget', { targetId });
 
-await visit(cdp, base, '', true);
+await visit(cdp, base, '', true, true); // the real default lattice
 for (const m of modes) await visit(cdp, base, `?color=${encodeURIComponent(m)}`, false);
 // The lab's panel, then the viewer page's (in this order: the second reads what the first saved).
 await visit(cdp, base, 'lab.html#tune', false);

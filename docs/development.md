@@ -67,9 +67,12 @@ node test/smoke.mjs
 It needs Node 22 and Chrome (`google-chrome` or `chromium` on PATH, or set
 `CHROME=/path/to/chrome`). It serves the repo and opens it in headless
 Chrome with software GL. It fails on any error, a shown fallback message, a
-frame loop that stops, or a black canvas. It visits:
+frame loop that stops, or a black canvas. Software GL draws a frame in
+seconds, so only the first visit uses the real default lattice; every other
+visit adds `leds=20` (20 thousand LEDs) to its URL, which cuts a visit from
+about 11 s to 3 s. It visits:
 
-- the default page, with a click, the keys and turning the picture; it
+- the default page (the real lattice), with a click, the keys and turning the picture; it
   changes the scene in the panel (the page must not reload) and checks that
   Reset brings back the mix;
 - every colour mode;
