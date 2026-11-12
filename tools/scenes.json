@@ -8,7 +8,7 @@
     {
       "name": "rain",
       "seed": 1,
-      "q": "scene=rain&color=cloud&weather=drizzle&flow=down&density=manual&strandShare=0.7&rowShare=0.85&seed=8&t=30&orbit=0.03&exposure=2.4&leds=1000"
+      "q": "scene=rain&color=cloud&weather=drizzle&flow=down&density=manual&strandShare=0.7&rowShare=0.85&seed=5&t=30&orbit=0.03&exposure=2.4&leds=1000"
     },
     {
       "name": "storm",

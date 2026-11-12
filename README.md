@@ -12,16 +12,16 @@ ripple of light rings a bell.
 
 <table>
   <tr>
-    <td align="center"><img src="docs/rain.gif" alt="Rain of light: drops in drifting clouds of magenta, violet and teal fall along strands of light points, over their dimmer image in the mirror floor" width="100%"><br><sub>rain of light</sub></td>
-    <td align="center"><img src="docs/storm.gif" alt="Amber rain of light falls around an orb of amber light and gives way to it; the floor mirrors both" width="100%"><br><sub>rain falling through a form</sub></td>
+    <td align="center"><img src="docs/rain.gif" alt="Rain of light: drops in drifting clouds of violet, magenta and teal fall in close rows along strands of light points" width="100%"><br><sub>rain of light</sub></td>
+    <td align="center"><img src="docs/storm.gif" alt="Pale rain of light falls around an orb of amber light, over a pink layer of light; the floor mirrors both" width="100%"><br><sub>rain falling through a form</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/orb.gif" alt="An orb of amber light, pale at its heart, glows in the still room above a mirror floor, with a thin blue layer of light along the floor" width="100%"><br><sub>an orb in the still room, with the layer</sub></td>
+    <td align="center"><img src="docs/orb.gif" alt="An orb of amber light, pale at its heart, glows in the still room above a mirror floor, with a thin pink layer of light along the floor" width="100%"><br><sub>an orb in the still room, with the layer</sub></td>
     <td align="center"><img src="docs/spiral.gif" alt="A spiral of pale blue light turns slowly above a green layer of light and is mirrored in the floor" width="100%"><br><sub>a spiral</sub></td>
   </tr>
   <tr>
     <td align="center"><img src="docs/knot.gif" alt="A knot of green light, one closed line in a figure of eight woven in depth, with two lights running round it, above a pink layer of light and its image in the mirror floor" width="100%"><br><sub>a knot</sub></td>
-    <td align="center"><img src="docs/veil.gif" alt="A veil of green light like an aurora: rays of many heights rise from a bright wavy hem, above a blue layer of light and its image in the floor" width="100%"><br><sub>a veil</sub></td>
+    <td align="center"><img src="docs/veil.gif" alt="A veil of green light like an aurora: rays of many heights rise from a bright wavy hem, above a pink layer of light and its image in the floor" width="100%"><br><sub>a veil</sub></td>
   </tr>
 </table>
 
