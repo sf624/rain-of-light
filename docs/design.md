@@ -374,6 +374,15 @@ at 1280x720 in `rain` weather, the mean brightness is the same as with the
 plain fog. In a phone's tall view it is about 85% of it, and the floor's
 image still shows in the lower half.
 
+**Near heads.** A near drop's head would get the lattice's share of a
+drop's light (up to `DROP_MAX`), the near light and a large sprite at
+once, and swell into a blurred ball in the glow. Its light per pixel is
+capped (`POINT_VS: HEAD_MAX`, 2 heads' light at 1.5 px, less by the
+sprite's area as it grows), so no head gives more light in all than one at
+1.5 px. Farther heads keep their light and still dim with distance; the
+trails are not capped. In a phone's tall view this takes about 6% off the
+mean brightness of falling rain, at 1280x720 about 4%.
+
 ### Rain flowing sideways
 
 ![Rain falling, and rain drifting sideways](img/direction.jpg)

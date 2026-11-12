@@ -650,6 +650,19 @@ void main() {
     phys = mix(1.0, f * pow(min(1.0, uSize * uFocal / (dist * uRayView.x) / 1.5), FALL_DIM), uFallLight);
     physWire = mix(1.0, f * pow(min(1.0, 4.0 / dist), FALL_DIM), uFallLight);
   }
+  // Every LED has the same physical size; only its brightness changes.
+  // Below 1.5 px, keep the size and dim it instead, so far LEDs do not shimmer.
+  float px = uSize * uFocal / dist;
+  float shown = clamp(px, 1.5, max(1.5, uMaxPx));
+  // A drop's head gives at most HEAD_MAX times the light of one LED's head on
+  // the lattice the light is set for (see latticeLight), seen at 1.5 px: a
+  // near head on a sparse lattice gets the lattice's boost (uRainK), the near
+  // light (phys) and a larger sprite, and would swell into a big blurred
+  // ball in the glow. The cap falls with the sprite's area, so no near head
+  // gives more light in all than one at 1.5 px; farther heads keep theirs,
+  // and dim with distance. (min is continuous: a head never jumps.)
+  const float HEAD_MAX = 2.0;
+  float headTip = min(tip * phys, HEAD_MAX * (1.5 / shown) * (1.5 / shown)) / max(phys, 1e-3);
   float rk = uRainMix;
   if (rk > 0.001) {
     // The rain's look: its colour modes. Colours travel with each drop; an
@@ -678,9 +691,9 @@ void main() {
     const float WHITE[11] = float[11](0.5, 0.5, 0.15, 0.2, 0.3, 0.0, 0.3, 0.35, 0.35, 0.3, 0.35);
     float white = 0.0;
     for (int i = 0; i < 11; i++) white += WHITE[i] * W[i];
-    c += (restCol * rest + rainCol * rain * uRainGain + mix(tipCol, vec3(1.0), white) * tip * uTipGain
+    c += (restCol * rest + rainCol * rain * uRainGain + mix(tipCol, vec3(1.0), white) * headTip * uTipGain
         + mix(restCol, vec3(1.0), 0.35) * wave * 4.0) * rk * (1.0 - 0.25 * uStorm) * (1.0 - 0.75 * around * (1.0 - inForm)) * phys;
-    glint += (tipCol * tip * uTipGain + mix(restCol, vec3(1.0), 0.35) * wave * 4.0) * rk * phys; // a head's light in its own colour
+    glint += (tipCol * headTip * uTipGain + mix(restCol, vec3(1.0), 0.35) * wave * 4.0) * rk * phys; // a head's light in its own colour
     wireCol += (rainCol * rain * wireRain + restCol * wireRest + restCol * wireWave) * rk * physWire;
   }
   if (rk < 0.999) {
@@ -734,13 +747,9 @@ void main() {
     return;
   }
 
-  // Every LED has the same physical size; only its brightness changes.
-  // Below 1.5 px, keep the size and dim it instead, so far LEDs do not shimmer.
-  float px = uSize * uFocal / dist;
   // The head's light as seen in a view 1080 px tall (in a smaller view an LED
   // dims sooner with distance): what a light ray's length goes by.
   float seenLight = max(glint.r, max(glint.g, glint.b)) * min(1.0, px / (uRayView.x * 1.5));
-  float shown = clamp(px, 1.5, max(1.5, uMaxPx));
   c *= min(1.0, px / shown);
   glint *= min(1.0, px / shown);
   gl_Position = clip;
