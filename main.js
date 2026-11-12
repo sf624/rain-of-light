@@ -781,7 +781,7 @@ function frame(now) {
   gl.uniform1f(u.uStorm, shown.storm);
   gl.uniform4fv(u.uFormA, shown.A);
   gl.uniform4fv(u.uFormB, shown.B);
-  gl.uniform4fv(u.uFormE, shown.E);
+  gl.uniform3fv(u.uFormE, shown.E);
   gl.uniform4fv(u.uFormF, shown.F);
   gl.uniform3fv(u.uFormC, shown.C);
   gl.uniform3fv(u.uFormD, shown.D);

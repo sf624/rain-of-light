@@ -62,7 +62,7 @@ with `wire=1&rest=0.1` (strand), `wire=0&rest=0.1&size=0.03` (LED, cut out),
 `t=60` (a storm passage of the whole show);
 `scene=crystal&form=orb&layer=off&t=30` (form);
 `scene=crystal&form=none&layer=on&t=30` (layer);
-`scene=crystal&form=knot&layer=off&t=50` (knot);
+`scene=crystal&form=knot&layer=off&t=30` (knot);
 `scene=crystal&form=none&layer=off&t=30` and a click (ripple);
 `scene=crystal&form=orb&layer=off&t=30&mirror=1` (mirror image, lower half).
 
@@ -219,38 +219,36 @@ top down, as if rain gathered into it or ran off it as rain.
 ![The six forms alone in the still room: an amber orb, a blue spiral, an amber ring, a green veil, a pale solid of lines and a green knot; the seventh picture, form=none, is the empty room](img/forms.jpg)
 
 Query: `scene=crystal&layer=off&t=30` with `form=orb`, `form=spiral`,
-`form=ring`, `form=veil`; a little later in their
-lives, `form=solid&t=50`, `form=knot&t=50`; and `form=none`.
+`form=ring`, `form=veil`, `form=solid`, `form=knot` and `form=none`.
 
-Each form moves slowly in its own way, and the floor shows each move:
+Each form comes and goes where it stands: its light fades in LED by LED
+as it grows a little, over about 18 s, and fades out as it shrinks a little,
+over about 16 s. While it shows, it moves slowly in its own way, and the
+floor shows each move:
 
-- **orb**: rises out of the floor, meeting its image there; drifts and
-  breathes. Now and then it parts into two that drift apart and flow
-  together again. It goes by sinking back into the floor. It is pale at
-  its heart and deepens to its rim.
-- **spiral**: unfurls out of its bright core, its arms turning, and winds
-  back into it as it goes. It turns its face to the room, leaning to and fro.
-- **ring**: rises out of the floor lying flat, then stands up and turns
-  slowly. Now and then it parts into two hoops that cross and come back
-  into one. It goes by lying down and sinking into the floor.
+- **orb**: drifts and breathes. It is pale at its heart and deepens to its
+  rim.
+- **spiral**: its arms turn. It turns its face to the room, leaning to and
+  fro.
+- **ring**: stands and turns slowly. Now and then it parts into two hoops
+  that cross and come back into one.
 - **veil**: a curtain of light like an aurora, across the room, a little
-  beyond its middle. It unrolls from one end, its folds travelling along it; its lower
-  hem is a bright line that rises and falls, with rays of many heights
-  above it. It goes by lifting away upward.
+  beyond its middle. Its folds travel along it; its lower hem is a bright
+  line that rises and falls, with rays of many heights above it.
 
 Two forms come from mathematics. They come a little less often than the
 four above:
 
 - **solid**: the edges of a regular solid as rods of light: a tetrahedron,
   point up, or an octahedron standing on its point (one of the two for its
-  whole life; the seed chooses). Its corners come first, as bright points;
-  the edges are drawn out from them until they meet. It leans a little and
-  turns slowly about its upright axis, and goes as the edges draw back.
+  whole life; the seed chooses), with a bright point at each corner. It
+  leans a little and turns slowly about its upright axis.
 - **knot**: a Lissajous curve, a closed rod of light that swings three
   ways at once: twice across while it goes once up and down, and three
   times in depth. Its broad side faces the room, a figure of eight; its
   phase sways, so the loops open and close a little, and two lights run
-  round it. It is drawn once round as it comes, and undone as it goes.
+  round it.
+
 Each form takes its colours from a few palettes of its own
 (`config.js: FORMS`). The forms keep a little beyond the middle of the room
 as you look at them.
