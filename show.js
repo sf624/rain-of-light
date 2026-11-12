@@ -38,10 +38,10 @@ const between = (a, b, r) => a + (b - a) * r;
 
 // When a channel changes at the start T of a passage: it begins at T + at
 // and takes `fade` seconds. Rain comes early and leaves late, so a form
-// that goes while rain comes dissolves into it, and one that comes while
+// that goes while rain comes fades into it, and one that comes while
 // rain goes seems to gather out of it.
 const RAIN_IN = { at: -5, fade: 14 }, RAIN_OUT = { at: 4, fade: 16 };
-const SKY_IN = { at: -2, fade: 12 }, SKY_OUT = { at: -5, fade: 10 };
+const SKY_IN = { at: -4, fade: 18 }, SKY_OUT = { at: -8, fade: 16 };
 const SKY_INTO_RAIN = { at: 2, fade: 15 };   // a form going as rain comes
 // Among rain or under a form the layer keeps this share of the glow it has alone.
 const LAYER_UNDER = 0.6;
@@ -140,7 +140,7 @@ function createTimeline(seed, pool, name, mood) {
       for (const e of [p.sky, p.layer]) {
         if (!e || items.has(e.id)) continue;
         const w = weight(e, t);
-        if (w > 0.001) items.set(e.id, { e, w, age: t - e.inAt, out: t > e.outAt, gone: t - e.outAt });
+        if (w > 0.001) items.set(e.id, { e, w, age: t - e.inAt, out: t > e.outAt });
       }
       if (p.start > t + 30) break;
     }
@@ -236,7 +236,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
   const SLOTS = 3;                            // two sky forms (one coming, one going) and the layer
   const A = new Float32Array(SLOTS * 4), B = new Float32Array(SLOTS * 4);
   const C = new Float32Array(SLOTS * 3), D = new Float32Array(SLOTS * 3);
-  const E = new Float32Array(SLOTS * 4), F = new Float32Array(SLOTS * 4);
+  const E = new Float32Array(SLOTS * 3), F = new Float32Array(SLOTS * 4);
   const tint = [...ROOM_TINT];
 
   // Where a form is at its age, how large, how turned (see forms.js). The
@@ -245,21 +245,20 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
   function place(k, s, sweep, view, dt, down = 1) {
     const eye = view?.eye;
     const { x, w, col } = s;
-    const { e, age, out, gone } = x;
+    const { e, age, out } = x;
     const { form, r } = e;
     let m;
     if (form === LAYER) {                     // the layer: its surface height, its thickness
       m = { centre: [0, feet + between(0.5, 1.8, hash(r * 61 + 1)), 0], size: between(0.2, 0.45, hash(r * 61 + 2)),
-        turn: 0, tilt: 0, yaw: 0, f: [between(0.55, 1, hash(r * 61 + 3)), s.alone, LAYER_UNDER], dissolve: 0, bound: 1e4 };
+        turn: 0, tilt: 0, yaw: 0, f: [between(0.55, 1, hash(r * 61 + 3)), s.alone, LAYER_UNDER], bound: 1e4 };
     } else {
-      const leave = out ? smooth(gone / e.outFade) : 0;
-      m = motion(form.name, age, leave, r, s.face ?? 0, view?.rise);
+      m = motion(form.name, age, w, r, s.face ?? 0, view?.rise);
       if (eye) {
         const goal = Math.atan2(m.anchor[0] - eye[0], m.anchor[2] - eye[2]);
         const turn = s.face === undefined ? 1 : 1 - Math.exp(-dt / 5);
         const d = goal - (s.face ?? goal);
         s.face = (s.face ?? goal) + (d - Math.round(d / (2 * Math.PI)) * 2 * Math.PI) * turn;
-        m = motion(form.name, age, leave, r, s.face, view.rise);
+        m = motion(form.name, age, w, r, s.face, view.rise);
       }
     }
     A.set([form.type, w, m.size, m.turn], k * 4);
@@ -271,7 +270,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
     // While rain falls, a form comes from the top down and goes from the top
     // down, as if rain gathered into it or it ran off as rain; else LED by LED
     // (also beside sideways rain, which falls from nowhere: down 0).
-    E.set([sweep * down, out ? -1 : 1, m.yaw, m.dissolve], k * 4);
+    E.set([sweep * down, out ? -1 : 1, m.yaw], k * 3);
     F.set([...m.f, m.bound], k * 4);
   }
 

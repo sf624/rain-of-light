@@ -430,10 +430,9 @@ look that no strand shows.
 gives, at the LED's position, the light, a white-hot share, and a mix from
 the form's first colour to its second:
 
-- `orbLight`: a ball, pale at its heart, deep at its thin rim. It may part
-  in two.
+- `orbLight`: a ball, pale at its heart, deep at its thin rim.
 - `spiralLight`: a tilted disc with two arms and a bright bulge, slowly
-  turning. It unfurls from its core.
+  turning.
 - `ringLight`: a hoop, a bright thread in a soft sheath, with two brighter
   arcs. It may part into two crossing hoops.
 - `veilLight`: a curtain like an aurora, in travelling folds, with a bright
@@ -442,8 +441,7 @@ the form's first colour to its second:
   `CORNER`, `EDGE`). The distance to each edge is that from a point to a
   straight piece of line, worked out exactly, 6 or 12 times. Each edge
   is a rod of even light with a clean edge (`rod`), dark around and
-  inside the solid, and shows from its two corners inward, as far as it
-  is drawn. Each corner is a white-hot point. The solid stands on the axis
+  inside the solid. Each corner is a white-hot point. The solid stands on the axis
   of a corner and leans at most 0.4 rad (`forms.js: solid`), so every edge
   runs aslant or level: an edge along a strand would light one strand or
   none.
@@ -483,8 +481,9 @@ dark, and those between are partly lit. Normally the order is random per
 LED, so a form gathers LED by LED. While rain falls (not sideways), the order follows the
 height (`uFormE[k].x`), so a form comes from the top down, as if rain
 gathered into it, and goes from the top down, as if it ran off as rain.
-A form that rises away as points (`uFormE[k].w`, the veil)
-shows each LED's light a random way below it, so the light lifts off.
+A form comes and goes in place: it never travels to come or go. As its
+weight rises it also grows from 0.75 of its size to its full size, and as
+its weight falls it shrinks back (`forms.js: GROW`, `motion`).
 
 **Colour.** The light is the form's first colour mixed towards its second,
 then towards `WHITE_HOT` by the white-hot share. Sky forms give 1.25 times
@@ -597,7 +596,7 @@ pace (`show.js: RAIN_IN`, `RAIN_OUT`, `SKY_IN`, `SKY_OUT`,
 `SKY_INTO_RAIN`, `LAYER_IN`, `LAYER_OUT`). Rain comes early and leaves late.
 
 Example: a form passage starts at 100 s after a rain passage. The form
-begins to gather at 98 s and is full by 110 s (`SKY_IN`). The rain begins to
+begins to gather at 96 s and is full by 114 s (`SKY_IN`). The rain begins to
 leave at 104 s and has gone by 120 s (`RAIN_OUT`). So the form seems to
 gather out of the rain.
 
@@ -613,12 +612,10 @@ uniforms `uFormA` to `uFormF` for each slot: type, weight, size, turn,
 centre, tilt, how it comes and goes, its own measures and its reach.
 
 Where a form is comes from `forms.js: motion`, as a function of its age and
-of how far it has gone on its way out. Each form has a life of its own
+of its weight (its size, see `GROW`). Each form has a life of its own
 (`forms.js: orb`, `spiral`, `ring`, `veil`, `solid`,
-`knot`). For example, the orb
-rises out of the floor to meet its image, drifts, parts in two now and then,
-and sinks back as it leaves. The ring rises lying flat, stands up, and lies
-down into the floor as it goes. The forms slowly turn to face the eye (eased
+`knot`). For example, the orb drifts and breathes; the ring parts in two
+now and then and comes back into one. The forms slowly turn to face the eye (eased
 over 5 s), and keep a little beyond their path as the eye sees them
 (`forms.js: BACK`).
 
@@ -1059,8 +1056,8 @@ more pass, not a different renderer.
 
 **Nothing comes or goes at once.** Many details exist only to avoid a one-frame
 step: the rain share fades per strand, LEDs fade near the eye, a drop fades
-in over its first LEDs, a wave swells in, a form's LEDs fade as they rise
-away. The noise's hash (`hash3`) uses no sine: a hash built on a sine jumps
+in over its first LEDs, a wave swells in, a form's LEDs fade in and out
+one by one. The noise's hash (`hash3`) uses no sine: a hash built on a sine jumps
 all at once every few seconds.
 
 **Two colour looks, not a blend.** Blending two colour modes passes through
