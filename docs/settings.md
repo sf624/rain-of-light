@@ -148,18 +148,30 @@ mode, Weather and Move settings. While
 a setting is `auto`, the key moves the show on to its next choice. Otherwise
 it sets the next value in the list. `d` sets Direction to `down` or `across`.
 
+The lab also has a clock for the show (top left): pause the picture, step
+it, run it faster, and read its time. See [Development](development.md#the-labs-clock).
+Its keys, which the viewer page does not have:
+
+| Key | Does |
+| --- | --- |
+| `Space` | pause / resume the show |
+| `.` | one step forward (pauses) |
+| `[` `]` | slower / faster: x1, x4, x12, x30 |
+
 ### URL parameters
 
 Every setting below can be given in the URL with its key, such as
 `?color=cloud&weather=drizzle`. A URL value wins over a saved one. A value
 that does not exist falls back to the default; a number is kept within the
-slider's range. Both pages take every parameter. The URL also takes four
+slider's range. Both pages take every parameter (`pause` and `rate` only the lab). The URL also takes
 things that are not in the panel:
 
 | Parameter | Values | Default | Does |
 | --- | --- | --- | --- |
 | `seed` | any number | random | One order of the show: its passages, forms, weather, colours, direction and density. The same seed gives the same show. |
 | `t` | seconds | `0` | Starts the show at that time of its order. The camera starts there too, so a time shows one view. |
+| `pause` | `1` | off | The lab only: opens with the show paused (see [the lab's clock](development.md#the-labs-clock)). |
+| `rate` | a number up to `60` | `1` | The lab only: opens with the show running this many times faster. |
 | `dpr` | a number, such as `1` or `1.5` | `2` | The highest pixel ratio drawn. A screen with a higher ratio is drawn at this one. |
 | `#tune` | (a hash, not a parameter) | | Opens the settings panel: `#tune` the viewer page's, `lab.html#tune` the lab's. |
 

@@ -278,6 +278,20 @@ async function visit(cdp, base, query, interact) {
     if (await evalJs('window.__stay') !== 1) fail(`[${label}] Reset reloaded the page`);
     check('after changing the scene and Reset');
   }
+  // The lab's show clock: opened paused it stands still while frames are drawn, Space runs it, Space stops it again; the viewer page has none.
+  const clockText = () => evalJs(`document.querySelector('.clock-time')?.textContent ?? ''`);
+  const press = (key) => evalJs(`dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)} }))`);
+  if (lab && query.includes('pause=1')) {
+    if (await clockText() !== 't 20.0 s') fail(`[${label}] the paused clock reads ${await clockText()}, not t 20.0 s`);
+    await framesAfter(await evalJs('window.__frames'), 'while paused');
+    if (await clockText() !== 't 20.0 s') fail(`[${label}] the show moved while paused: ${await clockText()}`);
+    await press(' ');
+    await poll(`the show clock to run after Space [${label}]`, async () => await clockText() !== 't 20.0 s', { tick: () => check('after Space') });
+    await press(' ');
+    const held = await clockText();
+    await framesAfter(await evalJs('window.__frames'), 'after pausing again');
+    if (await clockText() !== held) fail(`[${label}] the show moved after Space paused it: ${held} -> ${await clockText()}`);
+  } else if (!lab && await evalJs(`!!document.querySelector('.clock')`)) fail(`[${label}] the viewer page has the lab's clock`);
   await evalJs(`(() => { const o = document.getElementById('overlay'); if (o) o.style.display = 'none'; })()`);
   await framesAfter(await evalJs('window.__frames'), 'after hiding the overlay'); // the screenshot shows a frame drawn without it
   const shot = await s('Page.captureScreenshot', { format: 'png' });
@@ -317,6 +331,7 @@ await visit(cdp, base, 'lab.html#tune', false);
 await visit(cdp, base, '#tune', false);
 // The pinned scenes (the rain in the lab), and the mix part-way through (a form, rain going or coming).
 await visit(cdp, base, 'lab.html?scene=rain', true);
+await visit(cdp, base, 'lab.html?pause=1&t=20&scene=rain', false);   // the lab's clock
 await visit(cdp, base, '?scene=crystal', true);
 await visit(cdp, base, '?seed=7&t=100', false);
 await visit(cdp, base, '?seed=7&t=100&story=off', false);   // without the colour story

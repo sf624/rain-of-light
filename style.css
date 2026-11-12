@@ -295,3 +295,34 @@ body.idle .full-toggle:focus-visible, body.idle .rotate-toggle:focus-visible, bo
 @media (hover: none) and (pointer: coarse) {
   body.turned .tuner, body.turned .tuner-row input[type="range"] { touch-action: pan-x; }
 }
+
+/* ---------- the lab's show clock: pause, step, speed, time ---------- */
+.clock {
+  position: fixed;
+  top: 16px;
+  left: max(16px, var(--sa-left, 0px));
+  z-index: 2;
+  display: flex;
+  gap: 6px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.clock button {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+  opacity: 0.6;
+}
+.clock button:hover, .clock button:focus-visible, .clock.paused .clock-pause { opacity: 1; }
+.clock button:focus-visible { outline: 2px solid #9cc8ff; outline-offset: 2px; }
+.clock.paused .clock-pause { border-color: rgba(156, 200, 255, 0.6); color: #cfe4ff; }
+.clock-time { min-width: 7.5em; text-align: left; }
+.clock-time.copied { border-color: rgba(156, 255, 200, 0.6); }
+/* The lab's panel starts below the clock. */
+.tuner:not(.basic) { top: 64px; }
