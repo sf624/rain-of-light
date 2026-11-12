@@ -10,7 +10,7 @@
       {"q": "seed=1&t=60", "label": "passage (storm)"},
       {"q": "scene=crystal&form=orb&layer=off&t=30", "label": "form (orb)"},
       {"q": "scene=crystal&form=none&layer=on&t=30", "label": "layer of light"},
-      {"q": "scene=crystal&form=attractor&layer=off&t=55", "label": "attractor (a form)"},
+      {"q": "scene=crystal&form=knot&layer=off&t=50", "label": "knot (a form)"},
       {"q": "scene=crystal&form=none&layer=off&t=30", "label": "ripple", "click": [0.5, 0.55], "after": 24},
       {"q": "scene=crystal&form=orb&layer=off&t=30&mirror=1", "label": "mirror image", "crop": [0.1, 0.45, 0.9, 1.0]}
     ] },
@@ -28,15 +28,13 @@
       {"q": "seed=1&t=60&scene=rain", "label": "scene=rain"},
       {"q": "seed=1&t=60&scene=crystal", "label": "scene=crystal"}
     ] },
-    { "name": "forms", "cols": 3, "base": "scene=crystal&layer=off&t=30", "pre": 100, "cells": [
+    { "name": "forms", "cols": 4, "base": "scene=crystal&layer=off&t=30", "pre": 100, "cells": [
       {"q": "form=orb", "label": "form=orb"},
       {"q": "form=spiral", "label": "form=spiral"},
       {"q": "form=ring", "label": "form=ring"},
       {"q": "form=veil", "label": "form=veil"},
       {"q": "form=solid&t=50", "label": "form=solid"},
-      {"q": "form=attractor&t=55", "label": "form=attractor"},
       {"q": "form=knot&t=50", "label": "form=knot"},
-      {"q": "form=fractal&t=60", "label": "form=fractal"},
       {"q": "form=none", "label": "form=none"}
     ] },
     { "name": "layer", "cols": 3, "base": "scene=crystal&t=30", "cells": [

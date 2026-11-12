@@ -30,7 +30,6 @@ reload.
 | `show.js` | the show's director: the timeline of passages, how much rain falls and which way, which forms of light show, and how bright |
 | `direction.js` | a change of the rain's direction: the old drops stop coming and fade out before the new ones set out |
 | `forms.js` | how each form of light moves through its life: where it is, how large and how turned |
-| `lorenz.js` | the path of the Lorenz equations, worked out once as a field for the attractor form |
 | `shaders.js` | the GLSL shaders: the points of light, bloom and tone mapping |
 | `lattice.js` | the strands and LEDs, and the order in which they thin out |
 | `gl.js` | WebGL helpers and vector maths |
@@ -81,7 +80,7 @@ frame loop that stops, or a black canvas. It visits:
   a setting the lab saved and its Reset clears it;
 - the pinned scenes (`rain` in the lab, `crystal`, both with the click,
   keys and Reset), a time part-way through the show
-  (with and without the colour story), six of the forms held, and
+  (with and without the colour story), four of the forms held, and
   `?jitter=pitch`.
 
 It then renders a few seconds of sound offline and checks that a held orb
