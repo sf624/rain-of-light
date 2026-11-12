@@ -189,7 +189,7 @@ list.
 The share picture, `og-image.jpg` (1200x630, named in `index.html`), is
 made with the same tool, from a list of its own given by `DOC_SHOTS=`: one
 figure, `"w": 1200, "h": 675`, one cell with the query
-`scene=mix&form=orb&layer=on&weather=drizzle&color=cloud&seed=8&t=30`
+`scene=mix&form=orb&layer=on&weather=drizzle&color=cloud&seed=7&t=30`
 (plus `dpr=1&quality=full&ripples=0&breath=off`), cut to its middle 630
 rows. A bigger capture looks sparser, not sharper: near LEDs are capped at
 Largest size, which is in pixels.
