@@ -7,7 +7,7 @@ References look like `file.js: name`: search the file for that name.
 For what each setting does, see [settings.md](settings.md). For running,
 testing and capturing, see [development.md](development.md).
 
-![Three scenes side by side: mix, rain and crystal](img/scenes.jpg)
+![The same moment three ways: the whole show (an orb in rain), only the rain, and the forms without rain](img/scenes.jpg)
 
 ## 1. The idea and the constraints
 
@@ -717,9 +717,16 @@ another, from hashes of the seed and the passage's number:
   form's place uses none of its figures. The lab can pin one
   (`solid=`, `knot=`; `show.js: variantOf`).
 
-The scene setting chooses a pool (`show.js: POOLS`): `mix` uses all
-passages; `crystal` uses only `form` and `still` (and `still` half as
-often); `rain` is rain alone, with no timeline.
+The Rain setting chooses the timeline (`show.js: POOLS`, `timelineFor`):
+`auto` and `on` play the whole show's (`all`, every passage); `off` plays
+one without rain (`dry`: only `form` and `still`, and `still` half as
+often), so the forms are not left with an empty room where the whole show
+has rain alone. `show.js: wanted` then pins the rain: `on` holds it at 1
+(the forms come and go through it, from the top down, and glow brighter, as
+in a storm), `off` at 0. Only `auto` turns sideways (`flowAt`): rain that
+never ends would read as a rain that turned. The Form and Layer settings
+take their part out of the timeline, or hold one episode for good.
+Rain `on` with Form `none` and Layer `off` is rain alone.
 
 ### Fades: no cut
 
@@ -751,7 +758,7 @@ has gone (`episode`). The layer is not a sky form: it may stay.
 
 `show.js: createShow` (its `update`) moves each shown weight at most a
 quarter a second (`BLEND`). The timeline's fades are less steep, so the
-shown weight follows them exactly. A change of scene or of the Form setting
+shown weight follows them exactly. A change of the Rain or Form setting
 fades a form out over 4 s, down to 0. While a sky form still shows, any
 other waits at 0 and begins only once it has gone, so a change of the Form
 setting also shows one form at a time. The rain eases over 2.5 s (`EASE`).
@@ -871,7 +878,8 @@ The rain either falls or flows sideways, never both at once
 little before a `drift` passage until its rain has gone
 (`show.js: flowAt`). Because drift comes only next to form passages, the
 direction changes only while no rain passage falls. Then only the few pale
-drops change.
+drops change. With the Rain setting `on` or `off` the show does not turn
+the rain at all.
 
 A change goes like this. The old direction's gate closes: drops that set
 out before now keep running; no new ones start. The old rain fades out over
@@ -948,8 +956,11 @@ Two pages run the same app, with two panels:
   `viewer: n` in `SCHEMA`, in that order, each under its `short` label if
   it has one (`tuner.js: viewerSchema`). Its rows put each name beside its
   control. A group keeps its heading only where it brings more than one
-  item: the four sound levels sit under Sound, the other four have no
-  heading. In a short landscape view the sound stands beside them.
+  item, and only if it has one there (`viewerTitle`): the four sound
+  levels sit under Sound, the other five (Rain and Form of the Scene
+  group among them) have no heading. On a phone held upright the panel
+  holds them all without scrolling; in a short landscape view the sound
+  stands beside them, with the links under it.
 - `lab.html`, the lab, shows every item of `SCHEMA`, and a Copy button. It
   differs from `index.html` only in `data-page="lab"` on `<html>` (read by
   `main.js`), its title and its share tags.
@@ -975,7 +986,7 @@ sideways drag, so a vertical drag scrolls the panel (`touchSlider`).
 A change applies at once (`main.js: apply`): the lattice is rebuilt for its
 size and layout, and a setting of a track (weather, colour, palette, set,
 density, camera) takes over from the running episode or hands back to it.
-The show reads the scene, form and layer settings every frame and blends
+The show reads the Rain, Form and Layer settings every frame and blends
 into a change.
 
 Besides the settings, the URL takes `?seed=`, `?t=` and `?dpr=` (the
@@ -1153,20 +1164,22 @@ Details and commands are in [development.md](development.md).
   (software GL) over the DevTools protocol. It fails on any error, on a
   shown fallback, on a frame loop that stalls, or on a black canvas. It
   visits the default page (with a click, the keys, turning the picture, a
-  scene change without a reload, and Reset), every colour mode, both panels
+  change of Rain without a reload, and Reset), every colour mode, both panels
   (`lab.html#tune` and `#tune`: the GitHub link and the commit link from a
   fake `version.json`, the sliders' `touch-action`, which settings each
   shows, the lab's link to the viewer page (and none from the viewer page to the lab), and the shared saved settings that
-  the viewer page's Reset clears), the rain scene in the lab and the
-  crystal scene (with the same click, keys and Reset), a seeded time with and without the story, four of the forms
-  held, and `?jitter=pitch`. It then renders the sound: a held orb must be
+  the viewer page's Reset clears), rain alone in the lab and no rain
+  (with the same click, keys and Reset), rain that never ends with a form
+  through it, a seeded time with and without the story, four of the forms
+  held, and `?jitter=pitch`; and that a `scene=` in a link or in saved
+  settings is read as Rain, Form and Layer. It then renders the sound: a held orb must be
   audible, a still room at least 3 dB quieter, and neither may clip. The
   `test` workflow runs it on every pull request and push to main.
 - **`test/render-audio.mjs`** renders the page's real sound for a seed and a
   stretch of the show, to a WAV file plus the show's state every 0.05 s.
   The page runs on a fake clock, with an `OfflineAudioContext` in place of
   its `AudioContext`. There is no hook in the page's code.
-- **`tools/capture-frames.mjs`** captures PNG frames of the scenes in
+- **`tools/capture-frames.mjs`** captures PNG frames of the scenes (named URL queries) in
   `tools/scenes.json` on a fake clock with a seeded `Math.random`.
   **`tools/make-gifs.py`** turns them into the looping GIFs in `docs/`.
 - **`tools/doc-shots.mjs`** captures the stills listed in

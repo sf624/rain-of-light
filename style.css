@@ -190,6 +190,10 @@ body.idle .full-toggle:focus-visible, body.idle .rotate-toggle:focus-visible, bo
     width: min(600px, calc(100% - 32px));
   }
   body:not(.portrait) .tuner.basic > :not(section) { grid-column: 1 / -1; }
+  /* The links go under the sound, beside the first section's longer list. */
+  body:not(.portrait) .tuner.basic > section:first-of-type { grid-row: span 3; }
+  body:not(.portrait) .tuner.basic > .tuner-page,
+  body:not(.portrait) .tuner.basic > .tuner-foot { grid-column: 2; }
   body:not(.portrait) .tuner.basic h3 { margin-top: 6px; }
 }
 
@@ -301,7 +305,7 @@ body.idle .full-toggle:focus-visible, body.idle .rotate-toggle:focus-visible, bo
     width: auto;
     height: min(58%, 560px);
   }
-  body.portrait .tuner.basic { height: auto; max-height: min(58%, 560px); }
+  body.portrait .tuner.basic { height: auto; max-height: min(62%, 600px); }   /* (the viewer's few settings, whole on a phone) */
 }
 
 /* touch-action does not follow the rotation: a turned panel scrolls along the screen's x. */

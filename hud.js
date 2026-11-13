@@ -22,10 +22,11 @@ const ROWS = [
   ['perf', 'frame', true, (s) => `${s.fps.toFixed(0)} fps  ${s.ms.toFixed(1)} ms  scale ${f2(s.scale)}${s.adaptive ? '' : ' (full)'}  ${s.canvas[0]}x${s.canvas[1]}`],
   ['seek', 'seek', false, (s) => `last seek: ${s.seek.steps} steps, ${s.seek.ms.toFixed(1)} ms  snapshots ${s.seek.snaps}`],
   ['lattice', 'lattice', false, (s) => `${s.grid}x${s.grid} strands x ${s.rows} LEDs = ${s.leds}`],
+  // The settings that choose what plays, what plays now, and the timeline's passage where that differs.
   ['show', 'show', true, (s) => {
     const w = s.show;
-    const held = [s.form !== 'auto' && `form ${s.form}`, s.layer !== 'auto' && `layer ${s.layer}`].filter(Boolean).join(' ');
-    return `${w.scene}${held ? ` (${held})` : ''}  ${w.next === null ? w.passage : `${w.passage}, next in ${sec(Math.max(0, w.next))}`}`;
+    return `rain ${s.rain} form ${s.form} layer ${s.layer}  ${w.playing}${w.playing === w.passage ? ''
+      : ` (passage ${w.passage})`}, next in ${sec(Math.max(0, w.next))}`;
   }],
   ['rain', 'rain', true, (s) => `${f2(s.show.rain)}  storm ${f2(s.show.storm)} (rain through a form)`],
   ['forms', 'forms', true, (s) => {

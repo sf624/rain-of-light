@@ -52,7 +52,7 @@ Inspired by teamLab's *Light Sculpture - Point*.
   | `f` | full screen |
   | `r` | landscape / portrait |
 
-The settings panel (⚙ or `p`) has a few settings: the scene, the colour,
+The settings panel (⚙ or `p`) has a few settings: the rain, the form, the colour,
 the brightness, the quality and the sound's levels. The lab,
 [`lab.html`](https://sf624.github.io/rain-of-light/lab.html), is opened by
 its address: the same page with every setting in its panel. Both pages keep what you
@@ -61,8 +61,9 @@ also go in the URL, on either page. A few that people use:
 
 | URL | Shows |
 | --- | --- |
-| `?scene=rain` | only the rain |
-| `?scene=crystal` | only the forms of light |
+| `?rain=on&form=none&layer=off` | only the rain |
+| `?rain=on` | rain that never ends, the forms coming and going through it |
+| `?rain=off` | only the forms of light |
 | `?form=orb` | always the orb (also `spiral`, `ring`, `veil`, `solid`, `knot`, `none`) |
 | `?color=cloud&weather=drizzle` | a colour mode and a weather |
 | `?seed=7&t=120` | one order of the show, from 2 minutes in |

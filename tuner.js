@@ -272,15 +272,16 @@ export function createTuner({ schema, lab = false, settings, defaults, storageKe
 }
 
 // The viewer page's panel: the items marked `viewer: n`, in that order, each
-// under its `short` label if it has one. A group keeps its heading where it
-// brings more than one item; the others share a section without one.
+// under its `short` label and with its `viewerOptions` if it has them. A group keeps its heading (its
+// `viewerTitle`, if it has one) where it brings more than one item; the
+// others share a section without one.
 export function viewerSchema(schema) {
   const picked = schema.flatMap((group) => group.items.filter((item) => item.viewer)
-    .map((item) => ({ group, item: { ...item, label: item.short ?? item.label } })))
+    .map((item) => ({ group, item: { ...item, label: item.short ?? item.label, options: item.viewerOptions ?? item.options } })))
     .sort((a, b) => a.item.viewer - b.item.viewer);
   const sections = [];
   for (const { group, item } of picked) {
-    const title = picked.filter((p) => p.group === group).length > 1 ? group.title : '';
+    const title = picked.filter((p) => p.group === group).length > 1 ? group.viewerTitle ?? group.title : '';
     const last = sections.at(-1);
     if (last && last.title === title) last.items.push(item);
     else sections.push({ title, items: [item] });
@@ -289,11 +290,21 @@ export function viewerSchema(schema) {
 }
 
 // Defaults, then what this browser saved, then the URL (?key=value).
-export function loadSettings(defaults, storageKey, params) {
+// scenes: the settings an old `scene` (in the URL, else saved) stands for
+// (see SCENES in config.js); they fill in those still at their default. A
+// saved scene is turned into its settings once, and is then no more kept.
+export function loadSettings(defaults, storageKey, params, scenes = {}) {
   const settings = { ...defaults };
+  let scene = null;
   try {
     const saved = JSON.parse(localStorage.getItem(storageKey) || '{}');
     for (const key of Object.keys(defaults)) if (key in saved) settings[key] = saved[key];
+    if ('scene' in saved) {
+      scene = saved.scene;
+      for (const [key, v] of Object.entries(scenes[scene] ?? {})) if (!(key in saved)) saved[key] = v;
+      delete saved.scene;
+      localStorage.setItem(storageKey, JSON.stringify(saved));
+    }
   } catch { /* nothing saved, or storage blocked */ }
   for (const key of Object.keys(defaults)) {
     if (!params.has(key)) continue;
@@ -301,5 +312,7 @@ export function loadSettings(defaults, storageKey, params) {
     if (typeof defaults[key] !== 'number') settings[key] = raw;
     else if (Number.isFinite(Number(raw))) settings[key] = Number(raw);
   }
+  if (params.has('scene')) scene = params.get('scene');
+  for (const [key, v] of Object.entries(scenes[scene] ?? {})) if (settings[key] === defaults[key]) settings[key] = v;
   return settings;
 }

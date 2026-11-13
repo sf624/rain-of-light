@@ -227,7 +227,7 @@ async function visit(cdp, base, query, interact, full = false, fetches = null) {
       labLinks: [...document.querySelectorAll('a[href*="lab"], a[href*="lab.html"]')].map((a) => a.getAttribute('href')), saved: localStorage.getItem(${JSON.stringify(STORAGE_KEY)}) }))()`);
     const want = lab ? schema.all : schema.viewer;
     if (panel.keys.join() !== want.join()) fail(`[${label}] the panel shows ${panel.keys.join()}, not ${want.join()}`);
-    if (!lab && (panel.keys.includes('jitter') || want.length > 8)) fail(`[${label}] the viewer panel has lab settings: ${panel.keys.join()}`);
+    if (!lab && (panel.keys.includes('jitter') || want.length > 9)) fail(`[${label}] the viewer panel has lab settings: ${panel.keys.join()}`);
     const buttons = lab ? 'Copy,Reset,×' : 'Reset,×';
     if (panel.buttons.join() !== buttons) fail(`[${label}] the panel's buttons are ${panel.buttons.join()}, not ${buttons}`);
     const search = full ? '' : `?${LITE}`; // the link carries the URL settings
@@ -275,20 +275,18 @@ async function visit(cdp, base, query, interact, full = false, fetches = null) {
       await framesAfter(await evalJs('window.__frames'), `after turning the picture (${want})`);
     }
     check('after turning the picture');
-    // The scene changes in place (no reload), and Reset brings back the mix.
-    await evalJs(`(() => { window.__stay = 1; const s = [...document.querySelectorAll('.tuner select')]
-      .find((x) => [...x.options].some((o) => o.value === 'crystal')); s.value = 'crystal';
+    // The rain changes in place (no reload), and Reset brings back the whole show.
+    await evalJs(`(() => { window.__stay = 1; const s = document.querySelector('.tuner-row[data-key="rain"] select'); s.value = 'off';
       s.dispatchEvent(new Event('change')); })()`);
     // A frame can take over a second on a slow software renderer: wait for one.
-    await framesAfter(await evalJs('window.__frames'), 'after changing the scene');
-    if (await evalJs('window.__stay') !== 1) fail(`[${label}] changing the scene reloaded the page`);
-    const scene = await evalJs(`(() => { [...document.querySelectorAll('.tuner-buttons button')]
-      .find((b) => b.textContent === 'Reset').click(); return [...document.querySelectorAll('.tuner select')]
-      .find((x) => [...x.options].some((o) => o.value === 'crystal')).value; })()`);
-    if (scene !== 'mix') fail(`[${label}] Reset left the scene at ${scene}, not mix`);
+    await framesAfter(await evalJs('window.__frames'), 'after changing the rain');
+    if (await evalJs('window.__stay') !== 1) fail(`[${label}] changing the rain reloaded the page`);
+    const rain = await evalJs(`(() => { [...document.querySelectorAll('.tuner-buttons button')]
+      .find((b) => b.textContent === 'Reset').click(); return document.querySelector('.tuner-row[data-key="rain"] select').value; })()`);
+    if (rain !== 'auto') fail(`[${label}] Reset left the rain at ${rain}, not auto`);
     await framesAfter(await evalJs('window.__frames'), 'after Reset');
     if (await evalJs('window.__stay') !== 1) fail(`[${label}] Reset reloaded the page`);
-    check('after changing the scene and Reset');
+    check('after changing the rain and Reset');
   }
   // The lab's show clock: opened paused it stands still while frames are drawn, Space runs it, Space stops it again; the viewer page has none.
   const clockText = () => evalJs(`document.querySelector('.clock-time')?.textContent ?? ''`);
@@ -408,7 +406,7 @@ async function visit(cdp, base, query, interact, full = false, fetches = null) {
     await poll(`the select to take the option picked by the keyboard [${label}]`, async () => await evalJs(`document.querySelector('.tuner select').value`) !== sel.v, { tick: () => check('after picking an option') });
     if (await evalJs(`!!document.activeElement?.closest('.tuner')`)) fail(`[${label}] a select kept the focus after an option was picked`);
     await evalJs(`(() => { const e = document.querySelector('.tuner select'); e.value = ${JSON.stringify(sel.v)}; e.dispatchEvent(new Event('change', { bubbles: true })); localStorage.removeItem(${JSON.stringify(STORAGE_KEY)}); })()`);   // (what the panel saved is not for the next visit)
-    await poll(`the clock to settle after the scene is back [${label}]`, async () => await clockText() === timeBefore, { tick: () => check('after the scene is back') });
+    await poll(`the clock to settle after the setting is back [${label}]`, async () => await clockText() === timeBefore, { tick: () => check('after the setting is back') });
     await seekBy(() => trusted('ArrowLeft', 'ArrowLeft', 37), -5, 'ArrowLeft after picking an option');
     // A seek key pressed while a seek is still going on moves from where that seek is heading, not from the time it has
     // reached part-way (a long seek, to time 5000; it takes many frames, and the readout says `seeking`).
@@ -473,32 +471,74 @@ for (const m of modes) await visit(cdp, base, `?color=${encodeURIComponent(m)}`,
 // The lab's panel, then the viewer page's (in this order: the second reads what the first saved).
 await visit(cdp, base, 'lab.html#tune', false);
 await visit(cdp, base, '#tune', false);
-// The pinned scenes (the rain in the lab), and the mix part-way through (a form, rain going or coming).
-await visit(cdp, base, 'lab.html?scene=rain', true);
-await visit(cdp, base, 'lab.html?pause=1&t=20&scene=rain', false);   // the lab's clock
+// Rain alone (in the lab) and no rain, and the whole show part-way through (a form, rain going or coming).
+await visit(cdp, base, 'lab.html?rain=on&form=none&layer=off', true);
+await visit(cdp, base, 'lab.html?pause=1&t=20&rain=on&form=none&layer=off', false);   // the lab's clock
 await visit(cdp, base, 'lab.html?pause=1&t=45&seed=7&hud=1', false);   // paused part-way through a form's coming: settings keep the moment
-await visit(cdp, base, 'lab.html?pause=1&t=Infinity&scene=rain', false);   // a start time that is no number
-await visit(cdp, base, '?scene=crystal', true);
+await visit(cdp, base, 'lab.html?pause=1&t=Infinity&rain=on&form=none&layer=off', false);   // a start time that is no number
+await visit(cdp, base, '?rain=off', true);
+await visit(cdp, base, '?rain=on&seed=1&t=60', false);   // rain that never ends, and a form through it
 await visit(cdp, base, '?seed=7&t=100', false);
 await visit(cdp, base, '?seed=7&t=100&story=off', false);   // without the colour story
 // The forms added later, each held part-way through its life (it has come and turned).
-for (const f of ['ring', 'veil', 'solid', 'knot']) await visit(cdp, base, `?scene=crystal&form=${f}&seed=2&t=40`, false);
+for (const f of ['ring', 'veil', 'solid', 'knot']) await visit(cdp, base, `?rain=off&form=${f}&seed=2&t=40`, false);
 // The other kinds of knot the shader draws (seed 2 holds the Moebius band): the Lissajous curve and a link of rings.
-for (const k of ['lissajous', 'hopf']) await visit(cdp, base, `?scene=crystal&form=knot&knot=${k}&seed=2&t=40`, false);
+for (const k of ['lissajous', 'hopf']) await visit(cdp, base, `?rain=off&form=knot&knot=${k}&seed=2&t=40`, false);
 // Names that are no option (a form, a figure) fall back to the defaults.
-await visit(cdp, base, '?scene=crystal&form=cone&solid=sphere&knot=granny&seed=2&t=40', false);
+await visit(cdp, base, '?rain=off&form=cone&solid=sphere&knot=granny&seed=2&t=40', false);
 // A baked form held in the lab: its field is fetched (see fields.js); a plain visit fetches none (see test/site.mjs).
-await visit(cdp, base, 'lab.html?scene=crystal&form=teapot&seed=2&t=40', false, false, 'fields/teapot.bin');
+await visit(cdp, base, 'lab.html?rain=off&form=teapot&seed=2&t=40', false, false, 'fields/teapot.bin');
 // LEDs spaced per strand: some LEDs are never lit, and the wires skip them.
 await visit(cdp, base, '?jitter=pitch', false);
+
+// Links and settings saved before Rain and Form chose what plays name a scene: it is read once, at
+// load, as the settings it stands for (config.js: SCENES), filling in those still at auto; the URL's
+// scene wins over a saved one, and a saved one is turned into its settings and no more kept.
+{
+  const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
+  const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
+  const ev = async (expression) => {
+    const r = await cdp.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, sessionId);
+    if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);
+    return r.result.value;
+  };
+  const read = async (q, saved) => {
+    if (saved !== undefined) await ev(`localStorage.setItem(${JSON.stringify(STORAGE_KEY)}, ${JSON.stringify(JSON.stringify(saved))})`);
+    const url = `${base}lab.html?${q}${q ? '&' : ''}${LITE}`;
+    await cdp.send('Page.navigate', { url }, sessionId);
+    return poll(`lab.html?${q} to load its panel`, () => ev(`location.href === ${JSON.stringify(url)} && document.readyState === 'complete'
+      && !!document.querySelector('.tuner-row') && ['rain', 'form', 'layer'].map((k) => document.querySelector(\`.tuner-row[data-key="\${k}"] select\`).value).join()`));
+  };
+  await read('');   // (the page's origin, for its storage)
+  await ev(`localStorage.removeItem(${JSON.stringify(STORAGE_KEY)})`);
+  for (const [q, saved, want] of [
+    ['scene=rain', undefined, 'on,none,off'],
+    ['scene=rain&layer=on', undefined, 'on,none,on'],
+    ['scene=crystal&form=orb', undefined, 'off,orb,auto'],
+    ['scene=mix', undefined, 'auto,auto,auto'],
+    ['', { scene: 'rain', form: 'orb' }, 'on,orb,off'],
+    ['scene=crystal', { scene: 'rain' }, 'off,auto,auto'],
+  ]) {
+    const got = await read(q, saved);
+    if (got !== want) fail(`?${q} with ${JSON.stringify(saved ?? {})} saved reads rain, form, layer as ${got}, not ${want}`);
+    if (saved) {
+      const kept = JSON.parse(await ev(`localStorage.getItem(${JSON.stringify(STORAGE_KEY)})`) || '{}');
+      if ('scene' in kept) fail(`a saved scene is still kept: ${JSON.stringify(kept)}`);
+      if (!q && JSON.stringify(kept) !== JSON.stringify({ form: 'orb', rain: 'on', layer: 'off' })) fail(`a saved scene=rain was kept as ${JSON.stringify(kept)}`);
+    }
+    await ev(`localStorage.removeItem(${JSON.stringify(STORAGE_KEY)})`);
+  }
+  await cdp.send('Target.closeTarget', { targetId });
+  console.log('ok  old scene= links and saved scenes read as Rain, Form and Layer');
+}
 
 // The sound follows the show: rendered offline on the page's own clock (see
 // render-audio.mjs), a held orb sounds (its voice, the pad) and a still room
 // is near silence; neither clips. The fake clock makes this independent of
 // how fast frames are drawn.
 const [orb, still] = await renderSound([
-  { query: '?scene=crystal&form=orb&seed=1', seconds: 12 },
-  { query: '?scene=crystal&form=none&layer=on&seed=1', seconds: 12 },
+  { query: '?rain=off&form=orb&seed=1', seconds: 12 },
+  { query: '?rain=off&form=none&layer=on&seed=1', seconds: 12 },
 ], { root: ROOT }).catch((e) => fail(`sound render: ${e.message}`));
 const a = levels(orb.L, orb.R, 6 * RATE), b = levels(still.L, still.R, 6 * RATE);
 const say = (x) => `RMS ${x.rms.toFixed(1)} dBFS, peak ${x.peak.toFixed(1)} dBFS`;
