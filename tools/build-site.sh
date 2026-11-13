@@ -57,7 +57,8 @@ copy() {
   done < <(find "$src" -type l -print0)
 
   # Only what the page, the manifest and the service worker load: these
-  # files, every module at the top level, and the icons.
+  # files, every module at the top level, the icons, and the data files in
+  # fields/ if the commit has them (see copy_fields).
   # sw.js is one of the modules.
   local files=(index.html lab.html style.css manifest.webmanifest favicon.svg og-image.jpg)
   local f
@@ -78,6 +79,7 @@ copy() {
       return 1
     fi
   done
+  copy_fields "$src" "$dest" "$pr" || return 1
   if [ -d "$src/icons" ]; then
     cp -r "$src/icons" "$dest/icons" || return 1
   elif [ -z "$pr" ]; then
@@ -92,6 +94,37 @@ copy() {
   else
     printf '{"sha":"%s","date":"%s"}\n' "$sha" "$date" > "$dest/version.json" || return 1
   fi
+}
+
+# copy_fields SRC DEST [PR]: the data files a page fetches when it needs them
+# (fields/*.bin): regular files only (symbolic links are gone by now), none
+# in subfolders, each at most FIELD_MAX bytes (a bigger one is skipped with
+# a warning); if together they pass FIELDS_MAX bytes, none is copied (with a
+# warning), so a commit can never publish more than that. A commit without
+# fields/ gets none.
+FIELD_MAX=262144      # 256 KiB per file
+FIELDS_MAX=2097152    # 2 MiB in all
+copy_fields() {
+  local src=$1 dest=$2 pr=${3:-} f size total=0
+  local keep=()
+  [ -d "$src/fields" ] || return 0
+  for f in "$src"/fields/*.bin; do
+    [ -f "$f" ] || continue
+    size=$(wc -c < "$f") || return 1
+    if [ "$size" -gt "$FIELD_MAX" ]; then
+      warn "${pr:+pr $pr: }skipped ${f#"$src"/}: $size bytes, over $FIELD_MAX"
+      continue
+    fi
+    total=$((total + size))
+    keep+=("$f")
+  done
+  [ ${#keep[@]} -gt 0 ] || return 0
+  if [ "$total" -gt "$FIELDS_MAX" ]; then
+    warn "${pr:+pr $pr: }skipped fields/: $total bytes in all, over $FIELDS_MAX"
+    return 0
+  fi
+  mkdir -p "$dest/fields" || return 1
+  cp "${keep[@]}" "$dest/fields/" || return 1
 }
 
 mkdir -p "$out"

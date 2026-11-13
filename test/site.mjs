@@ -3,7 +3,8 @@
 // under /rain-of-light/ as GitHub Pages does and opens it in headless Chrome:
 // the root registers its service worker, each preview loads with no error,
 // loads only its own files, registers no service worker, and is not cached by
-// the root's.
+// the root's. The data files in fields/ are published as build-site.sh
+// promises (a fixture commit in a clone of the repo tries the limits).
 // Usage: node test/site.mjs [ROOT_COMMIT [N=COMMIT ...]]   (default: HEAD 1=HEAD)
 // CHROME=/path/to/chrome chooses the browser. Node 22 built-ins only.
 import http from 'node:http';
@@ -17,7 +18,10 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PREFIX = '/rain-of-light/';
 const WAIT_MS = 90_000;
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
-  '.jpg': 'image/jpeg', '.png': 'image/png', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
+  '.jpg': 'image/jpeg', '.png': 'image/png', '.json': 'application/json', '.webmanifest': 'application/manifest+json',
+  '.bin': 'application/octet-stream' };
+// As in tools/build-site.sh (copy_fields).
+const FIELD_MAX = 262144, FIELDS_MAX = 2097152;
 
 const args = process.argv.slice(2);
 const rootRef = args[0] || 'HEAD';
@@ -52,8 +56,9 @@ async function poll(what, probe, timeout = WAIT_MS) {
     await sleep(200);
   }
 }
-const git = (...a) => {
-  const r = spawnSync('git', a, { cwd: ROOT, encoding: 'utf8' });
+const git = (...a) => gitIn(ROOT, ...a);
+const gitIn = (cwd, ...a) => {
+  const r = spawnSync('git', a, { cwd, encoding: 'utf8' });
   if (r.status !== 0) fail(`git ${a.join(' ')}: ${r.stderr}`);
   return r.stdout.trim();
 };
@@ -77,6 +82,19 @@ function walk(dir, out = []) {
 const all = walk(site);
 // The files of one copy (the root, or pr/<n>), relative to it.
 const copyFiles = (dir) => all.filter((f) => dir ? f.startsWith(dir + '/') : !f.startsWith('pr/')).map((f) => dir ? f.slice(dir.length + 1) : f);
+// The fields/ files a commit should publish (see copy_fields in build-site.sh):
+// its regular fields/*.bin (no subfolder) of at most FIELD_MAX bytes each, or
+// none if those pass FIELDS_MAX in all.
+function fieldsOf(sha, g = git) {
+  const keep = g('ls-tree', '-l', sha, 'fields/').split('\n').filter(Boolean).map((l) => {
+    const [meta, name] = l.split('\t');
+    const [mode, type, , size] = meta.split(/\s+/);
+    return { name, size: Number(size), ok: type === 'blob' && mode.startsWith('100') && /^fields\/[^/]+\.bin$/.test(name) };
+  }).filter((f) => f.ok && f.size <= FIELD_MAX);
+  return keep.reduce((n, f) => n + f.size, 0) > FIELDS_MAX ? [] : keep.map((f) => f.name).sort();
+}
+const fieldsIn = (files) => files.filter((f) => f.startsWith('fields/')).sort();
+
 function checkCopy(dir, sha, pr) {
   const label = dir || '(root)';
   const files = copyFiles(dir);
@@ -87,6 +105,7 @@ function checkCopy(dir, sha, pr) {
     if (!files.includes(f)) fail(`[${label}] no ${f}`);
   }
   for (const f of tracked) if (/^[^/]+\.js$/.test(f) && !(pr && f === 'sw.js') && !files.includes(f)) fail(`[${label}] module ${f} not copied`);
+  if (fieldsIn(files).join() !== fieldsOf(sha).join()) fail(`[${label}] fields/ has ${fieldsIn(files).join(', ') || 'nothing'}, not ${fieldsOf(sha).join(', ') || 'nothing'}`);
   if (pr && files.includes('sw.js')) fail(`[${label}] a preview must have no sw.js`);
   if (!pr && !files.includes('sw.js')) fail('[root] no sw.js');
   const v = JSON.parse(fs.readFileSync(at('version.json'), 'utf8'));
@@ -132,6 +151,43 @@ for (const m of core[1].matchAll(/'([^']*)'/g)) {
 for (const p of previews) checkCopy(`pr/${p.n}`, p.sha, p.n);
 const strays = new Set(all.filter((f) => f.startsWith('pr/')).map((f) => f.split('/')[1]));
 for (const s of strays) if (!previews.some((p) => p.n === s)) fail(`unexpected pr/${s}/`);
+
+// fields/ at its limits, in a clone (the repo itself is left alone): a commit
+// with fields/ gets its small regular *.bin files under its own folder, and
+// neither a symbolic link, a subfolder, another kind of file nor one over
+// FIELD_MAX; a commit whose files pass FIELDS_MAX in all gets none; a commit
+// without fields/ gets none.
+{
+  const clone = path.join(tmp, 'fixture');
+  const c = spawnSync('git', ['clone', '--quiet', '--shared', '--no-checkout', ROOT, clone], { encoding: 'utf8' });
+  if (c.status !== 0) fail(`git clone: ${c.stderr}`);
+  const g = (...a) => gitIn(clone, ...a);
+  g('checkout', '--quiet', '--detach', rootSha);
+  const put = (name, bytes) => { fs.mkdirSync(path.dirname(path.join(clone, name)), { recursive: true }); fs.writeFileSync(path.join(clone, name), Buffer.alloc(bytes, 7)); };
+  const commit = (msg) => { g('add', '-A', '.'); g('-c', 'user.name=site test', '-c', 'user.email=site@test', '-c', 'commit.gpgsign=false', 'commit', '--quiet', '--allow-empty', '-m', msg); return g('rev-parse', 'HEAD'); };
+  g('rm', '-r', '--quiet', '--ignore-unmatch', 'fields');
+  const none = commit('no fields');
+  put('fields/a.bin', 1000); put('fields/b.bin', FIELD_MAX); put('fields/big.bin', FIELD_MAX + 1);
+  put('fields/note.txt', 10); put('fields/sub/c.bin', 10);
+  fs.symlinkSync('a.bin', path.join(clone, 'fields/link.bin'));
+  const some = commit('fields at their limits');
+  g('rm', '-r', '--quiet', 'fields');
+  for (let i = 0; i < 9; i++) put(`fields/f${i}.bin`, 240_000);
+  const many = commit('fields over the total');
+  const out = path.join(tmp, 'fixture-site');
+  const b = spawnSync('bash', [path.join(ROOT, 'tools/build-site.sh'), out, some, `2=${none}`, `3=${many}`], { cwd: clone, encoding: 'utf8' });
+  if (b.status !== 0) fail(`build-site.sh on the fixture failed:\n${b.stdout}${b.stderr}`);
+  const got = (dir) => (fs.existsSync(path.join(out, dir, 'fields')) ? fs.readdirSync(path.join(out, dir, 'fields')).map((f) => `fields/${f}`).sort() : []);
+  const want = { '': ['fields/a.bin', 'fields/b.bin'], 'pr/2': [], 'pr/3': [] };
+  for (const [dir, w] of Object.entries(want)) {
+    if (got(dir).join() !== w.join()) fail(`[fixture ${dir || 'root'}] fields/ has ${got(dir).join(', ') || 'nothing'}, not ${w.join(', ') || 'nothing'}`);
+    if (fieldsOf({ '': some, 'pr/2': none, 'pr/3': many }[dir], g).join() !== w.join()) fail(`[fixture ${dir || 'root'}] fieldsOf disagrees`);
+  }
+  if (fs.lstatSync(path.join(out, 'fields/a.bin')).size !== 1000) fail('[fixture] fields/a.bin copied wrong');
+  const said = b.stdout + b.stderr;   // (a warning goes to stdout on GitHub Actions)
+  if (!/big\.bin/.test(said) || !/over 2097152/.test(said)) fail(`[fixture] no warning for the files over the limits:\n${said}`);
+  console.log('ok  fields/: small *.bin files published under their own folder; links, subfolders, other files and those over the limits not');
+}
 
 // 3. In the browser, under /rain-of-light/ as on GitHub Pages.
 server = http.createServer((req, res) => {
