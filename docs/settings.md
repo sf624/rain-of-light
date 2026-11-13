@@ -51,7 +51,7 @@ pictures again (see [development.md](development.md#the-pictures-of-the-docs)).
 | **passage** | One stretch of the show: rain, a form, rain through a form (storm), a still room, or sideways rain (drift). Each lasts from about 20 seconds to over a minute. |
 | **form** | A large shape of light that gathers in the room: an orb, a spiral, a ring or a veil; or a solid or a knot. |
 | **layer of light** | A sea of light near the floor. It comes and goes beside the forms. |
-| **knot** | The form drawn as one closed line, a figure of eight woven in depth, with two lights running round it. |
+| **knot** | The form drawn as closed lines of light, with two lights running round each: a figure of eight woven in depth, two linked rings or a Möbius band. |
 | **ripple** | A wave of light from a click or a tap, or from the show itself. It also rings a bell. |
 | **mirror image** | The room seen again, upside down, in the dark mirror floor. A thin dark line parts each strand from its image. |
 
@@ -62,7 +62,7 @@ with `wire=1&rest=0.1` (strand), `wire=0&rest=0.1&size=0.03` (LED, cut out),
 `t=60` (a storm passage of the whole show);
 `scene=crystal&form=orb&layer=off&t=30` (form);
 `scene=crystal&form=none&layer=on&t=30` (layer);
-`scene=crystal&form=knot&layer=off&t=30` (knot);
+`scene=crystal&form=knot&knot=lissajous&layer=off&t=30` (knot);
 `scene=crystal&form=none&layer=off&t=30` and a click (ripple);
 `scene=crystal&form=orb&layer=off&t=30&mirror=1` (mirror image, lower half).
 
@@ -102,7 +102,7 @@ The site has two pages, with the same picture, keys and URL parameters:
 
 ![The viewer page's small panel at the lower right: Scene, Colour mode, Brightness, Quality and four sound levels, and the GitHub link](img/viewer-panel.jpg)
 
-![The lab's panel open on the right of the picture: Scene, Form, Layer of light, the mirror sliders and more, each row with its default; Twinkle and Quality are not at theirs, and are marked](img/panel.jpg)
+![The lab's panel open on the right of the picture: Scene, Form, Which solid, Which knot, Layer of light, the mirror sliders and more, each row with its default; Twinkle and Quality are not at theirs, and are marked](img/panel.jpg)
 
 The gear button or the `p` key opens the panel; a link that ends in
 `#tune` opens the page with it (`lab.html#tune`: the lab with its panel
@@ -198,6 +198,8 @@ things that are not in the panel:
 | --- | --- | --- | --- | --- |
 | **Scene** | `scene` | `mix`, `rain`, `crystal` | `mix` | `mix`: the whole show, rain and forms come and go and blend. `rain`: only the rain, which never ends. `crystal`: only the forms of light. |
 | Form | `form` | `auto`, `orb`, `spiral`, `ring`, `veil`, `solid`, `knot`, `none` | `auto` | `auto`: as the scene brings them. A name holds that form for good. `none`: no form. A change fades the form that shows out over 4 s; the next fades in once it has gone. |
+| Which solid | `solid` | `auto`, `tetrahedron`, `cube`, `star` | `auto` | `auto`: each time the solid comes, another of its figures (see [Forms](#forms)). A name: always that one. |
+| Which knot | `knot` | `auto`, `lissajous`, `hopf`, `mobius` | `auto` | As for the solid. |
 | Layer of light | `layer` | `auto`, `on`, `off` | `auto` | `auto`: the layer comes and goes with the show (about 70% of the time). `on` holds it, `off` removes it. |
 | Floor mirror (0: off) | `mirror` | 0 to 1 | `0.6` | How bright the image in the floor is. |
 | Wall mirrors (copies per side) | `walls` | 0 or 1 | `0` | `1`: the room repeats beyond its walls, one copy on each side. Each copy draws the lattice again, so it is costly. |
@@ -233,11 +235,11 @@ top down, as if rain gathered into it or ran off it as rain.
 
 ### Forms
 
-![The six forms alone in the still room: an amber orb, a blue spiral, an amber ring, a green veil, a pale solid of lines and a green knot; the seventh picture, form=none, is the empty room](img/forms.jpg)
+![The six forms alone in the still room: an amber orb, a blue spiral, an amber ring, a green veil, a pale cube of lines and a green knot; the seventh picture, form=none, is the empty room](img/forms.jpg)
 
 Query: `scene=crystal&layer=off&t=30` with `form=orb`, `form=spiral`,
-`form=ring&t=60` (its face to the room), `form=veil`, `form=solid`,
-`form=knot` and `form=none`.
+`form=ring&t=60` (its face to the room), `form=veil`, `form=solid&solid=cube`,
+`form=knot&knot=lissajous` and `form=none`.
 
 Each form comes and goes where it floats, in a way of its own: none rises
 out of the floor or sinks into it. Its light fades in LED by LED over
@@ -265,18 +267,31 @@ the floor shows each move:
   many heights above it. It goes by lifting away upward.
 
 Two forms come from mathematics. They come a little less often than the
-four above:
+four above. Each time one comes, it is one of its figures for its whole
+life: never the figure it was the time before, and over an hour each
+figure about as often as the others.
 
-- **solid**: the edges of a regular solid as rods of light: a tetrahedron,
-  point up, or an octahedron standing on its point (one of the two for its
-  whole life; the seed chooses). Its corners come first, as bright points;
-  the edges are drawn out from them until they meet. It leans a little and
-  turns slowly about its upright axis, and goes as the edges draw back.
-- **knot**: a Lissajous curve, a closed rod of light that swings three
-  ways at once: twice across while it goes once up and down, and three
-  times in depth. Its broad side faces the room, a figure of eight; its
-  phase sways, so the loops open and close a little, and two lights run
-  round it. It is drawn once round as it comes, and undone as it goes.
+- **solid**: the edges of a solid as rods of light, with a bright point at
+  each corner: a tetrahedron (`tetrahedron`), a cube (`cube`), or a star
+  of two tetrahedra through each other, one point up and one point down
+  (`star`). Its corners come first, as bright points; the edges are drawn
+  out from them until they meet. It stands on a corner, leans a little and turns slowly about its upright
+  axis, and goes as the edges draw back.
+- **knot**: closed lines of light, with two lights running round each:
+  a Lissajous curve that swings twice across while it goes once up and
+  down, and three times in depth, its phase swaying so that its loops open
+  and close a little (`lissajous`, a figure of eight); two rings linked
+  through each other (`hopf`, the Hopf link); or a Möbius band, a band
+  with a half twist and one edge (`mobius`). Its broad side faces the
+  room. The link and the band spin slowly and lean a little, so you can see
+  which line passes in front where two cross. A knot is drawn once round
+  as it comes (a link: all its rings at once), and undone as it goes.
+
+![The figures of the two forms of mathematics: the solid's tetrahedron, cube and star; the knot's Lissajous figure, Hopf link and Möbius band](img/figures.jpg)
+
+Query: `scene=crystal&layer=off&t=40` with `form=solid&solid=tetrahedron`,
+`solid=cube`, `solid=star`; `form=knot&knot=lissajous`, `knot=hopf`,
+`knot=mobius`.
 
 Each form takes its colours from a few palettes of its own
 (`config.js: FORMS`). The forms keep a little beyond the middle of the room
@@ -743,7 +758,7 @@ fades:
   it is seen (it follows the form as it moves): the orb a warm, low hum, the
   spiral a slow figure of notes that climbs and turns, the ring a clear, glassy tone, the veil a soft, open air,
   the solid a still chord of pure fifths, the knot two tones that beat
-  against each other.
+  against each other. Each form keeps its voice whichever figure it shows.
   As it leaves, the harmony comes home to D.
 - **rain through a form**: both, fuller but not louder.
 - **a still room**: close to silence. The pad thins out, and now and then a

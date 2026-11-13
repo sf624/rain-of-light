@@ -28,7 +28,7 @@
     {
       "name": "knot",
       "seed": 1,
-      "q": "scene=crystal&form=knot&layer=on&seed=1&t=40&orbit=0.05&leds=1000"
+      "q": "scene=crystal&form=knot&knot=lissajous&layer=on&seed=1&t=40&orbit=0.05&leds=1000"
     },
     {
       "name": "veil",

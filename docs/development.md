@@ -31,6 +31,7 @@ reload.
 | `direction.js` | a change of the rain's direction: the old drops stop coming and fade out before the new ones set out |
 | `forms.js` | how each form of light moves through its life: where it is, how large and how turned |
 | `fields.js`, `fields/` | the baked forms' fields of distance (`fields/*.bin`), fetched only when one is about to show (see Baking a form's field) |
+| `figures.js` | the figures of the solid and the knot: their names, corners and edges, curves, sizes |
 | `shaders.js` | the GLSL shaders: the points of light, bloom and tone mapping |
 | `lattice.js` | the strands and LEDs, and the order in which they thin out |
 | `gl.js` | WebGL helpers and vector maths |

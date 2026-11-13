@@ -477,26 +477,41 @@ the form's first colour to its second:
   arcs that run slowly round it.
 - `veilLight`: a curtain like an aurora, in travelling folds, with a bright
   lower hem and rays rising from it.
-- `solidLight`: the edges of a tetrahedron or an octahedron (`SOLID`,
-  `CORNER`, `EDGE`). The distance to each edge is that from a point to a
-  straight piece of line, worked out exactly, 6 or 12 times. Each edge
+- `solidLight`: the edges of a solid as rods of light: a tetrahedron, a
+  cube or a star of two tetrahedra (`figures.js: SOLIDS`;
+  in the shader `FIG_SOLID`, `FIG_CORNER`, `FIG_EDGE`, made from it). The distance to
+  each edge is that from a point to a straight piece of line, worked out
+  exactly, 6 or 12 times. An LED nearer the centre than the nearest edge
+  comes, or beyond the corners, skips them all (`FIG_NEAR`). Each edge
   is a rod of even light with a clean edge (`rod`), dark around and
   inside the solid, and shows from its two corners inward, as far as it
   is drawn. Each corner is a white-hot point. The solid stands on the axis
   of a corner and leans at most 0.4 rad (`forms.js: solid`), so every edge
   runs aslant or level: an edge along a strand would light one strand or
   none.
-- `knotLight`: a Lissajous curve, `x = sin(u t + p)`, `y = sin(v t)`,
-  `z = sin(w t + q)` with `u, v, w` = 2, 1, 3 (`KNOT`): it swings twice
-  across while it goes once up and down, so it runs aslant or level and
-  hardly ever along a strand. The phase sways about 0, where the loops
-  stand widest, and stays well short of a quarter turn, where they close
-  into one line (`forms.js: KNOT_SWAY`). The LEDs are dense along a
-  strand, so the shader starts from the LED's height: the curve passes
-  that height at `2 v` values of `t` (2). From each it takes one step
-  along the curve's tangent towards the LED, and keeps the nearest place
-  found. The cost does not grow with the curve's length. The line is a
-  rod of even light (`rod`); two lights run round it (`runner`).
+- `knotLight`: one or a few closed lines (`figures.js: KNOTS`), each a rod
+  of even light (`rod`) with two lights running round it (`runner`). Three
+  kinds:
+  - A Lissajous curve, `x = sin(u t + p)`, `y = sin(v t)`,
+    `z = sin(w t + q)` with `u, v, w` = 2, 1, 3: it swings twice across
+    while it goes once up and down, so it runs aslant or level and hardly
+    ever along a strand. The phase sways about 0, where the loops stand
+    widest, and stays well short of a quarter turn, where they close into
+    one line (`sway`). The LEDs are dense along a strand, so the shader
+    starts from the LED's height: the curve passes that height at `2 v`
+    values of `t` (2). From each it takes one step along the curve's
+    tangent towards the LED, and keeps the nearest place found.
+  - A link of rigid rings (the Hopf link: two circles, each through the
+    other's centre), turned so that their crossings stand open to the
+    room (`figures.js: ringsOf`). The distance to each ring is worked out
+    exactly: from the LED's place in the ring's plane and off it. The slow
+    spin and lean show which ring passes in front where they cross.
+  - A Moebius band: the distance to it at the LED's angle about its axis,
+    where its cross-section is a straight piece turned half that angle
+    (worked out exactly). Its one edge is a rod; the band between is a
+    faint sheet, brighter along 12 of its straight lines (`MOBIUS_RULINGS`).
+  None of them costs more for a longer curve. A knot also stops early
+  outside its own box (its reach, `figures.js: KNOTS`).
 - `layerLight`: the layer of light, a sea near the floor in slow waves, its
   points glinting.
 - `bakedLight`: a baked form (see Baked forms below), a shape's skin.
@@ -505,7 +520,14 @@ Each is a field: a function of the LED's position relative to the
 form's centre, size and turn. Where the form is moves in `forms.js` (see
 section 5). Each form also has a reach (`uFormF[k].w`, the `bound` from
 `forms.js`). LEDs beyond it skip the form, so a form costs little where it
-is not. The knot also stops early outside its own box.
+is not.
+
+The tables of the figures (the solids' corners and edges, the knots'
+measures, the rings) come from `figures.js` and reach the shader as one
+uniform block (`shaders.js: figureTables`, `Figures`), filled once in
+`main.js`. The shader keeps only their places as constants: tables of
+constants indexed at run time are copied for every LED on some GPUs
+(SwiftShader).
 
 The thin forms (ring, veil, solid, knot) are about as thick as the gap
 between strands on a lattice of 72 a side (half a unit), or as one strand
@@ -531,8 +553,8 @@ it. Each comes and goes where it floats, in a way of its own
 (`forms.js`): the spiral unfurls from its core and winds back into it,
 the ring turns its face to the room out of a line and back into one, the
 veil unrolls from one end and lifts away upward, the solid's edges are
-drawn out from its corners and back, and the knot is drawn once round and
-undone. The orb has no move of its own: it grows from 0.75 of its size as
+drawn out from its corners and back, and the knot
+is drawn once round and undone (a link: all its rings at once). The orb has no move of its own: it grows from 0.75 of its size as
 its weight rises, and shrinks back as it falls (`forms.js: GROW`, `FADING`).
 
 **Colour.** The light is the form's first colour mixed towards its second,
@@ -684,8 +706,16 @@ another, from hashes of the seed and the passage's number:
   is as likely as its weight (`config.js: FORMS`: 1 for the orb, spiral,
   ring and veil, 0.4 for the solid and knot)
   times the square of how many forms have come since it last did. Over an
-  hour a form comes about 36 times: each of the first four about 6.6 times, the
+  hour a form comes about 36 times: each of the first four about 6.5 times, the
   solid and the knot about 5 times (`tools/story-stats.mjs`).
+- A form with figures (the solid, the knot) is each time one of them for
+  its whole life (`show.js: figureOf`). They come in
+  rounds: each round has every figure once, in an order shuffled from the
+  passage's hash, and never begins with the figure the last round ended
+  on. So no figure comes twice running, and each comes about as often as
+  the others (about 1.7 times an hour). An egg that takes a
+  form's place uses none of its figures. The lab can pin one
+  (`solid=`, `knot=`; `show.js: variantOf`).
 
 The scene setting chooses a pool (`show.js: POOLS`): `mix` uses all
 passages; `crystal` uses only `form` and `still` (and `still` half as
@@ -879,8 +909,8 @@ The layers:
   weight, panned to where it is seen (`mixVoices`): the orb a warm low hum,
   the spiral a slow figure of notes (scheduled in `tick`), the ring a glassy tone, the veil a soft air, the solid a chord
   of three pure fifths, the knot two tones that beat at different paces,
-  a baked form the ring's glassy tone, softer, with the chord's third
-  over it, on D.
+  and a baked form the ring's glassy tone, softer, with the chord's third
+  over it, on D. The voice is the form's, whichever figure it shows.
   The veil also gets a little high noise (`AIRY`).
 - **Pale drops.** In a still room a high, soft note falls now and then.
 - **Reverb.** A 6 s convolution reverb (`impulse`), then a compressor.
@@ -1070,6 +1100,7 @@ GitHub link shows.
 | `show.js` | The show's timeline of passages, fades, casting into slots, form colours, the rain's direction over time. |
 | `forms.js` | How each form moves through its life: centre, size, turn, tilt, its own measures, reach. |
 | `fields.js` | The baked forms' fields: the 3D texture, fetching a field when its form draws near, `able`. |
+| `figures.js` | The figures of the solid and the knot: names, corners and edges, curves, sizes and heights (one per life). |
 | `director.js` | Seeded tracks (weather, colour, density, camera), the colour story's mood, the shared `hash`. |
 | `direction.js` | The change of the rain's direction: weights and gates per direction. |
 | `audio.js` | The generative music: pad, bells, rain, form voices, reverb. |

@@ -30,7 +30,7 @@ const ROWS = [
   ['rain', 'rain', true, (s) => `${f2(s.show.rain)}  storm ${f2(s.show.storm)} (rain through a form)`],
   ['forms', 'forms', true, (s) => {
     const sky = s.show.items.filter((i) => i.form !== 'layer');
-    const one = (i) => `${i.form} ${f2(i.w)} ${i.palette} age ${sec(i.age)} ${i.out ? 'going' : i.w < 0.99 ? 'coming' : 'in'}`;
+    const one = (i) => `${i.form}${i.figure ? ` (${i.figure})` : ''} ${f2(i.w)} ${i.palette} age ${sec(i.age)} ${i.out ? 'going' : i.w < 0.99 ? 'coming' : 'in'}`;
     return sky.length ? sky.map(one).join('  |  ') : 'none';
   }, (s) => s.show.items.filter((i) => i.form !== 'layer').flatMap((i) => i.colors)],
   ['layer', 'layer', false, (s) => {

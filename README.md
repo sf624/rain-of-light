@@ -3,8 +3,9 @@
 A room of small points of light over a mirror floor. Rain of light falls
 through it. Now and then the rain eases off, and a large form of light
 gathers in the room: an orb, a spiral, a ring, or a veil
-like an aurora; or a form of mathematics: a regular solid or a Lissajous
-knot. Sometimes the rain falls through the form. The show moves
+like an aurora; or a form of mathematics: a solid (a tetrahedron, a cube,
+a star) or a knot (a Lissajous figure, linked rings, a Möbius band).
+Sometimes the rain falls through the form. The show moves
 between these on its own, with slow cross-fades. The weather, the colours
 and the direction of the rain change on their own too, and the camera
 circles the room slowly. Calm generative music follows the show, and every

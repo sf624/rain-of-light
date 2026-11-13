@@ -483,6 +483,10 @@ await visit(cdp, base, '?seed=7&t=100', false);
 await visit(cdp, base, '?seed=7&t=100&story=off', false);   // without the colour story
 // The forms added later, each held part-way through its life (it has come and turned).
 for (const f of ['ring', 'veil', 'solid', 'knot']) await visit(cdp, base, `?scene=crystal&form=${f}&seed=2&t=40`, false);
+// The other kinds of knot the shader draws (seed 2 holds the Moebius band): the Lissajous curve and a link of rings.
+for (const k of ['lissajous', 'hopf']) await visit(cdp, base, `?scene=crystal&form=knot&knot=${k}&seed=2&t=40`, false);
+// Names that are no option (a form, a figure) fall back to the defaults.
+await visit(cdp, base, '?scene=crystal&form=cone&solid=sphere&knot=granny&seed=2&t=40', false);
 // A baked form held in the lab: its field is fetched (see fields.js); a plain visit fetches none (see test/site.mjs).
 await visit(cdp, base, 'lab.html?scene=crystal&form=teapot&seed=2&t=40', false, false, 'fields/teapot.bin');
 // LEDs spaced per strand: some LEDs are never lit, and the wires skip them.

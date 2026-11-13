@@ -1,5 +1,7 @@
 // The static data: palettes, weather, flows, colour modes and the tunable settings.
 
+import { SOLIDS, KNOTS } from './figures.js';
+
 export const small = Math.min(innerWidth, innerHeight) < 700;
 
 export const PALETTES = [
@@ -80,14 +82,15 @@ export const CAMERAS = [
 // them. Each form picks its colours from a few of the palettes. type is the
 // form's number in the shader (see formsAt in shaders.js); weight is how
 // often it comes (see the casting in show.js): the forms of nature come more
-// often than the forms of mathematics.
+// often than the forms of mathematics. variants: the figures a form may be,
+// one for each of its lives (see figures.js, and show.js: variantOf).
 export const FORMS = [
   { name: 'orb',       type: 0, weight: 1,   palettes: ['amber', 'candle', 'sakura', 'deep sea'] },
   { name: 'spiral',    type: 1, weight: 1,   palettes: ['deep sea', 'sakura', 'ice', 'aurora'] },
   { name: 'ring',      type: 3, weight: 1,   palettes: ['amber', 'aurora', 'sakura', 'deep sea'] },
   { name: 'veil',      type: 4, weight: 1,   palettes: ['aurora', 'sakura', 'deep sea', 'amber'] },
-  { name: 'solid',     type: 5, weight: 0.4, palettes: ['ice', 'amber', 'aurora', 'sakura'] },
-  { name: 'knot',      type: 6, weight: 0.4, palettes: ['aurora', 'amber', 'sakura', 'deep sea'] },
+  { name: 'solid',     type: 5, weight: 0.4, palettes: ['ice', 'amber', 'aurora', 'sakura'], variants: SOLIDS.map((x) => x.name) },
+  { name: 'knot',      type: 6, weight: 0.4, palettes: ['aurora', 'amber', 'sakura', 'deep sea'], variants: KNOTS.map((x) => x.name) },
 ];
 export const LAYER = { name: 'layer', type: 2, palettes: ['deep sea', 'ice', 'aurora', 'sakura', 'amber'] };
 // The baked forms: shapes baked into fields of distance (fields/*.bin, see
@@ -129,7 +132,7 @@ export const SCENES = ['mix', 'rain', 'crystal'];
 
 // ---------- tunable settings (panel: p key or the gear button; also ?key=value) ----------
 export const DEFAULTS = {
-  scene: 'mix', form: 'auto', layer: 'auto', mirror: 0.6, walls: 0, haze: 0, burn: 0.7, twinkle: 0.4, rainShare: 1,
+  scene: 'mix', form: 'auto', solid: 'auto', knot: 'auto', layer: 'auto', mirror: 0.6, walls: 0, haze: 0, burn: 0.7, twinkle: 0.4, rainShare: 1,
   leds: small ? 210 : 1000, aspect: 1, grid: 0, rows: 0,
   layout: 'strands', jitter: 'off', density: 'auto', strandShare: 1.0, rowShare: 1.0, strandMin: 0.66, rowMin: 0.68,
   size: 0.018, maxPx: 4.5, rest: 0.03, wire: 0.2,
@@ -157,6 +160,8 @@ export const SCHEMA = [
       hint: 'mix: rain and forms of light come and go, and blend / rain: only the rain / crystal: only the forms of light' },
     { key: 'form', label: 'Form', options: ['auto', ...FORMS.map((f) => f.name), ...EGGS.map((f) => f.name), 'none'],
       hint: 'auto: as the scene brings them / or hold one form (none: no form)' },
+    ...FORMS.filter((f) => f.variants).map((f) => ({ key: f.name, label: `Which ${f.name}`, options: ['auto', ...f.variants],
+      hint: `auto: each time the ${f.name} comes, another of its figures / or always this one` })),
     { key: 'layer', label: 'Layer of light', options: ['auto', 'on', 'off'] },
     { key: 'mirror', label: 'Floor mirror (0: off)', min: 0, max: 1, step: 0.05 },
     { key: 'walls', label: 'Wall mirrors (copies per side)', min: 0, max: 1, step: 1,
