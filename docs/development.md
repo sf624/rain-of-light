@@ -58,8 +58,11 @@ The link to this repository and the short commit hash being served are at
 the bottom of the settings panel. GitHub Pages deploys through
 `.github/workflows/pages.yml`, which assembles the site with
 `tools/build-site.sh`. It copies only what the page loads (the page, the
-modules, the manifest, the icons, `og-image.jpg`, `sw.js`) and writes
-`version.json` (the commit and its date) into the site. That file is not
+modules, the manifest, the icons, `og-image.jpg`, `sw.js`, and the data
+files in `fields/` if the commit has them) and writes `version.json` (the
+commit and its date) into the site. Of `fields/` it copies only regular
+`*.bin` files, none in a subfolder, each at most 256 KiB, and none at all
+if they pass 2 MiB together (with a warning). That file is not
 committed, so a local server shows only the link.
 
 ### Previews of pull requests
