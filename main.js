@@ -9,7 +9,7 @@ import { createAudio } from './audio.js';
 import { createSway, createRandom } from './sway.js';
 import {
   PALETTES, WEATHER, FLOWS, COLOR_MODES, SETS, SKY, CAMERAS,
-  DEFAULTS, STORAGE_KEY, SCHEMA, ROOM, SCENES,
+  DEFAULTS, STORAGE_KEY, SCHEMA, ROOM, SCENES, FORMS,
 } from './config.js';
 import { createShow } from './show.js';
 import { createDirector, hash } from './director.js';
@@ -17,6 +17,7 @@ import { createDirection } from './direction.js';
 import { FLOW_WRAP, RAY_CAP, FIGURES, POINT_VS, POINT_FS, WIRE_FS, QUAD_VS, DOWN_FS, BLUR_FS, COMPOSITE_FS } from './shaders.js';
 import { createGL, sub, cross, dot, norm, perspective, lookAt } from './gl.js';
 import { createFields } from './fields.js';
+import { createRingMap, planetShader } from './planets.js';
 import { createLattice, fillLattice, latticeLight } from './lattice.js';
 import { createControls } from './controls.js';
 import { createClock, rateText } from './clock.js';
@@ -110,35 +111,49 @@ const plain = { point: program(POINT_VS, POINT_FS), wire: program(POINT_VS, WIRE
 const downProg = program(QUAD_VS, DOWN_FS);
 const blurProg = program(QUAD_VS, BLUR_FS);
 const compProg = program(QUAD_VS, COMPOSITE_FS);
-// The same with the light of the easter egg that shows (egg-shaders.js), built the first time that
-// egg shows, and used once the GPU has built them (gl.js: ready): until then (a few frames, as the egg
-// fades in) the plain programs draw. While no egg shows, the LEDs are drawn by programs with no egg
-// in them at all. An egg whose programs cannot be built is dropped (eggs.drop): the show goes on without it.
-const withEggs = new Map();   // the egg's type -> { point, wire, done }: done once both are ready and set up
-let eggDrawn = 0;             // the type of the egg drawn by its own programs in the last frame (for the tests)
-function eggProgs(type) {
+// Programs with code of their own for a guest that shows now and then (an
+// easter egg, egg-shaders.js; the planet, planets.js), built the first time
+// it shows, and used once the GPU has built them (gl.js: ready): until then
+// (a few frames, as it fades in) the plain programs draw. While none shows,
+// the LEDs are drawn by programs with none of that code at all. made: the
+// vertex shader; fail: what to do if they cannot be built (they are not
+// tried again).
+function builtProgs(cache, key, made, fail) {
   if (gl.isContextLost()) return plain;
   try {
-    if (!withEggs.has(type)) {
-      const vs = eggShader(POINT_VS, type);
-      withEggs.set(type, { point: program(vs, POINT_FS), wire: program(vs, WIRE_FS), done: false });
+    if (!cache.has(key)) {
+      const vs = made();
+      cache.set(key, { point: program(vs, POINT_FS), wire: program(vs, WIRE_FS), done: false });
     }
-    const p = withEggs.get(type);
+    const p = cache.get(key);
+    if (p.failed) return plain;
     if (!p.done) {
       if (!p.point.ready() || !p.wire.ready()) return plain;
-      for (const prog of [p.point, p.wire]) { fieldsUnit(prog); figuresBlock(prog); }   // (their first use: throws if a build failed)
+      for (const prog of [p.point, p.wire]) { fieldsUnit(prog); figuresBlock(prog); ringsUnit(prog); }   // (their first use: throws if a build failed)
       p.done = true;
     }
     return p;
   } catch (err) {
-    withEggs.delete(type);
-    // (A context that goes fails every build: no fault of the egg's. It is built again if the context stays.)
+    cache.delete(key);
+    // (A context that goes fails every build: no fault of the guest's. It is built again if the context stays.)
     if (gl.isContextLost() || err.lost) return plain;
-    console.warn('easter egg dropped:', err.message);
-    eggs.drop(type);
+    cache.set(key, { failed: true });
+    fail(err);
     return plain;
   }
 }
+// An egg whose programs cannot be built is dropped (eggs.drop): the show goes on without it.
+const withEggs = new Map();   // the egg's type -> { point, wire, done }: done once both are ready and set up
+let eggDrawn = 0;             // the type of the egg drawn by its own programs in the last frame (for the tests)
+const eggProgs = (type) => builtProgs(withEggs, type, () => eggShader(POINT_VS, type), (err) => {
+  console.warn('easter egg dropped:', err.message);
+  eggs.drop(type);
+});
+// The planet's (they are started a few seconds in, so that they are done when it first comes).
+const withPlanet = new Map();
+const PLANET_TYPE = FORMS.find((f) => f.name === 'planet').type;
+const planetProgs = () => builtProgs(withPlanet, 'planet', () => planetShader(POINT_VS), (err) => console.warn('the planet cannot show:', err.message));
+setTimeout(planetProgs, 3000);
 
 const lattice = createLattice(gl);
 let count = 0, GRID = 0, ROWS = 0, wireCount = 0, light = null;
@@ -158,6 +173,10 @@ const MAX_POINT = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1]; // the larges
 const FIELD_UNIT = 5;
 const fields = createFields(gl, FIELD_UNIT);
 const fieldsUnit = (prog) => { gl.useProgram(prog.p); gl.uniform1i(prog.u.uFields, FIELD_UNIT); };
+// The planet's rings' profile (see planets.js), on the next unit.
+const RINGS_UNIT = 6;
+createRingMap(gl, RINGS_UNIT);
+const ringsUnit = (prog) => { gl.useProgram(prog.p); gl.uniform1i(prog.u.uRings, RINGS_UNIT); };
 // Every program built at load is checked here, before the first frame: a failed build shows at once.
 for (const prog of [plain.point, plain.wire]) { fieldsUnit(prog); figuresBlock(prog); }
 for (const prog of [downProg, blurProg, compProg]) void prog.u;
@@ -965,7 +984,9 @@ function frame(now) {
   // the second buffer. Without float buffers there are none.
   const rays = S.rays === 'off' || !hasFloat ? 0 : Number(S.rays);
   const eggType = eggs.showing();
-  const { point: pointProg, wire: wireProg } = eggType ? eggProgs(eggType) : plain;
+  // (While a planet shows, no egg does: an egg takes a form's place.)
+  const planetShows = [0, 1, 2].some((k) => shown.A[k * 4] === PLANET_TYPE && shown.A[k * 4 + 1] >= 0.001);
+  const { point: pointProg, wire: wireProg } = eggType ? eggProgs(eggType) : planetShows ? planetProgs() : plain;
   eggDrawn = pointProg !== plain.point ? eggType : 0;
   const progs = [pointProg];
   if (wiresOn) progs.push(wireProg);
@@ -1045,6 +1066,11 @@ function frame(now) {
   gl.uniform4fv(u.uFormF, shown.F);
   gl.uniform3fv(u.uFormC, shown.C);
   gl.uniform3fv(u.uFormD, shown.D);
+  gl.uniform3fv(u.uFormG, shown.G);
+  gl.uniform3fv(u.uFormH, shown.H);
+  gl.uniform3fv(u.uFormN, shown.N);
+  gl.uniform3fv(u.uFormS, shown.S);
+  gl.uniform3fv(u.uFormT, shown.T);
   gl.uniform3fv(u.uTint, shown.tint);
   gl.uniform1f(u.uTwinkle, S.twinkle);
   gl.uniform4fv(u.uCopy, copies);

@@ -77,13 +77,42 @@ export const CAMERAS = [
   { name: 'rise',  hold: [25, 40], weight: 1.5 },
 ];
 
+// The planet's variants (see planets.js): one of them each time it comes.
+// Per variant: size (the ball's radius); upright (its axis near the
+// vertical, its rings seen a little from above) or on its side (its rings
+// standing); open ([least, most]: how far its rings open to the eye, rad
+// from edge-on, slowly to and fro); roll (how far their ellipse leans to
+// and fro, rad); spin (rad/s); phase (the angle between the sun and the
+// eye, as seen from the planet, while it stays: 0 full .. pi new); rings
+// (its bands, each [from, to, density, tone]: in radii, as the real
+// planet's; tone from its third colour to its fourth, 2 .. 3), stretch
+// (how many times wider they spread out from the first band's inner edge
+// than the real ones); colors (four: the ball's two, then the rings' two,
+// see planetLight in planets.js); room (the room's tint
+// while it shows); under (the layer's palettes under it).
+const TAU = Math.PI * 2;
+export const PLANETS = [
+  // Saturn: C ring faint and dusky, B ring bright cream (brightest outward),
+  // the dark Cassini division, A ring greyer with the Encke gap, and the thin F ring.
+  { name: 'saturn', size: 2.3, upright: true, open: [0.3, 0.44], roll: 0.16, spin: TAU / 45, phase: 0.65,
+    rings: [[1.24, 1.43, 0.14, 3.0], [1.43, 1.53, 0.24, 2.9], [1.53, 1.72, 0.7, 2.1], [1.72, 1.95, 1.0, 1.9],
+      [2.06, 2.19, 0.5, 2.7], [2.225, 2.27, 0.42, 2.75], [2.32, 2.34, 0.4, 2.4]], stretch: 1.45,
+    colors: [[1.0, 0.85, 0.56], [0.78, 0.55, 0.3], [1.0, 0.92, 0.74], [0.6, 0.56, 0.52]], room: [0.95, 0.75, 0.42],
+    under: ['deep sea', 'sakura'] },
+  // Uranus: lying on its side, a few thin rings standing round it, the outer (epsilon) the brightest.
+  { name: 'uranus', size: 1.6, upright: false, open: [0.62, 0.85], roll: 0.14, spin: TAU / 50, phase: 0.55,
+    rings: [[1.64, 1.66, 0.55, 2.6], [1.75, 1.79, 0.65, 2.5], [1.86, 1.9, 0.7, 2.4], [1.99, 2.02, 1.0, 2.0]], stretch: 1.5,
+    colors: [[0.5, 0.92, 0.96], [0.3, 0.72, 0.9], [0.92, 0.98, 1.0], [0.55, 0.68, 0.8]], room: [0.35, 0.75, 0.95],
+    under: ['sakura', 'amber'] },
+];
+
 // Forms of light. Sky forms come one at a time (two while one turns into the
 // next); the layer (a sea of light near the floor) comes and goes beside
 // them. Each form picks its colours from a few of the palettes. type is the
 // form's number in the shader (see formsAt in shaders.js); weight is how
 // often it comes (see the casting in show.js): the forms of nature come more
 // often than the forms of mathematics. variants: the figures a form may be,
-// one for each of its lives (see figures.js, and show.js: variantOf).
+// one for each of its lives (see figures.js, PLANETS, and show.js: variantOf).
 export const FORMS = [
   { name: 'orb',       type: 0, weight: 1,   palettes: ['amber', 'candle', 'sakura', 'deep sea'] },
   { name: 'spiral',    type: 1, weight: 1,   palettes: ['deep sea', 'sakura', 'ice', 'aurora'] },
@@ -91,6 +120,8 @@ export const FORMS = [
   { name: 'veil',      type: 4, weight: 1,   palettes: ['aurora', 'sakura', 'deep sea', 'amber'] },
   { name: 'solid',     type: 5, weight: 0.4, palettes: ['ice', 'amber', 'aurora', 'sakura'], variants: SOLIDS.map((x) => x.name) },
   { name: 'knot',      type: 6, weight: 0.4, palettes: ['aurora', 'amber', 'sakura', 'deep sea'], variants: KNOTS.map((x) => x.name) },
+  // Each of its variants (PLANETS) has colours of its own, so it has no palettes.
+  { name: 'planet',    type: 8, weight: 0.4, palettes: [], variants: PLANETS.map((x) => x.name) },
 ];
 // The layer's surface lies height over the strands' feet, its bright band
 // thick around it (each a range: each time the layer has its own). The forms
@@ -136,7 +167,7 @@ export const SCENES = { rain: { rain: 'on', form: 'none', layer: 'off' }, crysta
 
 // ---------- tunable settings (panel: p key or the gear button; also ?key=value) ----------
 export const DEFAULTS = {
-  rain: 'auto', form: 'auto', solid: 'auto', knot: 'auto', layer: 'auto', mirror: 0.6, walls: 0, haze: 0, burn: 0.7, twinkle: 0.4, paleDrops: 1, rainShare: 1,
+  rain: 'auto', form: 'auto', solid: 'auto', knot: 'auto', planet: 'auto', layer: 'auto', mirror: 0.6, walls: 0, haze: 0, burn: 0.7, twinkle: 0.4, paleDrops: 1, rainShare: 1,
   leds: small ? 210 : 1000, aspect: 1, grid: 0, rows: 0,
   layout: 'strands', jitter: 'off', density: 'auto', strandShare: 1.0, rowShare: 1.0, strandMin: 0.66, rowMin: 0.68,
   size: 0.018, maxPx: 4.5, rest: 0.03, wire: 0.2,

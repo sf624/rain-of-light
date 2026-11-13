@@ -35,6 +35,7 @@
       {"q": "form=veil", "label": "form=veil"},
       {"q": "form=solid&solid=cube", "label": "form=solid"},
       {"q": "form=knot&knot=lissajous", "label": "form=knot"},
+      {"q": "form=planet&planet=saturn", "label": "form=planet"},
       {"q": "form=none", "label": "form=none"}
     ] },
     { "name": "figures", "cols": 3, "base": "rain=off&layer=off&t=40", "pre": 100, "cells": [
@@ -44,6 +45,10 @@
       {"q": "form=knot&knot=lissajous", "label": "knot=lissajous"},
       {"q": "form=knot&knot=hopf", "label": "knot=hopf"},
       {"q": "form=knot&knot=mobius", "label": "knot=mobius"}
+    ] },
+    { "name": "planets", "cols": 2, "base": "rain=off&layer=off&t=45", "pre": 100, "cells": [
+      {"q": "form=planet&planet=saturn", "label": "planet=saturn"},
+      {"q": "form=planet&planet=uranus", "label": "planet=uranus"}
     ] },
     { "name": "layer", "cols": 3, "base": "rain=off&t=30", "cells": [
       {"q": "form=orb&layer=off", "label": "form=orb&layer=off"},
