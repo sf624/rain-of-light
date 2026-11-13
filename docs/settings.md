@@ -196,7 +196,7 @@ things that are not in the panel:
 | Panel | URL key | Values | Default | What you see |
 | --- | --- | --- | --- | --- |
 | **Scene** | `scene` | `mix`, `rain`, `crystal` | `mix` | `mix`: the whole show, rain and forms come and go and blend. `rain`: only the rain, which never ends. `crystal`: only the forms of light. |
-| Form | `form` | `auto`, `orb`, `spiral`, `ring`, `veil`, `solid`, `knot`, `none` | `auto` | `auto`: as the scene brings them. A name holds that form for good. `none`: no form. |
+| Form | `form` | `auto`, `orb`, `spiral`, `ring`, `veil`, `solid`, `knot`, `none` | `auto` | `auto`: as the scene brings them. A name holds that form for good. `none`: no form. A change fades the form that shows out over 4 s; the next fades in once it has gone. |
 | Layer of light | `layer` | `auto`, `on`, `off` | `auto` | `auto`: the layer comes and goes with the show (about 70% of the time). `on` holds it, `off` removes it. |
 | Floor mirror (0: off) | `mirror` | 0 to 1 | `0.6` | How bright the image in the floor is. |
 | Wall mirrors (copies per side) | `walls` | 0 or 1 | `0` | `1`: the room repeats beyond its walls, one copy on each side. Each copy draws the lattice again, so it is costly. |
@@ -235,35 +235,47 @@ top down, as if rain gathered into it or ran off it as rain.
 ![The six forms alone in the still room: an amber orb, a blue spiral, an amber ring, a green veil, a pale solid of lines and a green knot; the seventh picture, form=none, is the empty room](img/forms.jpg)
 
 Query: `scene=crystal&layer=off&t=30` with `form=orb`, `form=spiral`,
-`form=ring`, `form=veil`, `form=solid`, `form=knot` and `form=none`.
+`form=ring&t=60` (its face to the room), `form=veil`, `form=solid`,
+`form=knot` and `form=none`.
 
-Each form comes and goes where it stands: its light fades in LED by LED
-as it grows a little, over about 18 s, and fades out as it shrinks a little,
-over about 16 s. While it shows, it moves slowly in its own way, and the
-floor shows each move:
+Each form comes and goes where it floats, in a way of its own: none rises
+out of the floor or sinks into it. Its light fades in LED by LED over
+about 12 s and out over about 10 s, while its own move takes 17 to 24 s;
+the orb, which has no move of its own, fades in over about 18 s and out
+over about 16 s. One form shows at a time: when one follows another, the
+first has gone before the next begins to come, with a moment of dark
+between them. While it shows, each form moves slowly in its own way, and
+the floor shows each move:
 
-- **orb**: drifts and breathes. It is pale at its heart and deepens to its
-  rim.
-- **spiral**: its arms turn. It turns its face to the room, leaning to and
+- **orb**: gathers where it hovers, growing a little, and shrinks a little
+  as it goes; it drifts and breathes. It is pale at its heart and deepens
+  to its rim.
+- **spiral**: unfurls out of its bright core, its arms turning, and winds
+  back into it as it goes. It turns its face to the room, leaning to and
   fro.
-- **ring**: stands and turns slowly. Now and then it parts into two hoops
-  that cross and come back into one.
+- **ring**: tumbles slowly, like a coin turning in the air: about a
+  slanting diameter, once round in 80 s, so it turns its face to the room
+  and then its edge, a slanting line of light. It comes edge-on, a line
+  that opens into the hoop, and goes by turning on to its edge again. Two
+  brighter arcs run slowly round it.
 - **veil**: a curtain of light like an aurora, across the room, a little
-  beyond its middle. Its folds travel along it; its lower hem is a bright
-  line that rises and falls, with rays of many heights above it.
+  beyond its middle. It unrolls from one end, its folds travelling along
+  it; its lower hem is a bright line that rises and falls, with rays of
+  many heights above it. It goes by lifting away upward.
 
 Two forms come from mathematics. They come a little less often than the
 four above:
 
 - **solid**: the edges of a regular solid as rods of light: a tetrahedron,
   point up, or an octahedron standing on its point (one of the two for its
-  whole life; the seed chooses), with a bright point at each corner. It
-  leans a little and turns slowly about its upright axis.
+  whole life; the seed chooses). Its corners come first, as bright points;
+  the edges are drawn out from them until they meet. It leans a little and
+  turns slowly about its upright axis, and goes as the edges draw back.
 - **knot**: a Lissajous curve, a closed rod of light that swings three
   ways at once: twice across while it goes once up and down, and three
   times in depth. Its broad side faces the room, a figure of eight; its
   phase sways, so the loops open and close a little, and two lights run
-  round it.
+  round it. It is drawn once round as it comes, and undone as it goes.
 
 Each form takes its colours from a few palettes of its own
 (`config.js: FORMS`). The forms keep a little beyond the middle of the room
@@ -363,14 +375,14 @@ area whatever the lattice, with drops as long.
 
 ![A ring with 250, 1000 and 1700 thousand LEDs](img/leds.jpg)
 
-Query: `scene=crystal&layer=off&form=ring&t=30` with `leds=250`,
+Query: `scene=crystal&layer=off&form=ring&t=60` with `leds=250`,
 `leds=1000`, `leds=1700`.
 
 ### Spacing along and between strands
 
 ![A ring with the LEDs on a strand at half, once and twice the spacing of the strands](img/aspect.jpg)
 
-Query: `scene=crystal&layer=off&form=ring&t=30` with `aspect=0.5`,
+Query: `scene=crystal&layer=off&form=ring&t=60` with `aspect=0.5`,
 `aspect=1`, `aspect=2`.
 
 ### Strands per side

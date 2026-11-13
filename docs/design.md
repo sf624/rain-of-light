@@ -426,22 +426,23 @@ look that no strand shows.
 ![The six forms alone: orb, spiral, ring, veil, solid and knot](img/forms.jpg)
 
 `shaders.js: formsAt` adds the light of up to three forms: two sky forms
-(one coming, one going) and the layer. For each it calls a function that
+(the one that shows, and the next, which waits until it has gone) and the layer. For each it calls a function that
 gives, at the LED's position, the light, a white-hot share, and a mix from
 the form's first colour to its second:
 
 - `orbLight`: a ball, pale at its heart, deep at its thin rim.
 - `spiralLight`: a tilted disc with two arms and a bright bulge, slowly
-  turning.
+  turning. It unfurls from its core.
 - `ringLight`: a hoop, a bright thread in a soft sheath, with two brighter
-  arcs. It may part into two crossing hoops.
+  arcs that run slowly round it.
 - `veilLight`: a curtain like an aurora, in travelling folds, with a bright
   lower hem and rays rising from it.
 - `solidLight`: the edges of a tetrahedron or an octahedron (`SOLID`,
   `CORNER`, `EDGE`). The distance to each edge is that from a point to a
   straight piece of line, worked out exactly, 6 or 12 times. Each edge
   is a rod of even light with a clean edge (`rod`), dark around and
-  inside the solid. Each corner is a white-hot point. The solid stands on the axis
+  inside the solid, and shows from its two corners inward, as far as it
+  is drawn. Each corner is a white-hot point. The solid stands on the axis
   of a corner and leans at most 0.4 rad (`forms.js: solid`), so every edge
   runs aslant or level: an edge along a strand would light one strand or
   none.
@@ -481,9 +482,17 @@ dark, and those between are partly lit. Normally the order is random per
 LED, so a form gathers LED by LED. While rain falls (not sideways), the order follows the
 height (`uFormE[k].x`), so a form comes from the top down, as if rain
 gathered into it, and goes from the top down, as if it ran off as rain.
-A form comes and goes in place: it never travels to come or go. As its
-weight rises it also grows from 0.75 of its size to its full size, and as
-its weight falls it shrinks back (`forms.js: GROW`, `motion`).
+A form that rises away as points (`uFormE[k].w`, the veil) shows each LED's
+light a random way below it, so the light lifts off.
+
+No form travels to come or go: none rises out of the floor or sinks into
+it. Each comes and goes where it floats, in a way of its own
+(`forms.js`): the spiral unfurls from its core and winds back into it,
+the ring turns its face to the room out of a line and back into one, the
+veil unrolls from one end and lifts away upward, the solid's edges are
+drawn out from its corners and back, and the knot is drawn once round and
+undone. The orb has no move of its own: it grows from 0.75 of its size as
+its weight rises, and shrinks back as it falls (`forms.js: GROW`, `FADING`).
 
 **Colour.** The light is the form's first colour mixed towards its second,
 then towards `WHITE_HOT` by the white-hot share. Sky forms give 1.25 times
@@ -596,12 +605,32 @@ pace (`show.js: RAIN_IN`, `RAIN_OUT`, `SKY_IN`, `SKY_OUT`,
 `SKY_INTO_RAIN`, `LAYER_IN`, `LAYER_OUT`). Rain comes early and leaves late.
 
 Example: a form passage starts at 100 s after a rain passage. The form
-begins to gather at 96 s and is full by 114 s (`SKY_IN`). The rain begins to
+begins to gather at 98 s and is full by 110 s (`SKY_IN`). The rain begins to
 leave at 104 s and has gone by 120 s (`RAIN_OUT`). So the form seems to
 gather out of the rain.
 
-`show.js: createShow` (its `update`) also eases the shown weights over
-2.5 s (`EASE`). A change of scene or of the Form setting then blends in.
+A form's light comes over 12 s and goes over 10 s when the form has a move
+of its own to come and go (it unfurls, turns, unrolls, is drawn): the light
+is there early, so the move shows, and the move runs on for 17 to 24 s in
+all. The orb has none (`forms.js: FADING`): its light itself takes as long,
+18 s to come from 4 s before the passage and 16 s to go from 8 s before
+the next (`SKY_IN_SLOW`, `SKY_OUT_SLOW`).
+
+**One form at a time.** Two forms never show at once. Where one form
+follows another directly, the first goes before the passage's start and
+the next comes after it, 1 s after the first has gone (`SKY_GAP`).
+Example: a veil follows a ring at 100 s. The ring's light goes from 89.5 s
+and has gone at 99.5 s; the veil begins to come at 100.5 s and is full by
+112.5 s. A form's first and last light is faint, so the room looks dark
+for 8 to 10 s between them. Any other form comes no sooner than `SKY_GAP` after the last one
+has gone (`episode`). The layer is not a sky form: it may stay.
+
+`show.js: createShow` (its `update`) moves each shown weight at most a
+quarter a second (`BLEND`). The timeline's fades are less steep, so the
+shown weight follows them exactly. A change of scene or of the Form setting
+fades a form out over 4 s, down to 0. While a sky form still shows, any
+other waits at 0 and begins only once it has gone, so a change of the Form
+setting also shows one form at a time. The rain eases over 2.5 s (`EASE`).
 
 ### Casting: slots and placing
 
@@ -611,11 +640,15 @@ which its LEDs light depends on the slot. `show.js: place` fills the
 uniforms `uFormA` to `uFormF` for each slot: type, weight, size, turn,
 centre, tilt, how it comes and goes, its own measures and its reach.
 
-Where a form is comes from `forms.js: motion`, as a function of its age and
-of its weight (its size, see `GROW`). Each form has a life of its own
+Where a form is comes from `forms.js: motion`, as a function of its age, of
+its weight (the orb's size, see `GROW`) and of how far it has gone on its
+way out. Each form has a life of its own
 (`forms.js: orb`, `spiral`, `ring`, `veil`, `solid`,
-`knot`). For example, the orb drifts and breathes; the ring parts in two
-now and then and comes back into one. The forms slowly turn to face the eye (eased
+`knot`). For example, the orb drifts and breathes; the ring tumbles like a
+coin turning in the air, about a slanting diameter, once round in 80 s
+(`TURN`), so it shows its face and then its edge, a slanting line. Edge-on,
+its light is piled up along the line of sight, and it gives half as much
+(`shaders.js: ringLight`). The forms slowly turn to face the eye (eased
 over 5 s), and keep a little beyond their path as the eye sees them
 (`forms.js: BACK`).
 
@@ -756,8 +789,9 @@ What drives them, from `main.js: frame` every frame:
 
 How the harmony follows the show: a form that arrives brings its own chord
 (`FORM_CHORD`; `arrive`), unless a chord began less than 6 s ago
-(`SETTLE`). A form that leaves with none coming takes the harmony home to
-D (`HOME`; `depart`). The pad's filter opens with a form, closes in rain,
+(`SETTLE`). A form that leaves takes the harmony home to D (`HOME`;
+`depart`): one form shows at a time, so the next form's chord blooms out of
+home, after the dark between them. The pad's filter opens with a form, closes in rain,
 and the pad thins out in a still room (`tick`, `mixPad`). What changes
 slowly sways with 1/f fluctuation (`sway.js: createSway`).
 
