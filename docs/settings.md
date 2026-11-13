@@ -101,7 +101,7 @@ The site has two pages, with the same picture, keys and URL parameters:
 
 ![The viewer page's small panel at the lower right: Scene, Colour mode, Brightness, Quality and four sound levels, a link to all settings, and the GitHub link](img/viewer-panel.jpg)
 
-![The lab's panel open on the right of the picture: Scene, Form, Layer of light, the mirror sliders and more](img/panel.jpg)
+![The lab's panel open on the right of the picture: Scene, Form, Layer of light, the mirror sliders and more, each row with its default; Twinkle and Quality are not at theirs, and are marked](img/panel.jpg)
 
 The gear button or the `p` key opens the panel; a link that ends in
 `#tune` opens the page with it (`lab.html#tune`: the lab with its panel
