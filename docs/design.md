@@ -459,6 +459,7 @@ the form's first colour to its second:
   rod of even light (`rod`); two lights run round it (`runner`).
 - `layerLight`: the layer of light, a sea near the floor in slow waves, its
   points glinting.
+- `bakedLight`: a baked form (see Baked forms below), a shape's skin.
 
 Each is a field: a function of the LED's position relative to the
 form's centre, size and turn. Where the form is moves in `forms.js` (see
@@ -504,6 +505,57 @@ full from 11 units away (`LAYER_NEAR`), so it never shows as big loose points ac
 floor.
 
 ![The layer of light off, on, and alone](img/layer.jpg)
+
+### Baked forms
+
+A baked form is a shape that no formula draws: the Utah teapot
+(`config.js: EGGS`). It is baked offline into a field: a cube of
+40 x 40 x 40 signed distances to the shape's skin (negative inside), one
+byte each, 64 KB in all (`fields/<name>.bin`; made by
+`tools/bake-field.py`, see [development.md](development.md)). The tool
+reads a closed mesh, or tessellates Bezier patches as for the teapot,
+stands the shape upright with its base at the bottom of its box, caps
+every hole (the teapot's spout is open at its tip, its lid and rim are
+open edges), finds the solid on a fine grid of 160 a side by filling the
+outside from the box's walls (so parts that overlap, like the spout in
+the body, make one solid), and samples the distance to that solid's
+outer skin.
+
+Source: the teapot is Martin Newell's, from the patch tables of Eric
+Haines's Standard Procedural Databases (CC0). Only the field made from it
+is in the repository.
+
+The page holds the fields in one 3D texture of 8-bit cells, a slab per
+shape, on texture unit 5 (`fields.js`; units 0 to 4 belong to the
+composite pass). The vertex shader reads it with trilinear filtering
+(`shaders.js: fieldAt`). `bakedLight` draws the skin as a shell about one
+LED gap thick (`exp(-d²/w²)`, `w` = 0.7 gaps), so any lattice draws the
+outline and the thin parts (the teapot's handle and spout) as
+brightly as the bulk; the shell's rim, where the skin runs along the line
+of sight, shows brighter by itself, which gives the shape its roundness.
+Inside, a faint glow grows towards the heart. The shape's own colour is a
+pale palette (ice or candle); the lattice's light (`uLight`) and the rays
+apply as for every form. A LED outside the shape's box, or more than 2.5
+`w` outside its skin, costs one texture read or none.
+
+A baked form sits on the floor (the mirror shows it), its side to the
+room, and sways about the vertical by up to 0.55 rad over about 140 s
+(`forms.js: baked`): its outline reads from the side, and a full turn
+would show it end-on. Like the orb, it has no move of its own to come and
+go (`forms.js: FADING`): its light fades in place, slowly, LED by LED
+(`SKY_IN_SLOW`, `SKY_OUT_SLOW`), and it grows from 0.75 of its size as it
+comes (`GROW`), its base kept on the floor; in a tall view, where the
+other forms float higher, it stays there (`onFloor`). It is one of the sky
+forms, so it too shows only alone (see One form at a time). LEDs above the
+top of its shape in its box skip it before reading the field (the
+teapot fills only the lower half of its box).
+
+**Loading.** A field is fetched only when its form is due within 40 s
+(`show.js: eggsNear`), or held. Until it has come, the form does not show;
+once it has, it eases in over 1.5 s if it is already due (after a seek, on
+a slow network). A plain visit fetches no field. Where the 3D texture
+cannot be made, no baked form is ever cast (`fields.js: able`), and a
+field that fails to load leaves its passage without a form.
 
 ### Waves of light
 
@@ -612,7 +664,7 @@ gather out of the rain.
 A form's light comes over 12 s and goes over 10 s when the form has a move
 of its own to come and go (it unfurls, turns, unrolls, is drawn): the light
 is there early, so the move shows, and the move runs on for 17 to 24 s in
-all. The orb has none (`forms.js: FADING`): its light itself takes as long,
+all. The orb (and a baked form) has none (`forms.js: FADING`): its light itself takes as long,
 18 s to come from 4 s before the passage and 16 s to go from 8 s before
 the next (`SKY_IN_SLOW`, `SKY_OUT_SLOW`).
 
@@ -651,6 +703,17 @@ its light is piled up along the line of sight, and it gives half as much
 (`shaders.js: ringLight`). The forms slowly turn to face the eye (eased
 over 5 s), and keep a little beyond their path as the eye sees them
 (`forms.js: BACK`).
+
+**The baked forms come rarely.** From 10 minutes on (`EGG.after`), each
+form cast is replaced by a baked one with a chance of 1.2% (`EGG.chance`),
+from the passage's random number (`show.js: eggOf`; with more than one,
+each would be as likely). That is about one every 2.3 hours (`tools/story-stats.mjs`
+over 50 seeds of 4 hours). Everything else runs as if the replaced form had
+come: it counts as seen, and its palette as told, so the other forms keep
+their frequencies and the rest of the timeline is the same (the egg's
+own slower fades only move the next form's coming a little). The lab can
+hold it (`form=teapot`, also in its Form setting); the viewer page's
+panel does not offer it.
 
 Among rain, a sky form glows up to 1.8 times brighter (`STORM_GAIN`), to
 hold its own. The layer has its own height, thickness and brightness each time. It
@@ -773,7 +836,9 @@ The layers:
 - **Form voices.** Each form has a voice that swells and fades with its
   weight, panned to where it is seen (`mixVoices`): the orb a warm low hum,
   the spiral a slow figure of notes (scheduled in `tick`), the ring a glassy tone, the veil a soft air, the solid a chord
-  of three pure fifths, the knot two tones that beat at different paces.
+  of three pure fifths, the knot two tones that beat at different paces,
+  a baked form the ring's glassy tone, softer, with the chord's third
+  over it, on D.
   The veil also gets a little high noise (`AIRY`).
 - **Pale drops.** In a still room a high, soft note falls now and then.
 - **Reverb.** A 6 s convolution reverb (`impulse`), then a compressor.
@@ -934,7 +999,9 @@ https and on localhost.
 online visitors always get the newest files (there is no build step and no
 file hashing), and offline visitors get the last ones they saw. On install
 it precaches `CORE`, so one visit is enough to work offline. **A new module
-or asset must be added to `CORE` by hand.**
+or asset must be added to `CORE` by hand.** The baked forms' fields are
+left out on purpose: each is fetched when its form is about to show, and
+the service worker keeps it from then on, as it keeps every file fetched.
 
 ### The version link
 
@@ -959,6 +1026,7 @@ GitHub link shows.
 | `lattice.js` | The size of the lattice from the settings, the point and wire buffers and their build (strand places, LED spacing, thinning ranks), and the light per LED on that lattice. |
 | `show.js` | The show's timeline of passages, fades, casting into slots, form colours, the rain's direction over time. |
 | `forms.js` | How each form moves through its life: centre, size, turn, tilt, its own measures, reach. |
+| `fields.js` | The baked forms' fields: the 3D texture, fetching a field when its form draws near, `able`. |
 | `director.js` | Seeded tracks (weather, colour, density, camera), the colour story's mood, the shared `hash`. |
 | `direction.js` | The change of the rain's direction: weights and gates per direction. |
 | `audio.js` | The generative music: pad, bells, rain, form voices, reverb. |

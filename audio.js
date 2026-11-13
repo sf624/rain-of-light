@@ -12,7 +12,8 @@
 //   warm, low hum; the spiral a slow figure of notes that turns; the ring a
 //   clear, glassy tone; the veil a soft, open air; the solid a still chord of
 //   pure fifths; the knot two tones that beat against each other, each at its
-//   own pace. As a form gathers, a chord of its own blooms; as it leaves, the
+//   own pace; a baked form (an egg) the ring's glassy tone, softer, with a
+//   high third over it, like a music box heard from another room. As a form gathers, a chord of its own blooms; as it leaves, the
 //   harmony comes home to D. Each voice comes from where its form is seen.
 // - With a form the pad opens (brighter); in rain it is veiled.
 // - In a still room (no rain, no form) the pad thins out, and now and then a
@@ -20,6 +21,7 @@
 // - The breath: a low tone under the pad swells as the light does.
 
 import { createSway } from './sway.js';
+import { EGGS } from './config.js';
 
 const mtof = (m) => 440 * 2 ** ((m - 69) / 12);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -39,7 +41,9 @@ const BELLS = [62, 64, 66, 69, 71, 74, 76, 78, 81]; // D major pentatonic
 // (warm palettes) the low, warm G; the spiral the open, unresolved A sus2;
 // the veil the soft Em9; the ring the still B minor; the solid
 // the A sus2 (it is made of fifths); the knot the G.
-const FORM_CHORD = { orb: 2, spiral: 3, ring: 1, veil: 4, solid: 3, knot: 2 };
+// The baked forms (EGGS in config.js) bring D, home itself.
+const EGG_VOICES = EGGS.map((e) => e.name);
+const FORM_CHORD = { orb: 2, spiral: 3, ring: 1, veil: 4, solid: 3, knot: 2, ...Object.fromEntries(EGG_VOICES.map((n) => [n, HOME])) };
 const VOICES = Object.keys(FORM_CHORD);
 const AIRY = { veil: 0.007 };                            // the forms with the air of the noise, and how much
 const SETTLE = 6;    // s: a chord a form brought is not changed again sooner
@@ -242,7 +246,7 @@ export function createAudio({ settings }) {
   // tick); the others are held, like the pad.
   function formLayer(name, notes, t, hold) {
     if (name === 'spiral' || settings.formSound <= 0) return;
-    const level = { orb: 0.035, ring: 0.02, veil: 0.022, solid: 0.022, knot: 0.024 }[name];
+    const level = EGG_VOICES.includes(name) ? 0.016 : { orb: 0.035, ring: 0.02, veil: 0.022, solid: 0.022, knot: 0.024 }[name];
     const dest = fadeTo(voice[name].g);
     if (name === 'orb') {
       // Warm and low: the root, its fifth and its octave, soft and dark.
@@ -271,6 +275,12 @@ export function createAudio({ settings }) {
         sustain(r + up, [['sine', 0, -1.5, 1], ['sine', 0, 1.5, 1]],
           { t, hold, attack: 8 + i, peak: level * [0.5, 0.36, 0.24][i], cutoff: 4000, pan: (i - 1) * 0.3, dest, follow: false });
       }
+    } else if (EGG_VOICES.includes(name)) {
+      // The ring's glassy pairs, the root two octaves up, and the third of
+      // the chord over it (D add9: F sharp), softer, swelling later.
+      const r = notes[0];
+      sustain(r + 24, [['sine', 0, -2, 1], ['sine', 0, 2, 1]], { t, hold, attack: 9, peak: level * 0.3, cutoff: 5000, pan: -0.1, dest, follow: false });
+      sustain(notes[3] + 24, [['sine', 0, -3, 1], ['sine', 0, 3, 1]], { t, hold, attack: 11, peak: level * 0.16, cutoff: 5000, pan: 0.2, dest, follow: false });
     } else if (name === 'knot') {
       // Two lines that cross: two notes of the chord an octave up, each a
       // pair a little apart in tune, the one beating half again as fast as

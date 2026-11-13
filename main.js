@@ -16,6 +16,7 @@ import { createDirector, hash } from './director.js';
 import { createDirection } from './direction.js';
 import { FLOW_WRAP, RAY_CAP, POINT_VS, POINT_FS, WIRE_FS, QUAD_VS, DOWN_FS, BLUR_FS, COMPOSITE_FS } from './shaders.js';
 import { createGL, sub, cross, dot, norm, perspective, lookAt } from './gl.js';
+import { createFields } from './fields.js';
 import { createLattice, fillLattice, latticeLight } from './lattice.js';
 import { createControls } from './controls.js';
 import { createClock, rateText } from './clock.js';
@@ -107,6 +108,10 @@ const downProg = program(QUAD_VS, DOWN_FS);
 const blurProg = program(QUAD_VS, BLUR_FS);
 const compProg = program(QUAD_VS, COMPOSITE_FS);
 const MAX_POINT = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1]; // the largest sprite this GPU draws
+// The baked forms' fields (see fields.js), on a texture unit of their own (0 .. 4: the composite's).
+const FIELD_UNIT = 5;
+const fields = createFields(gl, FIELD_UNIT);
+for (const prog of [pointProg, wireProg]) { gl.useProgram(prog.p); gl.uniform1i(prog.u.uFields, FIELD_UNIT); }
 
 const lattice = createLattice(gl);
 let count = 0, GRID = 0, ROWS = 0, wireCount = 0, light = null;
@@ -601,7 +606,7 @@ function ease(dt) {
 
 // ---------- the show: rain and forms of light, and the mirrors ----------
 // ?seed= gives the show's timeline; else each visit has its own.
-const show = createShow(S, { feet: -HEIGHT / 2, seed: SEED }); // the layer lies just above the strands' feet
+const show = createShow(S, { feet: -HEIGHT / 2, seed: SEED, eggs: fields.able }); // the layer lies just above the strands' feet
 // While no rain passage shows, a few pale drops still fall: more in heavier weather.
 const sparseShare = () => 0.03 + 0.05 * look.rain;
 // The images of the lattice in the wall mirrors: per image, x sign and offset,
@@ -866,6 +871,8 @@ function frame(now) {
   pointer.sx += (pointer.x - pointer.sx) * 0.03;
   pointer.sy += (pointer.y - pointer.sy) * 0.03;
   const { shown, breath } = advance(dt);
+  // A baked form's field loads as it draws near, and the form shows once it is there.
+  fields.frame(show.eggsNear(time), shown, Math.min(0.1, Math.max(0, rawDt)));
   if (lab && !job) snapshot();
   const view = viewM, proj = projM, fit = lastFit;
   const rk = shown.rain;                 // how much rain falls now: 0 a still room .. 1 a rain passage
