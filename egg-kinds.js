@@ -36,14 +36,17 @@ registerEgg({
     // the last generations of a cycle fade, and the board starts again
     const k = n % LIFE_CYCLE;
     const fade = smooth((LIFE_CYCLE - k - (g - n)) / 3);
-    // The board wraps round the room, so it can begin anywhere: the glider's first cells lie a
-    // little ahead of where the eye was as the egg began, a little left of the middle, so that it
-    // walks across the view (it goes towards +x +z); the sheet lies low, so that its image in the
-    // floor lies close under it.
+    // The board wraps round the room, so it can begin anywhere and lie either way along the
+    // strands' rows: as the eye was when the egg began, its columns run to the right and its rows
+    // towards the eye, so that the glider (which goes along both) walks from the far left of the
+    // view to the near right; the sheet lies low, so that its image in the floor lies close under it.
     const e0 = ctx.eyeAt(-s.age);
-    const ahead = norm([-e0[0], 0, -e0[2]]), left = [ahead[2], 0, -ahead[0]];
-    const g0 = add(add(e0, ahead, 9), left, 1.5);
-    put(out.v, 0, g0[0] - 2 * cell, g0[2] - 2 * cell, cell, -ctx.HEIGHT / 2 + 0.3);
+    const ahead = norm([-e0[0], 0, -e0[2]]), right = [-ahead[2], 0, ahead[0]];
+    const axis = (v) => (Math.abs(v[0]) > Math.abs(v[2]) ? [Math.sign(v[0]), 0] : [0, Math.sign(v[2])]);
+    const A = axis(right), B = axis([-ahead[0], 0, -ahead[2]]);
+    const g0 = add(add(e0, ahead, 14), right, -6);
+    put(out.v, 0, g0[0] - 2 * cell * (A[0] + B[0]), g0[2] - 2 * cell * (A[1] + B[1]), cell, -ctx.HEIGHT / 2 + 0.3);
+    put(out.v, 4, ...A, ...B);
     put(out.v, 1, Math.max(0.2, ctx.lane[1] * 0.8), g - n, 0.12, 0);
     put(out.v, 2, 0.15 * fade, 1.0 * fade, 0.65 * fade, 0);
     put(out.v, 3, 0.9 * fade, 1.0 * fade, 0.95 * fade, 0);
@@ -67,7 +70,8 @@ const B1 = [1 / Math.sqrt(2), -1 / Math.sqrt(2), 0], B2 = [1 / Math.sqrt(6), 1 /
 const ROLL = -Math.atan2(0.2357, 0.5443);   // a corner of the triangle on top
 // eye: where the eye is (or will be) at the click; ahead: the way the eye looks then (horizontal).
 function tribar(out, eye, ahead, turn, ctx) {
-  const C = [eye[0] + ahead[0] * TRI.far, ctx.FLOOR + (TRI.y - ctx.FLOOR) * (ctx.camera.rise ?? 1), eye[2] + ahead[2] * TRI.far];
+  const far = TRI.far / Math.sqrt(Math.min(1, ctx.camera.aspect));   // (farther in a tall view, so that it fits its width)
+  const C = [eye[0] + ahead[0] * far, ctx.FLOOR + (TRI.y - ctx.FLOOR) * (ctx.camera.rise ?? 1), eye[2] + ahead[2] * far];
   const v = norm(add(eye, C, -1));
   const r0 = norm(cross(v, [0, 1, 0])), u0 = cross(r0, v);
   const c = Math.cos(ROLL), s = Math.sin(ROLL);

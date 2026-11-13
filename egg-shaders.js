@@ -51,12 +51,14 @@ float eggNear(float d, float r) { float c = max(r, 0.45 * uLane.x); return 1.0 -
 // ---------- glider: Conway's Life on the layer ----------
 // v0: where the board's first cell begins (x, z), a cell's size, the sheet's height
 // v1: its half thickness, how far the generation has gone (0 .. 1), the board's glow, -
-// v2, v3: the colour of a living cell, of one just born
+// v2, v3: the colour of a living cell, of one just born; v4: the ways of the board's columns and rows (x, z each)
 vec3 lifeLight(vec3 p, vec4 a, int o) {
   vec4 g = uEggV[o], h = uEggV[o + 1];
   float dy = p.y - g.w;
   if (abs(dy) > h.x * 3.0) return vec3(0.0);
-  vec2 c = mod((p.xz - g.xy) / g.z, 32.0);           // (the board wraps round the room)
+  vec4 ax = uEggV[o + 4];
+  vec2 q = p.xz - g.xy;
+  vec2 c = mod(vec2(dot(q, ax.xy), dot(q, ax.zw)) / g.z, 32.0);   // (the board wraps round the room)
   ivec2 ci = ivec2(c);
   vec2 f = fract(c) - 0.5;
   float sq = 1.0 - smoothstep(0.3, 0.42, max(abs(f.x), abs(f.y)));
