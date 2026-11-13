@@ -379,6 +379,21 @@ async function visit(cdp, base, query, interact, full = false) {
     await framesAfter(await evalJs('window.__frames'), 'after an arrow on a focused slider');
     const v1 = await evalJs(`document.querySelector('.tuner input[type="range"]').value`);
     if (Number(v1) >= Number(v0) || Math.abs(num(await clockText()) - cur) > 0.15) fail(`[${label}] an arrow on a slider reached by Tab: slider ${v0} -> ${v1}, clock ${cur} -> ${await clockText()}`);
+    // A select of the panel can be used with real mouse events: the press opens its list, which the lift of the
+    // button must not close (the select keeps the focus), a key picks an option, and the focus is then let go, so
+    // the arrows seek again.
+    const sel = await evalJs(`(() => { const e = document.querySelector('.tuner select'); e.blur(); e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { at: [r.x + r.width / 2, r.y + r.height / 2], v: e.value, top: document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)?.outerHTML.slice(0, 80), rect: [r.x, r.y, r.width, r.height] }; })()`);
+    await s('Input.dispatchMouseEvent', { type: 'mouseMoved', x: sel.at[0], y: sel.at[1] });
+    for (const type of ['mousePressed', 'mouseReleased']) await s('Input.dispatchMouseEvent', { type, x: sel.at[0], y: sel.at[1], button: 'left', clickCount: 1 });
+    await sleep(400);
+    if (await evalJs(`document.activeElement === document.querySelector('.tuner select')`) !== true) fail(`[${label}] a click on a select of the panel took the focus away (its list closes): ${JSON.stringify(sel)}, focus on ${await evalJs('document.activeElement?.outerHTML.slice(0, 80)')}`);
+    await trusted('ArrowDown', 'ArrowDown', 40);
+    await trusted('Enter', 'Enter', 13);
+    await poll(`the select to take the option picked by the keyboard [${label}]`, async () => await evalJs(`document.querySelector('.tuner select').value`) !== sel.v, { tick: () => check('after picking an option') });
+    if (await evalJs(`!!document.activeElement?.closest('.tuner')`)) fail(`[${label}] a select kept the focus after an option was picked`);
+    await evalJs(`(() => { const e = document.querySelector('.tuner select'); e.value = ${JSON.stringify(sel.v)}; e.dispatchEvent(new Event('change', { bubbles: true })); localStorage.removeItem(${JSON.stringify(STORAGE_KEY)}); })()`);   // (what the panel saved is not for the next visit)
+    await poll(`the clock to settle after the scene is back [${label}]`, async () => !(await clockText()).includes('seeking'), { tick: () => check('after the scene is back') });
+    await seekBy(() => trusted('ArrowLeft', 'ArrowLeft', 37), -5, 'ArrowLeft after picking an option');
     await evalJs(`document.activeElement.blur()`);
     await press('p');   // the panel closes
     // The readout (HUD): h shows it with the seed, h hides it again.
