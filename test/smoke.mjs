@@ -296,6 +296,37 @@ async function visit(cdp, base, query, interact, full = false) {
     const held = await clockText();
     await framesAfter(await evalJs('window.__frames'), 'after pausing again');
     if (await clockText() !== held) fail(`[${label}] the show moved after Space paused it: ${held} -> ${await clockText()}`);
+    // Speed: ] steps to the next snap (x1 -> x2), [ back, [ again to slow motion (x0.5); the popover opens from the button.
+    const rateText = () => evalJs(`document.querySelector('.clock-rate')?.textContent ?? ''`);
+    await press(']');
+    if (await rateText() !== 'x2') fail(`[${label}] ] gave speed ${await rateText()}, not x2`);
+    await press('[');
+    await press('[');
+    if (await rateText() !== 'x0.5') fail(`[${label}] [ [ gave speed ${await rateText()}, not x0.5`);
+    await evalJs(`document.querySelector('.clock-rate').click()`);
+    if (await evalJs(`document.querySelector('.clock-pop').hidden`)) fail(`[${label}] the speed button did not open its popover`);
+    await press('Escape');
+    // Seek: the arrow keys go 5 s (30 s with Shift) forward and back, paused, and the picture is drawn again each time.
+    const arrow = (key, shift = false) => evalJs(`dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, shiftKey: ${shift} }))`);
+    const at = () => evalJs(`window.__frames`);
+    const seekTo = async (key, shift, want) => {
+      const f = await at();
+      await arrow(key, shift);
+      await poll(`the clock to read ${want} after ${shift ? 'Shift+' : ''}${key} [${label}]`, async () => await clockText() === want, { tick: () => check('while seeking') });
+      await framesAfter(f, 'after a seek');
+    };
+    const base0 = await clockText();   // t X s, paused
+    if (base0 !== held) fail(`[${label}] the clock moved to ${base0} while paused`);
+    const x = Number(held.match(/[\d.]+/)[0]);
+    await seekTo('ArrowRight', false, `t ${(x + 5).toFixed(1)} s`);
+    await seekTo('ArrowLeft', true, `t ${Math.max(0, x - 25).toFixed(1)} s`);   // 30 s back, from x + 5
+    await seekTo('ArrowRight', true, `t ${(Math.max(0, x - 25) + 30).toFixed(1)} s`);
+    // The readout (HUD): h shows it with the seed, h hides it again.
+    await press('h');
+    const hud = await poll(`the HUD to show its rows [${label}]`, async () => { const r = await evalJs(`(() => { const h = document.querySelector('.hud'); return h && !h.hidden ? h.textContent : ''; })()`); return r.includes('seed') ? r : null; }, { tick: () => check('while the HUD opens') });
+    if (!/frame.*fps/.test(hud) || !/lattice/.test(hud)) fail(`[${label}] the HUD lacks its rows: ${hud}`);
+    await press('h');
+    if (!(await evalJs(`document.querySelector('.hud').hidden`))) fail(`[${label}] h did not hide the HUD`);
   } else if (!lab && await evalJs(`!!document.querySelector('.clock')`)) fail(`[${label}] the viewer page has the lab's clock`);
   await evalJs(`(() => { const o = document.getElementById('overlay'); if (o) o.style.display = 'none'; })()`);
   await framesAfter(await evalJs('window.__frames'), 'after hiding the overlay'); // the screenshot shows a frame drawn without it

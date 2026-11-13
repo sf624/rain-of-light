@@ -6,7 +6,7 @@
 
 import { createTuner, loadSettings } from './tuner.js';
 import { createAudio } from './audio.js';
-import { createSway } from './sway.js';
+import { createSway, createRandom } from './sway.js';
 import {
   PALETTES, WEATHER, FLOWS, COLOR_MODES, SETS, SKY, CAMERAS,
   DEFAULTS, STORAGE_KEY, SCHEMA, ROOM,
@@ -18,7 +18,8 @@ import { FLOW_WRAP, RAY_CAP, POINT_VS, POINT_FS, WIRE_FS, QUAD_VS, DOWN_FS, BLUR
 import { createGL, sub, cross, dot, norm, perspective, lookAt } from './gl.js';
 import { createLattice, fillLattice, latticeLight } from './lattice.js';
 import { createControls } from './controls.js';
-import { createClock } from './clock.js';
+import { createClock, rateText } from './clock.js';
+import { createHud } from './hud.js';
 import { keepAwake } from './wakelock.js';
 import { view, createRotation } from './rotate.js';
 
@@ -258,7 +259,7 @@ const panOf = (p) => (camera ? dot(sub(p, camera.eye), camera.r) / 6 : 0);
 const rotation = createRotation();
 const sound = createAudio({ settings: S });
 const lab = document.documentElement.dataset.page === 'lab';
-const clock = createClock({ lab, params });
+const clock = createClock({ lab, params, seed: SEED });
 const controls = createControls({
   sound, S,
   onVolume: (v) => { tuner.set('volume', v); tuner.refresh(); },
@@ -391,9 +392,13 @@ function hideOverlay() {
   overlay.classList.add('hidden');
 }
 
-let time = Number(params.get('t')) || 0;
+const START = Number(params.get('t')) || 0;
+let time = START;
+// The lab draws every random number of the show from the seed, so that a moment can be
+// made again (see seekTo); the viewer page keeps Math.random.
+const randomFor = (salt) => (lab ? createRandom(SEED + salt) : Math.random);
 let nextAuto = time + 2, autoWaves = 0;   // the next automatic wave, and how many there were
-const rippleGap = createSway({ fastest: 1, octaves: 5 }); // per wave: how long until the next
+let rippleGap = null;                     // per wave: how long until the next
 let look = null;    // the rain now: its flow, rate, amount and density, easing towards the weather (set up below)
 
 // ---------- director: weather and colour change on their own ----------
@@ -525,14 +530,14 @@ function skyColors() {
   return [lerp(SKY[i][0], SKY[j][0]), lerp(SKY[i][1], SKY[j][1])];
 }
 
-// The episodes that run at the time the page opens with, at once.
-direct(time, true);
+// (The state is set up at the start time, or at 0 in the lab, by initState below.)
 
 // What a change in the panel does at once. The scene, form and layer need
 // nothing here: the show reads them every frame and blends into the change.
 let rebuildTimer = 0;
 function apply(key) {
   settle = 3;
+  if (key !== 'volume') snaps.clear();   // the lab's snapshots were made with the old setting (see seekTo)
   if (['leds', 'aspect', 'grid', 'rows', 'layout', 'jitter'].includes(key)) {
     clearTimeout(rebuildTimer);
     rebuildTimer = setTimeout(buildLattice, 250); // wait for the slider to settle
@@ -550,17 +555,11 @@ const tuner = createTuner({
   settings: S, defaults: DEF, storageKey: STORAGE_KEY,
   onChange: (key) => apply(key),
 });
-look = {
-  flow: Number(params.get('t')) || 0,
-  flowRate: weather.flow, rain: weather.rain,
-  density: [...densityGoal],
-};
-let bandShift = (look.flow * S.bandSpeed) % (10 / S.bandScale);
-look.flow %= FLOW_WRAP;
+let bandShift = 0;
 
 // The rain swells and eases within its weather, with 1/f fluctuation
 // (2 s .. about 2 min); the sound of rain follows the same sway.
-const rainSway = createSway({ fastest: 2, octaves: 6 });
+let rainSway = null;
 let sway = 0;
 
 // Ease the current look towards the targets, over about tau seconds.
@@ -595,9 +594,6 @@ function ease(dt, edt = dt) {   // edt: the time the easings take (dt, or long w
 // ---------- the show: rain and forms of light, and the mirrors ----------
 // ?seed= gives the show's timeline; else each visit has its own.
 const show = createShow(S, { feet: -HEIGHT / 2, seed: SEED }); // the layer lies just above the strands' feet
-flowGoal = show.flow(time);
-direction = createDirection(flowOf(flowGoal));
-if (flowGoal.toward) flowDir = [Math.cos(flowGoal.angle), Math.sin(flowGoal.angle)];
 // While no rain passage shows, a few pale drops still fall: more in heavier weather.
 const sparseShare = () => 0.03 + 0.05 * look.rain;
 // The images of the lattice in the wall mirrors: per image, x sign and offset,
@@ -616,33 +612,17 @@ function placeImages() {
 }
 
 // ---------- frame ----------
-let last = performance.now();
-let settle = 0;   // frames left to settle the easings after a change while paused
-
-let checked = false;
-
-function frame(now) {
-  const rawDt = (now - last) / 1000;
-  // rAF time may precede `last`. The lab's clock may stand the show still or run it faster.
-  const dt = clock.tick(Math.min(0.05, Math.max(0, rawDt)));
-  // A change in the panel while paused settles the easings at once (the show itself stays at its moment).
-  const edt = clock.paused && settle > 0 ? 1e3 : dt;
-  if (clock.paused && settle > 0) settle--;
-  last = now;
-  if (!clock.paused) adapt(rawDt, now);   // a paused picture keeps its render scale
-  time += dt;
-  clock.show(time);
-  resize();
-
-  // Camera: one of several moves, blended while one turns into the next.
-  pointer.sx += (pointer.x - pointer.sx) * 0.03;
-  pointer.sy += (pointer.y - pointer.sy) * 0.03;
+// One step of the show's state, without drawing or sound: the camera, the waves that come by
+// themselves, the director's episodes, the easings, the show. dt: the show's time that goes by;
+// edt: the time the easings take (see frame); quiet: no bell for a wave (a replay).
+let viewM = null, projM = null, lastFit = null;
+function advance(dt, edt, quiet = false) {
   camClock += dt * SPEED * (S.orbit / DEFAULTS.orbit); // integrated: a new speed never jumps
   camBlend = Math.min(1, camBlend + edt / CAMERA_BLEND);
   const kb = smooth(camBlend);
   let eye = [0, 0, 0], dir = [0, 0, 0];
   // The eye stands on the floor, with a little sway.
-  const fit = viewFit();
+  const fit = lastFit = viewFit();
   const ground = FLOOR + ROOM.eye;
   const bob = ground + Math.sin(time * 0.05) * 0.2;
   CAMERAS.forEach((cam, i) => {
@@ -666,8 +646,8 @@ function frame(now) {
   dir = norm([dir[0], dir[1] + fit.pitch, dir[2]]);
   const at = [eye[0] + dir[0], eye[1] + dir[1], eye[2] + dir[2]];
   const aspect = W / H;
-  const view = lookAt(eye, at, [0, 1, 0]);
-  const proj = perspective(fovRad(), aspect, 0.1, 60);
+  viewM = lookAt(eye, at, [0, 1, 0]);
+  projM = perspective(fovRad(), aspect, 0.1, 60);
   const f = norm(sub(at, eye));
   const r = norm(cross(f, [0, 1, 0]));
   camera = { eye, f, r, u: cross(r, f), aspect, rise: fit.rise };
@@ -675,7 +655,7 @@ function frame(now) {
   // A wave now and then, somewhere in the field.
   if (S.ripples > 0 && time > nextAuto) {
     const where = (i) => hash(SEED + ++autoWaves * 5.71 + i) - 0.5;   // from the seed, like the rest of the show
-    addRipple(where(1) * SPAN * 0.6, where(2) * HEIGHT * 0.5, where(3) * SPAN * 0.6, time, clock.rate > 4);   // a fast show rings no bells for them
+    addRipple(where(1) * SPAN * 0.6, where(2) * HEIGHT * 0.5, where(3) * SPAN * 0.6, time, quiet || clock.rate > 4);   // a fast show rings no bells for them, nor does a seek
     // While waves repaint the field, they come more often.
     // The gaps sway with 1/f fluctuation: about half to twice the setting.
     const every = colorMode.name === 'repaint' ? Math.min(S.ripples, 6) : S.ripples;
@@ -686,16 +666,185 @@ function frame(now) {
   ease(dt, edt);
   const shown = show.update(time, edt, camera);
   flowGoal = shown.flow;
+  // Breath: light and pad swell as you breathe in and ease as you breathe out.
+  const breath = S.breath === 'on' ? breathAt(dt) : 1;
+  return { shown, breath };
+}
+
+// ---------- the state at a time: set up, save, bring back, seek ----------
+// The show's timeline and the director's tracks are made from the seed, so they need no state. What
+// carries from frame to frame is listed here: the easings (weather, colours, direction, forms, camera
+// move), the sways, the waves, the sky, the breath (see saveState). A moment can be made again by
+// setting the state up at 0 and stepping it on, without drawing, in steps of REPLAY_STEP: the lab
+// does so for ?t= and for a seek back. Steps are cheap, and a snapshot every SNAP_EVERY s of the show
+// (made on the way) keeps a seek short. The settings (the scene, the colours' story ...) are those of now.
+const REPLAY_STEP = 0.05;     // s of the show per step: the longest step a frame takes
+const SNAP_EVERY = 600;       // steps (30 s) between snapshots
+function initState(t0) {
+  time = t0;
+  nextAuto = time + 2; autoWaves = 0;
+  rippleGap = createSway({ fastest: 1, octaves: 5, random: randomFor(1) });
+  ripples.fill(-1e4); rippleIndex = 0;
+  for (const key of TRACKS) delete episode[key];
+  side = 0; sideNow = 0;
+  camMode = CAMERAS[0]; camClock = time; camBlend = 1;
+  CAMERAS.forEach((c, i) => { camW[i] = c === camMode ? 1 : 0; });
+  camFrom = [...camW];
+  lastDir = [0, 0, -1];
+  skyClock = (director.skyStart + time / Math.max(1, S.skyDay)) % 1;
+  direct(time, true);
+  look = { flow: t0, flowRate: weather.flow, rain: weather.rain, density: [...densityGoal] };
+  bandShift = (look.flow * S.bandSpeed) % (10 / S.bandScale);
+  look.flow %= FLOW_WRAP;
+  rainSway = createSway({ fastest: 2, octaves: 6, random: randomFor(2) });
+  sway = 0;
+  breathPhase = 0;
+  show.reset();
+  flowGoal = show.flow(time);
+  direction = createDirection(flowOf(flowGoal));
+  flowDir = [0, 1];
+  if (flowGoal.toward) flowDir = [Math.cos(flowGoal.angle), Math.sin(flowGoal.angle)];
+}
+// (What the tracks and the config own is kept by reference; the rest is copied.)
+function saveState() {
+  return {
+    ...structuredClone({
+      time, nextAuto, autoWaves, ripples: [...ripples], rippleIndex, look, bandShift, sway, densityGoal,
+      goals, looks, side, sideNow, flowGoal, flowDir, skyClock, breathPhase, camBlend, camFrom, camW, camClock, lastDir,
+      gap: rippleGap.save(), rain: rainSway.save(), direction: direction.save(),
+    }),
+    show: show.save(), episode: { ...episode }, weather, colorMode, camMode,
+  };
+}
+function loadState(d) {
+  const c = structuredClone({ ...d, show: null, episode: null, weather: null, colorMode: null, camMode: null });
+  ({ time, nextAuto, autoWaves, rippleIndex, look, bandShift, sway, side, sideNow, flowGoal, flowDir, skyClock, breathPhase, camBlend, camFrom, camClock, lastDir } = c);
+  ripples.set(c.ripples);
+  densityGoal.splice(0, 2, ...c.densityGoal);
+  goals.splice(0, 2, ...c.goals); looks.splice(0, 2, ...c.looks);
+  camW.splice(0, camW.length, ...c.camW);
+  rippleGap.load(c.gap); rainSway.load(c.rain); direction.load(c.direction);
+  show.load(d.show);
+  for (const key of TRACKS) delete episode[key];
+  Object.assign(episode, d.episode);
+  ({ weather, colorMode, camMode } = d);
+}
+const snaps = new Map();      // k -> the state after k * SNAP_EVERY steps, made on the way by a replay from 0
+let seekMs = 0, replayed = 0;             // steps the last seek took (for the readout)
+// From the state after step n0 on to `target`, leaving a snapshot every SNAP_EVERY steps.
+function replayFrom(n0, target) {
+  const whole = Math.floor(target / REPLAY_STEP + 1e-9);
+  for (let n = n0 + 1; n <= whole; n++) {
+    time += REPLAY_STEP;   // (summed like the frames' time, so a frame at 0.05 s and a step are the same)
+    advance(REPLAY_STEP, REPLAY_STEP, true);
+    replayed++;
+    if (n % SNAP_EVERY === 0 && !snaps.has(n / SNAP_EVERY)) snaps.set(n / SNAP_EVERY, saveState());
+  }
+  const rest = target - time;
+  if (whole >= n0 && rest > 1e-6) { time = target; advance(rest, rest, true); replayed++; }
+}
+// The show at time t (the lab). Ahead of now: stepped on from the state as it is. Behind: made
+// again from the nearest snapshot before it (or from 0).
+function seekTo(t) {
+  t = Math.max(0, t);
+  replayed = 0;
+  if (t >= time) {
+    while (t - time > REPLAY_STEP + 1e-9) { time += REPLAY_STEP; advance(REPLAY_STEP, REPLAY_STEP, true); replayed++; }
+    const rest = t - time;
+    if (rest > 1e-6) { time = t; advance(rest, rest, true); replayed++; }
+    return;
+  }
+  let k = Math.floor(t / REPLAY_STEP / SNAP_EVERY);
+  while (k > 0 && !snaps.has(k)) k--;
+  if (k === 0) initState(0); else loadState(snaps.get(k));
+  replayFrom(k * SNAP_EVERY, t);
+}
+let pendingSeek = null;
+clock.onSeek = (t) => { pendingSeek = t; };
+if (lab) {
+  initState(0);
+  snaps.set(0, saveState());
+  resize();
+  replayFrom(0, START);
+} else initState(START);
+
+let last = performance.now();
+let settle = 0;   // frames left to settle the easings after a change while paused
+
+let checked = false;
+
+// ---------- the lab's readout ----------
+// What the readout (hud.js) shows, read from the real state when it asks (a few
+// times a second); the frame keeps only the last frame's few derived values.
+let lastShown = null, lastGlow = 1, lastBreath = null, rainShareNow = 0, fallLightNow = 0;
+const RIPPLE_LIFE = 7;   // seconds a wave lives (POINT_VS)
+function hudSnapshot() {
+  const info = show.info(time);
+  const lookNow = looks[sideNow < 0.5 ? 0 : 1], goalNow = goals[sideNow < 0.5 ? 0 : 1];
+  const [w0, w1] = direction.weights;
+  const moves = CAMERAS.map((c, i) => [c.name, camW[i]]).filter(([, w]) => w > 0.01).map(([n, w]) => `${n} ${w.toFixed(2)}`).join(' ');
+  return {
+    time, seed: SEED, rateText: rateText(clock.rate), paused: clock.paused,
+    seek: { steps: replayed, ms: seekMs, snaps: snaps.size },
+    scale: renderScale, adaptive: S.quality !== 'full', canvas: [W, H],
+    grid: GRID, rows: ROWS, leds: count,
+    scene: S.scene, form: S.form, layer: S.layer, show: info,
+    weather: { name: weather.name, rain: look.rain, fall: look.flowRate },
+    density: look.density, rainShare: rainShareNow,
+    flow: { down: w0, across: w1, mix: direction.mix, goal: flowOf(flowGoal) },
+    color: { mode: colorMode.name, palette: PALETTES.find((p) => p.a.every((v, i) => v === goalNow.a[i]))?.name, swatches: [lookNow.a, lookNow.b] },
+    light: {
+      exposure: S.exposure, breath: lastBreath, glow: lastGlow, applied: S.exposure * lastGlow,
+      room: light.room, wire: light.wire, twinkle: light.twinkle, fall: fallLightNow, stormGain: info.gain,
+      bloom: S.bloom, haze: S.haze, burn: S.burn, rays: S.rays, float: hasFloat,
+    },
+    camera: { moves, eye: camera ? camera.eye : [0, 0, 0] },
+    ripples: ripples.reduce((n, v, i) => (i % 4 === 3 && time - v >= 0 && time - v < RIPPLE_LIFE ? n + 1 : n), 0),
+  };
+}
+// For tests of the lab: the whole state as text, and a seek.
+if (lab) window.__lab = { state: () => JSON.stringify(saveState()), seek: (t) => { pendingSeek = t; } };
+const hud = createHud({ lab, params, bar: clock.bar, snapshot: hudSnapshot });
+
+function frame(now) {
+  const rawDt = (now - last) / 1000;
+  // rAF time may precede `last`. The lab's clock may stand the show still or run it faster.
+  let dt = clock.tick(Math.min(0.05, Math.max(0, rawDt)));
+  // A change in the panel while paused settles the easings at once (the show itself stays at its moment).
+  let edt = clock.paused && settle > 0 ? 1e3 : dt;
+  if (clock.paused && settle > 0) settle--;
+  last = now;
+  if (!clock.paused) adapt(rawDt, now);   // a paused picture keeps its render scale
+  if (pendingSeek !== null) {
+    const t0 = performance.now();
+    seekTo(pendingSeek);
+    seekMs = performance.now() - t0;
+    pendingSeek = null;
+    dt = 0; edt = clock.paused && settle > 0 ? 1e3 : 0;   // the frame of a seek shows the moment itself
+    settleUntil = performance.now() + SETTLE_MS;   // a seek's frame says little about the speed
+  } else time += dt;
+  clock.show(time);
+  hud.frame(now);
+  resize();
+
+  // Camera: the eye follows the pointer a little more each frame.
+  pointer.sx += (pointer.x - pointer.sx) * 0.03;
+  pointer.sy += (pointer.y - pointer.sy) * 0.03;
+  const { shown, breath } = advance(dt, edt);
+  const view = viewM, proj = projM, fit = lastFit;
   const rk = shown.rain;                 // how much rain falls now: 0 a still room .. 1 a rain passage
   placeImages();
   sound.rain(look.rain, sway, rk);
-  // Breath: light and pad swell as you breathe in and ease as you breathe out.
-  const breath = S.breath === 'on' ? breathAt(dt) : 1;
   const glow = 1 - S.breathDepth * (1 - breath);
   sound.breath(1 - S.breathDepth * 0.8 * (1 - breath));
   // Each form's voice swells and fades with it, from where it is seen.
   for (const f of shown.forms) f.pan = panOf(f.at);
   sound.forms(shown.forms);
+
+  // For the lab's readout (see hudSnapshot): the frame's last state.
+  lastShown = shown; lastGlow = glow; lastBreath = S.breath === 'on' ? breath : null;
+  rainShareNow = sparseShare() + (S.rainShare * (1 - 0.35 * shown.storm) - sparseShare()) * rk;
+  fallLightNow = rk * (1 - direction.mix);
 
   // Points.
   gl.bindFramebuffer(gl.FRAMEBUFFER, hasFloat ? scene.fb : null);
@@ -773,10 +922,10 @@ function frame(now) {
   // Rain spreads strand by strand as a rain passage comes, from the few
   // strands that carry pale drops in a still room.
   // Through a form it thins, so the form shows between the drops.
-  gl.uniform1f(u.uRainShare, sparseShare() + (S.rainShare * (1 - 0.35 * shown.storm) - sparseShare()) * rk);
+  gl.uniform1f(u.uRainShare, rainShareNow);
   gl.uniform1f(u.uRainMix, rk);
   // The falling rain's light goes as in a real room, as much as falling rain shows (see POINT_VS: phys).
-  gl.uniform1f(u.uFallLight, rk * (1 - direction.mix));
+  gl.uniform1f(u.uFallLight, fallLightNow);
   gl.uniform3fv(u.uEye, camera.eye);
   gl.uniform1f(u.uStorm, shown.storm);
   gl.uniform4fv(u.uFormA, shown.A);

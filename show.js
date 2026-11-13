@@ -167,7 +167,9 @@ function createTimeline(seed, pool, name, mood) {
     }
     return w && w.from <= t && t < w.end ? { toward: 1, angle: w.angle } : { toward: 0, angle: 0 };
   }
-  return { at, passage, flowAt };
+  // When the next passage begins (after t).
+  const upcoming = (t) => { extend(t); return next; };
+  return { at, passage, flowAt, upcoming };
 }
 
 export function createShow(S, { feet, seed = Math.random() * 1000 }) {
@@ -206,7 +208,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
   // The shown state eases to what is wanted, so a change of scene or of a
   // form setting blends in rather than cutting. Per episode: its weight now.
   const shown = new Map();                    // id -> { x, w, col: [c, d, the room's colour with it] }
-  let rainNow = null, shift = 0;
+  let rainNow = null, shift = 0, skyShown = 0;
   const story = () => S.story === 'on';
   // An episode's palette, by name: one of its form's (the colour key moves on from it).
   const nameOf = (e, names, pal) => names[(pal + shift) % names.length];
@@ -314,6 +316,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
     const forms = [];
     // How much of a sky form shows: it is the subject, the rest gives way.
     const skyNow = Math.min(1, sky.reduce((n, s) => n + s.w, 0));
+    skyShown = skyNow;
     slots.forEach((s, n) => {
       if (!s || s.w <= 0.001) return;
       // While rain falls, or under a form, the layer thins out a little, LED by LED:
@@ -349,8 +352,35 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
     return { kind: tl.passage(t).kind.name, items: es.map((e) => ({ form: e.form.name, palette: shownIn(e, top) })) };
   }
 
+  // The state that carries from frame to frame (the eased weights and colours, the slots), to be
+  // brought back (the lab's seek); the timelines are made from the seed and need none.
+  const copyShown = (m) => [...m].map(([id, s]) => [id, { ...s, x: { ...s.x }, col: s.col.map((c) => [...c]) }]);
+  const save = () => ({ rainNow, shift, skyShown, shown: copyShown(shown) });
+  const load = (d) => {
+    rainNow = d.rainNow; shift = d.shift; skyShown = d.skyShown;
+    shown.clear();
+    for (const [id, s] of copyShown(d.shown)) shown.set(id, s);
+  };
+  const reset = () => load({ rainNow: null, shift: 0, skyShown: 0, shown: [] });
+
+  // For the lab's readout: what the show plays now, read from its state (nothing is worked out for it every frame).
+  // passage / next: the timeline's passage at t and when the next begins (none for the rain scene, or a held form);
+  // rain, storm, gain: the eased rain, the rain through a form, and how much more a form glows among rain;
+  // items: each episode that shows, with its weight, age, whether it goes, its palette and its colours.
+  function info(t) {
+    const scene = S.scene === 'rain' || S.scene === 'crystal' ? S.scene : 'mix';
+    const tl = scene === 'rain' ? null : timeline(scene);
+    const top = [...shown.values()].filter((s) => s.x.e.form !== LAYER).sort((a, b) => b.w - a.w)[0]?.x.e;
+    const items = [...shown.values()].sort((a, b) => b.w - a.w).map((s) => ({
+      form: s.x.e.form.name, w: s.w, age: s.x.age, out: s.x.out, held: s.x.e.id.startsWith('held-'),
+      palette: shownIn(s.x.e, top), colors: [s.col[0], s.col[1]],
+    }));
+    return { scene, passage: tl?.passage(t).kind.name ?? 'rain', next: tl ? tl.upcoming(t) - t : null,
+      rain: rainNow ?? 0, storm: (rainNow ?? 0) * skyShown, gain: 1 + STORM_GAIN * (rainNow ?? 0), items };
+  }
+
   // The rain's direction at t, as the show has it (for the start: update returns it too).
   const flow = (t) => wanted(t).flow;
 
-  return { update, recolor, cast, flow };
+  return { update, recolor, cast, flow, info, save, load, reset };
 }

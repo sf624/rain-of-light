@@ -51,6 +51,9 @@ export function createDirection(toward) {
       if (lit >= 0) mix = Math.min(1, Math.max(0, mix + Math.sign(lit - mix) * dt / fade));
       return begun;
     },
+    // The whole state, to be brought back (the lab's seek).
+    save() { return { lit, w: [...w], gate: gate.map((g) => ({ ...g })), mix }; },
+    load(d) { lit = d.lit; w[0] = d.w[0]; w[1] = d.w[1]; d.gate.forEach((g, i) => { gate[i] = { ...g }; }); mix = d.mix; },
     // For the shader: per direction its weight, and its gate (from, span).
     get weights() { weights[0] = smooth(w[0]); weights[1] = smooth(w[1]); return weights; },
     get gates() { gate.forEach((g, i) => { gates[i * 2] = g.from ?? 0; gates[i * 2 + 1] = g.span; }); return gates; },

@@ -34,7 +34,8 @@ reload.
 | `lattice.js` | the strands and LEDs, and the order in which they thin out |
 | `gl.js` | WebGL helpers and vector maths |
 | `controls.js` | the sound, volume and full-screen controls |
-| `clock.js` | the lab's show clock: pause, step, speed (see below) |
+| `clock.js` | the lab's show clock: pause, step, speed, seek (see below) |
+| `hud.js` | the lab's readout of the show's state (see below) |
 | `rotate.js` | the landscape / portrait button |
 | `audio.js` | the music: pad, bells, rain, the forms' voices, reverb |
 | `sway.js` | 1/f fluctuation, used by the music and the rain |
@@ -121,19 +122,99 @@ to tune settings on one moment or to reach a late part of the show:
   running, following the frozen state.
 - **Step** (`.`): the show goes on by 0.1 s (times the speed) and stays
   paused.
-- **Speed** (`[` slower, `]` faster, or the button): x1, x4, x12, x30. A frame
-  advances the show by at most 0.05 s times the speed. Above x4 the waves
-  that come by themselves ring no bell; the pad's chords change at most every
-  6 s as always.
+- **Speed** (`[` slower, `]` faster, or the button): the button shows the
+  rate (`x0.25`, `x1`, `x12`) and opens a small popover with a slider on a
+  log scale from x0.1 to x30, which sticks to the snap points 0.1, 0.25,
+  0.5, 1, 2, 4, 12 and 30, and a reset to x1. The keys step through the snap
+  points. A frame advances the show by at most 0.05 s times the speed, so
+  in slow motion a frame is tiny but never zero: the easings, the waves
+  and the sway all work on that dt, and the sound follows the state as it
+  is. Above x4 the waves that come by themselves ring no bell; the pad's
+  chords change at most every 6 s as always.
+- **Seek** (`ArrowLeft` / `ArrowRight`: 5 s back / forward, with `Shift`
+  30 s; the same as buttons in the speed popover, which also has a
+  scrubber over the time played so far): the show goes to that time, and
+  shows the same picture it had there (same forms, colours, weather,
+  direction, camera). Paused, the frame is drawn at once. The arrow keys
+  are ignored while a button, slider or field has the focus.
 - **Time**: `t 123.4 s`, the show's clock. Clicking it copies a link to the
-  lab at that moment (`t=` and `pause=1`), to note it.
+  lab at that moment (`t=`, `seed=` and `pause=1`), to note it.
 
-`?pause=1` opens the lab paused, `?rate=12` opens it fast, and `?t=` sets the
-start time as on both pages. `t=` starts the show, the camera, the rain's
-fall and the sky from that time, so the link shows the same part of the
-show with the same seed; weather and colours that were easing at the moment
-of the click are at their goals instead. The viewer page has no clock; its
-frame loop is unchanged.
+`?pause=1` opens the lab paused, `?rate=0.25` opens it in slow motion
+(0.1 to 60), and `?t=` sets the start time as on both pages. On the lab
+`t=` makes the state of that time as a seek does (below), so the link shows
+the same picture as the show had there with the same seed; on the viewer
+page it starts the camera, the rain's fall and the sky from that time, and
+weather and colours that were easing are at their goals instead. The viewer
+page has no clock; its frame loop is unchanged.
+
+### How a seek makes a moment again
+
+The timeline (`show.js`) and the director's tracks (`director.js`) are
+made from the seed, so what they hold at a time needs no history. What
+carries from frame to frame is the state in `main.js`: the easings of the
+weather, colours, direction, forms (`show.update`) and camera move, the
+two sways (rain, and the gap between waves), the waves, the sky, the
+breath and the rain's fall (`saveState`). `advance(dt)` steps all of
+it without drawing or sound. In the lab every random number of the show
+comes from the seed (`createRandom` in `sway.js`), so the state at a time
+follows from the seed and the settings alone.
+
+A seek back sets the state up at 0 (or loads the nearest snapshot) and
+steps it on in steps of 0.05 s, the longest step a frame takes, leaving a
+snapshot every 30 s of the show; a seek forward steps on from where the
+show is. So each moment is made the same way however it is reached. The
+cost is about 8 microseconds per step, measured in Chrome: a seek of 60 s
+takes about 10 ms, of 10 min about 0.11 s, of 1 h about 0.6 s once, and
+at most 30 s of steps (about 5 ms) from a snapshot after that (the HUD's `seek` row shows the last
+one). The sound does not burst: the waves a seek makes ring no bell, and
+the rain, the forms and the breath move to their new state as they always
+do, over a second or so; the pad's chords go on by the real clock.
+
+Limits: a seek uses the settings as they are now (changing the scene,
+the colour story or a form while playing, and seeking back, shows the show
+with the new setting from the start), and the keys `w`, `c`, `v`, `d` and
+the clicks are not replayed (the waves from clicks are gone after a seek
+back). A moment reached by playing frames of 0.05 s (as the capture tools step)
+is the same as the one a seek makes, number for number. With other frame
+lengths the easings agree closely but not to the last digit: they do not
+depend on the step for a goal that holds, and a goal changes at a step's
+edge. `window.__lab.state()` and `window.__lab.seek(t)` give the
+tests the whole state as text and a seek.
+Playing backwards is not offered: it would mean a seek every frame, and
+the eased state (a form's weight, the colours going over) has no inverse.
+
+### The readout (HUD)
+
+The **HUD** button in the clock bar, the `h` key or `?hud=1` shows the
+state of the show as short lines of text at the top left, a few times a
+second (`hud.js`; `?hud=0` forces it off, and the choice is kept in this
+browser). `main.js` hands it `hudSnapshot()`, which reads the real state;
+hidden, the HUD costs one test per frame, and the viewer page has none. The
+lines:
+
+- `time`: the show's time, the speed, paused or running, the seed.
+- `frame`: fps and frame time, the render scale (the adaptive quality
+  step), the canvas size; `seek`: the last seek's steps and time.
+- `lattice`: strands, LEDs per strand, LEDs in all.
+- `show`: the scene (with a held form or layer), the passage now (rain,
+  form, storm, still, drift) and the time to the next one.
+- `rain`: how much rain the show has now (0 .. 1), and `storm`, the rain
+  through a form. `forms`: each form with its weight (0 .. 1), its palette,
+  its age and whether it comes or goes, with swatches of its colours;
+  `layer`: the layer of light.
+- `weather`: the weather's name and the eased rain and fall values, the
+  density, the share of strands with rain.
+- `flow`: how much of the rain falls down and how much flows across, and
+  the show's goal. `colour`: the colour mode, the palette, swatches.
+- `bright`: the exposure setting times the breath, the exposure applied;
+  `light`: the lattice light scale (`uLight`), the falling rain's light,
+  the gain a form gets among rain; `glow`: glow, haze, burn-out, rays, and
+  whether float buffers are there.
+- `camera`: the move or the blend of two, the eye; `ripples`: waves alive.
+
+On a screen narrower than 700 px only the main lines show, and with the
+settings panel open the HUD steps aside.
 
 ## Capturing the page
 
