@@ -331,6 +331,14 @@ async function visit(cdp, base, query, interact, full = false, fetches = null) {
     if (await rateText() !== 'x0.5') fail(`[${label}] [ [ gave speed ${await rateText()}, not x0.5`);
     await evalJs(`document.querySelector('.clock-rate').click()`);
     if (await evalJs(`document.querySelector('.clock-pop').hidden`)) fail(`[${label}] the speed button did not open its popover`);
+    // The typical rates are buttons in the popover: one click sets the speed and marks the button; the keys go on from it.
+    await evalJs(`[...document.querySelectorAll('.clock-preset')].find((b) => b.textContent === '4').click()`);
+    if (await rateText() !== 'x4') fail(`[${label}] the x4 button gave speed ${await rateText()}, not x4`);
+    if (await evalJs(`[...document.querySelectorAll('.clock-preset[aria-pressed="true"]')].map((b) => b.textContent).join()`) !== '4') fail(`[${label}] the current speed's button is not the only one marked`);
+    await press(']');
+    if (await rateText() !== 'x12') fail(`[${label}] ] after the x4 button gave speed ${await rateText()}, not x12`);
+    await evalJs(`[...document.querySelectorAll('.clock-preset')].find((b) => b.textContent === '0.5').click()`);
+    if (await rateText() !== 'x0.5') fail(`[${label}] the 0.5 button gave speed ${await rateText()}, not x0.5`);
     await press('Escape');
     if (!(await evalJs(`document.querySelector('.clock-pop').hidden`))) fail(`[${label}] Escape did not close the speed popover`);
     // Seek: the arrow keys go 5 s (30 s with Shift) forward and back, paused, and the picture is drawn again each time.
@@ -396,6 +404,14 @@ async function visit(cdp, base, query, interact, full = false, fetches = null) {
     await evalJs(`(() => { const e = document.querySelector('.tuner select'); e.value = ${JSON.stringify(sel.v)}; e.dispatchEvent(new Event('change', { bubbles: true })); localStorage.removeItem(${JSON.stringify(STORAGE_KEY)}); })()`);   // (what the panel saved is not for the next visit)
     await poll(`the clock to settle after the scene is back [${label}]`, async () => await clockText() === timeBefore, { tick: () => check('after the scene is back') });
     await seekBy(() => trusted('ArrowLeft', 'ArrowLeft', 37), -5, 'ArrowLeft after picking an option');
+    // A seek key pressed while a seek is still going on moves from where that seek is heading, not from the time it has
+    // reached part-way (a long seek, to time 5000; it takes many frames, and the readout says `seeking`).
+    await evalJs(`window.__lab.seek(5000)`);
+    await poll(`the readout to say it is seeking [${label}]`, async () => /seeking/.test(await clockText()), { tick: () => check('while a long seek runs') });
+    await arrow('ArrowRight', true);
+    await arrow('ArrowRight');
+    await poll(`a seek pressed during a seek to go on from its target (5035 s) [${label}]`, async () => (await clockText()) === 't 5035.0 s', { tick: () => check('while the long seek ends') });
+    cur = 5035;
     await evalJs(`document.activeElement.blur()`);
     await press('p');   // the panel closes
     // The readout (HUD): h shows it with the seed, h hides it again.

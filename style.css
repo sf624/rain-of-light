@@ -335,7 +335,7 @@ body.idle .full-toggle:focus-visible, body.idle .rotate-toggle:focus-visible, bo
 .clock button:hover, .clock button:focus-visible, .clock.paused .clock-pause { opacity: 1; }
 .clock button:focus-visible { outline: 2px solid #9cc8ff; outline-offset: 2px; }
 .clock.paused .clock-pause { border-color: rgba(156, 200, 255, 0.6); color: #cfe4ff; }
-/* The speed button's popover: a log slider with snap marks, and a reset to x1. */
+/* The speed button's popover: a log slider with snap marks, the typical rates as buttons, and the seek buttons. */
 .clock-speed { position: relative; }
 .clock-speed > button { min-width: 52px; }
 .clock-pop {
@@ -354,6 +354,9 @@ body.idle .full-toggle:focus-visible, body.idle .rotate-toggle:focus-visible, bo
   backdrop-filter: blur(6px);
 }
 .clock-pop[hidden] { display: none; }
+.clock-rates { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; flex: 1 1 100%; }
+.clock-rates .clock-preset { min-width: 0; padding: 0 4px; }
+.clock .clock-pop .clock-preset[aria-pressed="true"] { opacity: 1; border-color: rgba(156, 200, 255, 0.6); color: #cfe4ff; }
 .clock-seek { display: flex; flex-wrap: wrap; gap: 6px; flex: 1 1 100%; }
 .clock-seek .clock-jump { flex: 1; min-width: 0; padding: 0 4px; }
 .clock-seek .clock-scrub { flex: 1 1 100%; margin: 0; accent-color: #9cc8ff; touch-action: none; }
