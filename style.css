@@ -201,7 +201,8 @@ body.idle .full-toggle:focus-visible, body.idle .rotate-toggle:focus-visible, bo
   justify-content: space-between;
   margin: -10px -14px 4px;
   padding: 10px 14px 8px;
-  background: rgba(8, 10, 14, 0.95);
+  z-index: 2;   /* above the rows (they are positioned too) */
+  background: #090b0f;
   letter-spacing: 0.1em;
 }
 .tuner-buttons { display: flex; gap: 6px; }

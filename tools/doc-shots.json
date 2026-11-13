@@ -18,7 +18,7 @@
       {"q": "seed=1&t=110", "label": "", "ui": true, "keys": ["x"], "after": 4, "crop": [0.5, 0.8, 1, 1]}
     ] },
     { "name": "panel", "cols": 3, "base": "", "page": "lab.html", "cells": [
-      {"q": "seed=1&t=110", "label": "", "ui": true, "keys": ["p"], "after": 10}
+      {"q": "seed=1&t=110&twinkle=0.8", "label": "", "ui": true, "keys": ["p"], "after": 10}
     ] },
     { "name": "viewer-panel", "cols": 3, "base": "", "cells": [
       {"q": "seed=1&t=110", "label": "", "ui": true, "keys": ["p"], "after": 10}
