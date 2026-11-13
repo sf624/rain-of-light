@@ -149,29 +149,33 @@ a setting is `auto`, the key moves the show on to its next choice. Otherwise
 it sets the next value in the list. `d` sets Direction to `down` or `across`.
 
 The lab also has a clock for the show (top left): pause the picture, step
-it, run it faster, and read its time. See [Development](development.md#the-labs-clock).
+it, change its speed (slow motion too), go back and forward in time, and
+read its time. A readout of the show's state can be switched on. See [Development](development.md#the-labs-clock).
 Its keys, which the viewer page does not have:
 
 | Key | Does |
 | --- | --- |
 | `Space` | pause / resume the show |
 | `.` | one step forward (pauses) |
-| `[` `]` | slower / faster: x1, x4, x12, x30 |
+| `[` `]` | slower / faster, through x0.1, x0.25, x0.5, x1, x2, x4, x12, x30 |
+| `ArrowLeft` `ArrowRight` | 5 s back / forward (`Shift`: 30 s) |
+| `h` | the readout (HUD) of the show's state |
 
 ### URL parameters
 
 Every setting below can be given in the URL with its key, such as
 `?color=cloud&weather=drizzle`. A URL value wins over a saved one. A value
 that does not exist falls back to the default; a number is kept within the
-slider's range. Both pages take every parameter (`pause` and `rate` only the lab). The URL also takes
+slider's range. Both pages take every parameter (`pause`, `rate` and `hud` only the lab). The URL also takes
 things that are not in the panel:
 
 | Parameter | Values | Default | Does |
 | --- | --- | --- | --- |
 | `seed` | any number | random | One order of the show: its passages, forms, weather, colours, direction and density. The same seed gives the same show. |
-| `t` | seconds | `0` | Starts the show at that time of its order. The camera starts there too, so a time shows one view. |
+| `t` | seconds | `0` | Starts the show at that time of its order. The camera starts there too, so a time shows one view. On the lab the whole state of the show at that time is made again, as a seek does (see [the lab's clock](development.md#how-a-seek-makes-a-moment-again)). |
 | `pause` | `1` | off | The lab only: opens with the show paused (see [the lab's clock](development.md#the-labs-clock)). |
-| `rate` | a number up to `60` | `1` | The lab only: opens with the show running this many times faster. |
+| `rate` | a number from `0.1` to `60` | `1` | The lab only: opens with the show running at this speed (`0.25`: a quarter as fast). |
+| `hud` | `1` / `0` | as last chosen | The lab only: opens with the readout of the show's state shown / hidden. |
 | `dpr` | a number, such as `1` or `1.5` | `2` | The highest pixel ratio drawn. A screen with a higher ratio is drawn at this one. |
 | `#tune` | (a hash, not a parameter) | | Opens the settings panel: `#tune` the viewer page's, `lab.html#tune` the lab's. |
 
