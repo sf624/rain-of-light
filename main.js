@@ -863,7 +863,7 @@ function frame(now) {
     dt = 0;   // the frame of a seek shows the moment itself
     settleUntil = performance.now() + SETTLE_MS;   // a seek's frame says little about the speed
   } else time += dt;
-  clock.show(time, note);
+  clock.show(time, note, job ? job.target : time);
   hud.frame(now);
   resize();
 

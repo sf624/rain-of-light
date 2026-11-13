@@ -10,6 +10,7 @@ import { isTyping, ownsArrows, letGo } from './keys.js';
 
 const SNAPS = [0.1, 0.25, 0.5, 1, 2, 4, 12, 30];
 const MIN_RATE = 0.1, SLIDER_MAX = 30, MAX_RATE = 60;
+const EPS = 1e-6;   // (rates are compared to the snap points within this)
 const STEP = 0.1;   // seconds of the show per step, at rate 1
 const SNAP_PULL = 0.008;   // how near (of the slider's length) a snap point takes the thumb
 const SPAN_LOG = Math.log(SLIDER_MAX / MIN_RATE);
@@ -28,6 +29,7 @@ export function createClock({ lab, params, seed }) {
   let rate = Number(params.get('rate'));
   rate = Number.isFinite(rate) && rate > 0 ? clampRate(rate) : 1;
   let stepped = false, now = 0, top = 0;   // top: the furthest time shown
+  let heading = 0;   // the time a seek key moves from: where the show is going (a seek in progress's target), not where it is part-way
 
   const bar = document.createElement('div');
   bar.className = 'clock';
@@ -58,8 +60,16 @@ export function createClock({ lab, params, seed }) {
   const marks = document.createElement('datalist');
   marks.id = 'clock-snaps';
   for (const r of SNAPS) { const o = document.createElement('option'); o.value = String(toPos(r)); marks.append(o); }
-  const resetBtn = mk('clock-one', 'Back to normal speed');
-  resetBtn.textContent = 'x1';
+  // The typical rates (the snap points) as buttons: one click sets one; the current one is marked.
+  const rates = document.createElement('div');
+  rates.className = 'clock-rates';
+  const rateBtns = SNAPS.map((r) => {
+    const b = mk('clock-preset', `Speed ${rateText(r)}`);
+    b.textContent = String(r);
+    b.addEventListener('click', () => { rate = r; render(); });
+    rates.append(b);
+    return [r, b];
+  });
   // Seek: back and forward by 5 s and 30 s (the arrow keys, Shift for 30 s), and a scrubber over the time played so far.
   const seeks = document.createElement('div');
   seeks.className = 'clock-seek';
@@ -76,7 +86,7 @@ export function createClock({ lab, params, seed }) {
   scrub.setAttribute('aria-label', 'Time');
   scrub.addEventListener('input', () => state.onSeek?.(Number(scrub.value)));
   seeks.append(...seekBtns, scrub);
-  pop.append(slider, resetBtn, marks, seeks);
+  pop.append(slider, marks, rates, seeks);
   speed.append(rateBtn, pop);
   bar.append(pauseBtn, stepBtn, speed, readout);
   document.body.append(bar);
@@ -90,8 +100,9 @@ export function createClock({ lab, params, seed }) {
       if (stepped) { stepped = false; return STEP * rate; }
       return paused ? 0 : dt * rate;
     },
-    show(t, note = '') {
+    show(t, note = '', goal = t) {
       now = t;
+      heading = goal;
       if (t > top) top = t;
       const s = `t ${t.toFixed(1)} s${note ? `  ${note}` : ''}`;
       if (readout.textContent !== s) readout.textContent = s;
@@ -103,15 +114,16 @@ export function createClock({ lab, params, seed }) {
     pauseBtn.textContent = paused ? '▶' : '❚❚';
     pauseBtn.setAttribute('aria-pressed', String(paused));
     rateBtn.textContent = rateText(rate);
-    resetBtn.disabled = rate === 1;
+    for (const [r, b] of rateBtns) b.setAttribute('aria-pressed', String(Math.abs(r - rate) <= r * EPS));
     if (document.activeElement !== slider || toPos(rate) !== Number(slider.value)) slider.value = String(toPos(rate));
     slider.setAttribute('aria-valuetext', rateText(rate));
     bar.classList.toggle('paused', paused);
   }
   const togglePause = () => { paused = !paused; render(); };
   const step = () => { paused = true; stepped = true; render(); };
-  const seekBy = (d) => state.onSeek?.(Math.max(0, now + d));
-  const EPS = 1e-6;
+  // Relative to where the show is heading: a seek in progress (or a key just pressed, not yet taken up by a
+  // frame) has not got there, so a second press adds to the first instead of going from the time part-way.
+  const seekBy = (d) => { heading = Math.max(0, heading + d); state.onSeek?.(heading); };
   // The next snap point above (dir 1) or below (-1) the rate; none past the ends.
   const stepRate = (dir) => {
     const next = dir > 0 ? SNAPS.find((r) => r > rate * (1 + EPS)) : SNAPS.findLast((r) => r < rate * (1 - EPS));
@@ -122,7 +134,6 @@ export function createClock({ lab, params, seed }) {
   pauseBtn.addEventListener('click', togglePause);
   stepBtn.addEventListener('click', step);
   rateBtn.addEventListener('click', () => setOpen(pop.hidden));
-  resetBtn.addEventListener('click', () => { rate = 1; render(); });
   slider.addEventListener('input', () => {
     let p = Number(slider.value);
     const near = SNAPS.map(toPos).find((q) => Math.abs(q - p) < SNAP_PULL);

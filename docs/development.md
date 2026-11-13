@@ -180,8 +180,9 @@ to tune settings on one moment or to reach a late part of the show:
 - **Speed** (`[` slower, `]` faster, or the button): the button shows the
   rate (`x0.25`, `x1`, `x12`) and opens a small popover with a slider on a
   log scale from x0.1 to x30, which sticks to the snap points 0.1, 0.25,
-  0.5, 1, 2, 4, 12 and 30, and a reset to x1. The keys step through the snap
-  points. A frame advances the show by at most 0.05 s times the speed, so
+  0.5, 1, 2, 4, 12 and 30, and a button for each of them (two rows on a
+  narrow screen; the current rate's is marked). The keys step through the
+  snap points. A frame advances the show by at most 0.05 s times the speed, so
   in slow motion a frame is tiny but never zero: the easings, the waves
   and the sway all work on that dt, and the sound follows the state as it
   is. Above x4 the waves that come by themselves ring no bell; the pad's
@@ -190,7 +191,9 @@ to tune settings on one moment or to reach a late part of the show:
   30 s; the same as buttons in the speed popover, which also has a
   scrubber over the time played so far): the show goes to that time, and
   shows the same picture it had there (same forms, colours, weather,
-  direction, camera), within the limits below. Paused, the frame is drawn
+  direction, camera), within the limits below. A key pressed while a seek
+  is still going on moves from where that seek is heading (its target), so
+  two presses in a row add up. Paused, the frame is drawn
   at once. The clock's keys (`Space`, `.`, `[`, `]`, `h`, the arrows) work wherever
   the focus is, the settings panel too, and do not scroll it: Space pauses
   and does not press a focused button or open a focused select (`Enter`
