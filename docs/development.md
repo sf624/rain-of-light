@@ -45,19 +45,60 @@ reload.
 | `og-image.jpg` | the picture shown when the link is shared (1200x630) |
 | `sw.js` | the service worker: network first, cached files when offline (add new files to its list) |
 | `docs/` | these documents; the README's GIFs; `img/`, the pictures of the settings guide |
-| `tools/` | the capture tools for the GIFs and the docs' pictures, and `story-stats.mjs` (see below) |
+| `tools/` | the capture tools for the GIFs and the docs' pictures, `story-stats.mjs` (see below), and `build-site.sh`, which assembles the Pages site (see Version) |
 | `test/smoke.mjs` | the smoke test (see Test) |
+| `test/site.mjs` | the site test: the assembled site, with a preview (see Previews of pull requests) |
 | `test/render-audio.mjs` | renders the page's sound to a WAV file, for listening and measuring (see Test) |
-| `.github/workflows/` | `test.yml` runs the smoke test; `pages.yml` deploys the site |
+| `.github/workflows/` | `test.yml` runs the smoke and site tests; `pages.yml` deploys the site; `pr-preview.yml` redeploys it when a pull request changes |
 
 ## Version
 
 The link to this repository and the short commit hash being served are at
 the bottom of the settings panel. GitHub Pages deploys through
-`.github/workflows/pages.yml`. It copies only what the page loads (the page,
-the modules, the manifest, the icons, `og-image.jpg`, `sw.js`) and writes
+`.github/workflows/pages.yml`, which assembles the site with
+`tools/build-site.sh`. It copies only what the page loads (the page, the
+modules, the manifest, the icons, `og-image.jpg`, `sw.js`) and writes
 `version.json` (the commit and its date) into the site. That file is not
 committed, so a local server shows only the link.
+
+### Previews of pull requests
+
+Each open pull request from a branch of this repository has a preview:
+`https://sf624.github.io/rain-of-light/pr/<number>/` (the viewer) and
+`…/pr/<number>/lab.html` (the lab). A comment on the pull request links
+them; it is made once and then edited in place. Pull requests from forks
+get none: their code would run on the site's origin.
+
+- **What**: the pull request's head, copied by the same rule as main (so a
+  new module is included), except `sw.js`. Its `version.json` also has the
+  pull request's number; the panel links the head commit.
+- **When**: every deploy builds main and every open pull request again. A
+  pull request that opens, gets a push, reopens or closes runs
+  `pr-preview.yml`, which runs `pages.yml` on main (the `github-pages`
+  environment deploys only from main). A push to main deploys too. A
+  preview goes away at the first deploy after its pull request closes. One
+  deploy runs at a time; a newer one waits, and reads the pull requests
+  when it starts, so the last deploy has the newest heads. A deploy takes
+  about a minute.
+- **Service worker**: a preview registers none (`boot.js` skips it on a
+  page in `pr/<n>/`, and the preview has no `sw.js`), and the site's
+  service worker leaves `pr/` to the network (`sw.js`). So no service
+  worker serves or keeps a preview's files, and a preview leaves none
+  behind. A change to `sw.js` can only be tried locally. A branch made
+  before this rule still tries to register `sw.js` there: that fails (404,
+  shown in the console) and does no harm.
+- **Shared origin**: a preview runs on the same origin as the site, so it
+  shares its saved settings (local storage) with the live pages.
+- **Size**: each copy is about 0.5 MB; the Pages limit (1 GB) is far away.
+
+`node test/site.mjs [ROOT_COMMIT [N=COMMIT ...]]` (default: `HEAD 1=HEAD`)
+builds the site from those commits, checks the tree (the files, the
+links, `version.json`), and opens it under `/rain-of-light/` in headless
+Chrome: the root's service worker installs, and each preview loads with no
+error, loads only its own files, registers no service worker and is not
+cached. It reads commits, not the working tree: commit first. Keep `TMPDIR`
+short (Chrome's socket path is limited to 107 bytes). GitHub Actions runs it
+with the smoke test.
 
 ## Test
 
@@ -319,4 +360,5 @@ often each form comes. With and without the story.
 the network fails, it answers from that copy. It precaches a list of files
 on install, so that one visit is enough to work offline: add a new module or
 asset to that list. The docs and the GIFs are not on it; the page does not
-load them.
+load them. It leaves the previews of pull requests (`pr/`) to the network
+(see Previews of pull requests).

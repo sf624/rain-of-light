@@ -1,5 +1,10 @@
-# Deploys the site to GitHub Pages and stamps version.json with the commit.
-# (Repository settings: Pages > Source = GitHub Actions.)
+# Deploys the site to GitHub Pages: main at the root, and a preview of each
+# open pull request from a branch of this repository under pr/<n>/ (see
+# "Previews of pull requests" in docs/development.md). Each copy has its
+# version.json (the commit and its date).
+# (Repository settings: Pages > Source = GitHub Actions. The github-pages
+# environment deploys only from main, so this runs on main only: on a push,
+# or dispatched by pr-preview.yml when a pull request changes.)
 name: pages
 
 on:
@@ -7,37 +12,96 @@ on:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+permissions: {}
 
-# Never cancel a deploy that is running; a newer one waits its turn.
+# Never cancel a deploy that is running; a newer one waits its turn, and
+# replaces any run still waiting. Each run reads the open pull requests and
+# their heads when it starts, so the last run deploys the newest state.
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: read
+      pages: read
+      pull-requests: read
+    outputs:
+      previews: ${{ steps.build.outputs.previews }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/configure-pages@v6
       - name: Build the site directory
+        id: build
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir _site
-          # Only what the page, the manifest and the service worker load.
-          cp index.html lab.html style.css manifest.webmanifest favicon.svg og-image.jpg sw.js ./*.js _site/
-          cp -r icons _site/icons
-          printf '{"sha":"%s","date":"%s"}\n' "$GITHUB_SHA" \
-            "$(git log -1 --format=%cI "$GITHUB_SHA")" > _site/version.json
+          # Only pull requests whose head is a branch of this repository: a
+          # fork's code would be served from this site's origin.
+          list=$(gh api "repos/$GITHUB_REPOSITORY/pulls?state=open&per_page=100" --paginate \
+            --jq '.[] | select(.head.repo.full_name == "'"$GITHUB_REPOSITORY"'") | "\(.number)=\(.head.sha)"')
+          mapfile -t prs < <(printf '%s' "$list")
+          # Reads each head from git by its SHA and copies its files; runs none of them.
+          tools/build-site.sh _site "$GITHUB_SHA" "${prs[@]}"
           cat _site/version.json
+          shopt -s nullglob
+          previews=$(for v in _site/pr/*/version.json; do jq -r '"\(.pr)=\(.sha)"' "$v"; done | tr '\n' ' ')
+          echo "previews=$previews" | tee -a "$GITHUB_OUTPUT"
+          du -sh _site
       - uses: actions/upload-pages-artifact@v5
         with:
           path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v5
+
+  # One comment per pull request with its preview's links, made once and then
+  # edited in place (found by its first line, a hidden marker).
+  comment:
+    needs: [build, deploy]
+    if: needs.build.outputs.previews != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Link each preview from its pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PREVIEWS: ${{ needs.build.outputs.previews }}
+          SITE: ${{ needs.deploy.outputs.page_url }}
+        run: |
+          marker='<!-- pages-preview -->'
+          for p in $PREVIEWS; do
+            n=${p%%=*} sha=${p#*=}
+            body=$(printf '%s\nPreview of %s: [viewer](%spr/%s/) · [lab](%spr/%s/lab.html)\n\nIt follows each push, and goes away when the pull request closes.' \
+              "$marker" "${sha:0:7}" "$SITE" "$n" "$SITE" "$n")
+            if ! ids=$(gh api "repos/$GH_REPO/issues/$n/comments" --paginate \
+              --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id"); then
+              echo "::warning::pr $n: could not read its comments"
+              continue
+            fi
+            id=${ids%%$'\n'*}
+            if [ -z "$id" ]; then
+              gh api "repos/$GH_REPO/issues/$n/comments" -f body="$body" --silent || echo "::warning::pr $n: could not comment"
+            elif [ "$(gh api "repos/$GH_REPO/issues/comments/$id" --jq .body)" != "$body" ]; then
+              gh api -X PATCH "repos/$GH_REPO/issues/comments/$id" -f body="$body" --silent || echo "::warning::pr $n: could not edit comment $id"
+            fi
+          done

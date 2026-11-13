@@ -23,3 +23,5 @@ jobs:
           node-version: 22
       - name: Smoke test in headless Chrome
         run: node test/smoke.mjs
+      - name: Site test (the Pages site with a preview) in headless Chrome
+        run: node test/site.mjs

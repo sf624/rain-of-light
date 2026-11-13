@@ -25,9 +25,15 @@ self.addEventListener('activate', (e) => {
   e.waitUntil(self.clients.claim());
 });
 
+// The previews of pull requests (pr/<n>/ under this scope, see
+// docs/development.md) are left to the network: neither served from this
+// cache nor stored in it.
+const PREVIEWS = new URL('pr/', self.registration.scope).pathname;
+
 self.addEventListener('fetch', (e) => {
   const req = e.request;
-  if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
+  const url = new URL(req.url);
+  if (req.method !== 'GET' || url.origin !== location.origin || url.pathname.startsWith(PREVIEWS)) return;
   e.respondWith(
     // no-cache: revalidate, so the host's max-age does not delay an update.
     fetch(req, { cache: 'no-cache' })

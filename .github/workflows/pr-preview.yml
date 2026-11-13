@@ -1,0 +1,46 @@
+# Redeploys the site (pages.yml, on main) when a pull request from a branch of
+# this repository opens, changes or closes, so that its preview under pr/<n>/
+# appears, follows its head and goes away (see "Previews of pull requests" in
+# docs/development.md).
+#
+# Why pull_request_target, and why it is safe here. The github-pages
+# environment deploys only from main (and gh-pages); a pull_request run has the
+# pull request's ref, so it could not deploy. pull_request_target runs this file
+# as it is on the base branch, with a token that can write. This job checks out
+# nothing and runs no code of the pull request: it only asks GitHub to run
+# pages.yml on main, with fixed arguments (no text of the pull request reaches
+# the shell). pages.yml then reads each head from git by its SHA and copies its
+# files as static files. It dispatches rather than deploys itself because a
+# stacked pull request's base is another branch, whose runs the environment
+# refuses.
+#
+# This file takes effect only on the base branch: once it is on main (and, for
+# a stacked pull request, on the branch below it).
+name: pr preview
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, closed]
+
+permissions: {}
+
+concurrency:
+  group: pr-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  redeploy:
+    # A fork's pull request is never published: its code would be served from
+    # this site's origin.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Run the pages workflow on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BRANCH: ${{ github.event.repository.default_branch }}
+        run: gh workflow run pages.yml --ref "$BRANCH"
