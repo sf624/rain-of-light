@@ -543,9 +543,8 @@ Query: `t=30` with `scene=rain&flow=down`, `scene=rain&flow=across`; and
 
 - Sideways rain glitters. Each LED flashes as a drop crosses its strand,
   as bright as a falling drop's head, and fades within about a tenth of a
-  second; each flashes at its own strength and moment, and now and then
-  one glints brighter, with long rays. The trail behind the drop twinkles.
-  So the field sparkles as it flows, instead of sliding evenly.
+  second; all flash alike. Near, the flashes are crisp, with rays; far
+  away they are softer and longer, so the far room is a calm, even field.
 - In the whole show, about one rain passage in seven is a drift (a passage
   of half a minute or so), always between two form passages. A rain keeps
   its direction for its whole life, and falling and sideways rain never
