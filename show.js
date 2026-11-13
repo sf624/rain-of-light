@@ -168,7 +168,7 @@ function createTimeline(seed, pool, name, mood) {
     return w && w.from <= t && t < w.end ? { toward: 1, angle: w.angle } : { toward: 0, angle: 0 };
   }
   // When the next passage begins (after t).
-  const upcoming = (t) => { extend(t); return next; };
+  const upcoming = (t) => { extend(t); return list.find((p) => p.start > t)?.start ?? next; };
   return { at, passage, flowAt, upcoming };
 }
 
@@ -361,7 +361,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
     shown.clear();
     for (const [id, s] of copyShown(d.shown)) shown.set(id, s);
   };
-  const reset = () => load({ rainNow: null, shift: 0, skyShown: 0, shown: [] });
+  const reset = () => load({ rainNow: null, shift, skyShown: 0, shown: [] });   // (the colour key stays: it is not part of the show's time)
 
   // For the lab's readout: what the show plays now, read from its state (nothing is worked out for it every frame).
   // passage / next: the timeline's passage at t and when the next begins (none for the rain scene, or a held form);

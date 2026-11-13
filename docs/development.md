@@ -135,8 +135,10 @@ to tune settings on one moment or to reach a late part of the show:
   30 s; the same as buttons in the speed popover, which also has a
   scrubber over the time played so far): the show goes to that time, and
   shows the same picture it had there (same forms, colours, weather,
-  direction, camera). Paused, the frame is drawn at once. The arrow keys
-  are ignored while a button, slider or field has the focus.
+  direction, camera), within the limits below. Paused, the frame is drawn
+  at once. The arrow keys work while a button has the focus (after a click
+  on it); they are left to a focused slider, select or text field. `Escape`
+  closes the speed popover and gives the focus back to its button.
 - **Time**: `t 123.4 s`, the show's clock. Clicking it copies a link to the
   lab at that moment (`t=`, `seed=` and `pause=1`), to note it.
 
@@ -145,8 +147,10 @@ to tune settings on one moment or to reach a late part of the show:
 `t=` makes the state of that time as a seek does (below), so the link shows
 the same picture as the show had there with the same seed; on the viewer
 page it starts the camera, the rain's fall and the sky from that time, and
-weather and colours that were easing are at their goals instead. The viewer
-page has no clock; its frame loop is unchanged.
+weather and colours that were easing are at their goals instead. The lab's
+times run from 0 to 24 h (86400 s): a later `t=` or seek goes to 24 h, and
+one that is not a number (`t=Infinity`) is no time (0 for `t=`, ignored for
+a seek). The viewer page has no clock; its frame loop is unchanged.
 
 ### How a seek makes a moment again
 
@@ -155,34 +159,56 @@ made from the seed, so what they hold at a time needs no history. What
 carries from frame to frame is the state in `main.js`: the easings of the
 weather, colours, direction, forms (`show.update`) and camera move, the
 two sways (rain, and the gap between waves), the waves, the sky, the
-breath and the rain's fall (`saveState`). `advance(dt)` steps all of
-it without drawing or sound. In the lab every random number of the show
-comes from the seed (`createRandom` in `sway.js`), so the state at a time
-follows from the seed and the settings alone.
+breath, the rain's fall and the count of the rain's sideways turns
+(`saveState`). `advance(dt)` steps all of it without drawing or sound. In
+the lab every random number of the show comes from the seed
+(`createRandom` in `sway.js`; the way sideways rain takes comes from the
+count of turns, not from the time), so the state at a time follows from the
+seed and the settings alone. With no `seed=` the page picks one at random
+once, and keeps it for the session; the HUD shows it, and the time link
+carries it.
 
-A seek back sets the state up at 0 (or loads the nearest snapshot) and
-steps it on in steps of 0.05 s, the longest step a frame takes, leaving a
-snapshot every 30 s of the show; a seek forward steps on from where the
-show is. So each moment is made the same way however it is reached. The
-cost is about 8 microseconds per step, measured in Chrome: a seek of 60 s
-takes about 10 ms, of 10 min about 0.11 s, of 1 h about 0.6 s once, and
-at most 30 s of steps (about 5 ms) from a snapshot after that (the HUD's `seek` row shows the last
-one). The sound does not burst: the waves a seek makes ring no bell, and
-the rain, the forms and the breath move to their new state as they always
-do, over a second or so; the pad's chords go on by the real clock.
+A seek sets the state up at 0, or loads the latest snapshot at or before
+its time, and steps on in steps of 0.05 s (the longest step a frame takes;
+the last step is shorter when less is left) without drawing; a seek forward
+steps on from the state as it is. A snapshot is taken the first time the
+show's time passes each 60 s, while playing or in a replay, up to 1500 of
+them (24 h; about 25 MB at most), so a seek takes at most 60 s of steps,
+about 10 ms. Without one (after a change of setting, which drops them) it takes
+8 microseconds per step, measured in
+Chrome: about 0.11 s for 10 min, 0.6 s for 1 h. A seek is done in slices of
+about 8 ms per frame (more when the frames are slow), so the page never
+freezes: the readout shows `seeking 40%` when one takes over 100 ms, and a
+new seek or a change of setting begins it anew. Changing a setting, the
+colour key (`c`) or skipping an episode with a key (`w`, `c`, `v` while
+the setting is auto) drops the snapshots.
 
-Limits: a seek uses the settings as they are now (changing the scene,
-the colour story or a form while playing, and seeking back, shows the show
-with the new setting from the start), and the keys `w`, `c`, `v`, `d` and
-the clicks are not replayed (the waves from clicks are gone after a seek
-back). A moment reached by playing frames of 0.05 s (as the capture tools step)
-is the same as the one a seek makes, number for number. With other frame
-lengths the easings agree closely but not to the last digit: they do not
-depend on the step for a goal that holds, and a goal changes at a step's
-edge. `window.__lab.state()` and `window.__lab.seek(t)` give the
-tests the whole state as text and a seek.
-Playing backwards is not offered: it would mean a seek every frame, and
-the eased state (a form's weight, the colours going over) has no inverse.
+Equality: seeking to a time twice gives the same state number for number
+(checked on the whole saved state, for a rain moment, a form moment, one
+in a transition, with Direction = across, after a colour key, and with the
+mouse dragged between the two seeks), and seeking forward from a moment
+equals seeking there from 0. A moment reached by playing frames of 0.05 s
+(as the capture tools step) equals the seek's number for number; at other
+frame lengths the easings agree closely but not to the last digit (they do
+not depend on the step for a goal that holds, and a goal changes at a
+step's edge), and a snapshot taken while playing carries that difference.
+The sound does not burst: the waves a seek makes ring no bell, and the
+rain, the forms and the breath move to their new state as they always do,
+over a second or so; the pad's chords go on by the real clock.
+`window.__lab.state()` and `window.__lab.seek(t)` give the tests the whole
+state as text and a seek.
+
+Limits: a seek uses the settings as they are now (change the scene, the
+colour story or a form, and a seek back shows the show with the new
+setting from the start), and the colour key counts as a setting: all of
+the show, past and future, has its colours after a key press. The pointer
+is not replayed: a seek steps with a neutral pointer (and with the canvas
+as it is now, whose shape sets the camera's distance), so a view dragged
+with the mouse is only seen again as the live frames apply it. A skipped
+episode stays skipped. Clicks make waves that a seek back does not bring
+back. Playing backwards is not offered: it would mean a seek every
+frame, and the eased state (a form's weight, the colours going over) has
+no inverse.
 
 ### The readout (HUD)
 

@@ -287,11 +287,12 @@ async function visit(cdp, base, query, interact, full = false) {
   const clockText = () => evalJs(`document.querySelector('.clock-time')?.textContent ?? ''`);
   const press = (key) => evalJs(`dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)} }))`);
   if (lab && query.includes('pause=1')) {
-    if (await clockText() !== 't 20.0 s') fail(`[${label}] the paused clock reads ${await clockText()}, not t 20.0 s`);
+    const t0text = query.includes('t=Infinity') ? 't 0.0 s' : 't 20.0 s';   // (a start time that is not a number is no time)
+    if (await clockText() !== t0text) fail(`[${label}] the paused clock reads ${await clockText()}, not ${t0text}`);
     await framesAfter(await evalJs('window.__frames'), 'while paused');
-    if (await clockText() !== 't 20.0 s') fail(`[${label}] the show moved while paused: ${await clockText()}`);
+    if (await clockText() !== t0text) fail(`[${label}] the show moved while paused: ${await clockText()}`);
     await press(' ');
-    await poll(`the show clock to run after Space [${label}]`, async () => await clockText() !== 't 20.0 s', { tick: () => check('after Space') });
+    await poll(`the show clock to run after Space [${label}]`, async () => await clockText() !== t0text, { tick: () => check('after Space') });
     await press(' ');
     const held = await clockText();
     await framesAfter(await evalJs('window.__frames'), 'after pausing again');
@@ -306,6 +307,7 @@ async function visit(cdp, base, query, interact, full = false) {
     await evalJs(`document.querySelector('.clock-rate').click()`);
     if (await evalJs(`document.querySelector('.clock-pop').hidden`)) fail(`[${label}] the speed button did not open its popover`);
     await press('Escape');
+    if (!(await evalJs(`document.querySelector('.clock-pop').hidden`))) fail(`[${label}] Escape did not close the speed popover`);
     // Seek: the arrow keys go 5 s (30 s with Shift) forward and back, paused, and the picture is drawn again each time.
     const arrow = (key, shift = false) => evalJs(`dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, shiftKey: ${shift} }))`);
     const at = () => evalJs(`window.__frames`);
@@ -321,6 +323,13 @@ async function visit(cdp, base, query, interact, full = false) {
     await seekTo('ArrowRight', false, `t ${(x + 5).toFixed(1)} s`);
     await seekTo('ArrowLeft', true, `t ${Math.max(0, x - 25).toFixed(1)} s`);   // 30 s back, from x + 5
     await seekTo('ArrowRight', true, `t ${(Math.max(0, x - 25) + 30).toFixed(1)} s`);
+    // A button that has the focus (after a click on it) keeps the arrows for the seek.
+    {
+      const f = await at();
+      await evalJs(`(() => { const b = document.querySelector('.clock-step'); b.focus(); b.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })); })()`);
+      await poll(`the arrow key to seek with a button focused [${label}]`, async () => await clockText() === `t ${((Math.max(0, x - 25) + 30) - 5).toFixed(1)} s`, { tick: () => check('while seeking') });
+      await framesAfter(f, 'after a seek with a button focused');
+    }
     // The readout (HUD): h shows it with the seed, h hides it again.
     await press('h');
     const hud = await poll(`the HUD to show its rows [${label}]`, async () => { const r = await evalJs(`(() => { const h = document.querySelector('.hud'); return h && !h.hidden ? h.textContent : ''; })()`); return r.includes('seed') ? r : null; }, { tick: () => check('while the HUD opens') });
@@ -368,6 +377,7 @@ await visit(cdp, base, '#tune', false);
 // The pinned scenes (the rain in the lab), and the mix part-way through (a form, rain going or coming).
 await visit(cdp, base, 'lab.html?scene=rain', true);
 await visit(cdp, base, 'lab.html?pause=1&t=20&scene=rain', false);   // the lab's clock
+await visit(cdp, base, 'lab.html?pause=1&t=Infinity&scene=rain', false);   // a start time that is no number
 await visit(cdp, base, '?scene=crystal', true);
 await visit(cdp, base, '?seed=7&t=100', false);
 await visit(cdp, base, '?seed=7&t=100&story=off', false);   // without the colour story

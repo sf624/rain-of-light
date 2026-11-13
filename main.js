@@ -370,7 +370,7 @@ addEventListener('keydown', (e) => {
   if (e.key === 'f') controls.toggleFullscreen(); // full screen
   if (e.key === 'r') rotation.toggle();         // landscape / portrait
   if (e.key === 'w') step('weather', WEATHER);   // next weather
-  if (e.key === 'c') { step('color', COLOR_MODES); show.recolor(); } // next colour, of the rain and the forms
+  if (e.key === 'c') { step('color', COLOR_MODES); show.recolor(); snaps.clear(); } // next colour, of the rain and the forms
   if (e.key === 'd') {                           // switch direction (and hold it)
     tuner.set('flow', flowOf(flowGoal) ? 'down' : 'across');
     tuner.refresh();
@@ -380,7 +380,7 @@ addEventListener('keydown', (e) => {
 });
 // A key moves on to another episode while the setting is auto, else to the next choice.
 function step(key, list) {
-  if (S[key] === 'auto') { trackOf(key).skip(time); return; }
+  if (S[key] === 'auto') { trackOf(key).skip(time); snaps.clear(); return; }   // (the lab's snapshots hold the old track)
   const i = list.findIndex((x) => x.name === S[key]);
   tuner.set(key, list[(i + 1) % list.length].name);
   tuner.refresh();
@@ -392,7 +392,9 @@ function hideOverlay() {
   overlay.classList.add('hidden');
 }
 
-const START = Number(params.get('t')) || 0;
+const MAX_T = 86400;     // the lab's last time: 24 h (a seek or ?t= beyond it goes to it)
+const clampT = (t) => (Number.isFinite(t) ? Math.min(MAX_T, Math.max(0, t)) : 0);
+const START = lab ? clampT(Number(params.get('t'))) : Number(params.get('t')) || 0;
 let time = START;
 // The lab draws every random number of the show from the seed, so that a moment can be
 // made again (see seekTo); the viewer page keeps Math.random.
@@ -417,7 +419,8 @@ const densityGoal = [1, 1];
 // setting; a change never shows both at once (see direction.js).
 const flowOf = (flow) => { const f = FLOWS.find((x) => x.name === forced('flow')); return f ? f.toward : flow.toward; };
 let flowGoal = { toward: 0, angle: 0 };     // the show's direction now (see show.js, flowAt)
-let flowDir = [0, 1];                       // the way the sideways rain flows: a new one each time it begins
+let flowDir = [0, 1];
+let flowTurns = 0;                          // the lab: how many times a rain began with its own way                       // the way the sideways rain flows: a new one each time it begins
 let direction = null;
 // The rain's colours: two looks, and each strand shows one of them. A new
 // colour episode is written to the look that is out of sight, and the strands
@@ -537,7 +540,10 @@ function skyColors() {
 let rebuildTimer = 0;
 function apply(key) {
   settle = 3;
-  if (key !== 'volume') snaps.clear();   // the lab's snapshots were made with the old setting (see seekTo)
+  if (key !== 'volume') {
+    snaps.clear();   // the lab's snapshots were made with the old setting (see startSeek)
+    if (job) { const t = job.target; initState(0); startSeek(t); }
+  }
   if (['leds', 'aspect', 'grid', 'rows', 'layout', 'jitter'].includes(key)) {
     clearTimeout(rebuildTimer);
     rebuildTimer = setTimeout(buildLattice, 250); // wait for the slider to settle
@@ -571,7 +577,7 @@ function ease(dt, edt = dt) {   // edt: the time the easings take (dt, or long w
   look.rain += (weather.rain - look.rain) * kw;
   if (direction.update(edt, flowOf(flowGoal), look.flow) === 1) {
     // (With the setting the way is the show's next one, or one from the seed.)
-    const a = flowGoal.toward ? flowGoal.angle : hash(SEED * 5.3 + time) * Math.PI * 2;
+    const a = flowGoal.toward ? flowGoal.angle : hash(SEED * 5.3 + (lab ? 7.31 * ++flowTurns : time)) * Math.PI * 2;   // (the lab counts the turns: the same way however the steps fall)
     flowDir = [Math.cos(a), Math.sin(a)];
   }
   const kd = 1 - Math.exp(-edt / 5.0); // density drifts slowly
@@ -614,9 +620,10 @@ function placeImages() {
 // ---------- frame ----------
 // One step of the show's state, without drawing or sound: the camera, the waves that come by
 // themselves, the director's episodes, the easings, the show. dt: the show's time that goes by;
-// edt: the time the easings take (see frame); quiet: no bell for a wave (a replay).
+// edt: the time the easings take (see frame); replay: stepping to a time (no bell for a wave, and a
+// neutral pointer, so that a time comes out the same whatever the mouse did).
 let viewM = null, projM = null, lastFit = null;
-function advance(dt, edt, quiet = false) {
+function advance(dt, edt, replay = false) {
   camClock += dt * SPEED * (S.orbit / DEFAULTS.orbit); // integrated: a new speed never jumps
   camBlend = Math.min(1, camBlend + edt / CAMERA_BLEND);
   const kb = smooth(camBlend);
@@ -637,10 +644,11 @@ function advance(dt, edt, quiet = false) {
   dir = Math.hypot(...dir) > 1e-3 ? norm(dir) : lastDir;
   lastDir = dir;
   // The pointer turns the whole view about the centre and raises or lowers the eye.
-  const yaw = pointer.sx * 0.7, cy = Math.cos(yaw), sy = Math.sin(yaw);
+  const px = replay ? 0 : pointer.sx, py = replay ? 0 : pointer.sy;
+  const yaw = px * 0.7, cy = Math.cos(yaw), sy = Math.sin(yaw);
   const turn = (v) => [v[0] * cy + v[2] * sy, v[1], -v[0] * sy + v[2] * cy];
   eye = turn(eye);
-  eye[1] -= pointer.sy * 2.0;
+  eye[1] -= py * 2.0;
   dir = turn(dir);
   eye[1] = Math.max(FLOOR + 0.4, eye[1]);          // above the floor, looking a little up
   dir = norm([dir[0], dir[1] + fit.pitch, dir[2]]);
@@ -655,7 +663,7 @@ function advance(dt, edt, quiet = false) {
   // A wave now and then, somewhere in the field.
   if (S.ripples > 0 && time > nextAuto) {
     const where = (i) => hash(SEED + ++autoWaves * 5.71 + i) - 0.5;   // from the seed, like the rest of the show
-    addRipple(where(1) * SPAN * 0.6, where(2) * HEIGHT * 0.5, where(3) * SPAN * 0.6, time, quiet || clock.rate > 4);   // a fast show rings no bells for them, nor does a seek
+    addRipple(where(1) * SPAN * 0.6, where(2) * HEIGHT * 0.5, where(3) * SPAN * 0.6, time, replay || clock.rate > 4);   // a fast show rings no bells for them, nor does a seek
     // While waves repaint the field, they come more often.
     // The gaps sway with 1/f fluctuation: about half to twice the setting.
     const every = colorMode.name === 'repaint' ? Math.min(S.ripples, 6) : S.ripples;
@@ -675,11 +683,15 @@ function advance(dt, edt, quiet = false) {
 // The show's timeline and the director's tracks are made from the seed, so they need no state. What
 // carries from frame to frame is listed here: the easings (weather, colours, direction, forms, camera
 // move), the sways, the waves, the sky, the breath (see saveState). A moment can be made again by
-// setting the state up at 0 and stepping it on, without drawing, in steps of REPLAY_STEP: the lab
-// does so for ?t= and for a seek back. Steps are cheap, and a snapshot every SNAP_EVERY s of the show
-// (made on the way) keeps a seek short. The settings (the scene, the colours' story ...) are those of now.
+// bringing back a snapshot from before it (or setting the state up at 0) and stepping it on, without
+// drawing, in steps of REPLAY_STEP: the lab does so for ?t= and for a seek back. A snapshot is taken
+// the first time the show's time passes each SNAP_S, in play or in a replay, so a seek is short.
+// A seek is time-sliced over frames, so that a long one never freezes the page. The settings (the
+// scene, the colours' story ...) and the colour key (c) are those of now; a pointer is not replayed.
 const REPLAY_STEP = 0.05;     // s of the show per step: the longest step a frame takes
-const SNAP_EVERY = 600;       // steps (30 s) between snapshots
+const SNAP_S = 60;            // s of the show between snapshots
+const MAX_SNAPS = 1500;       // at most this many snapshots (25 h of show; about 25 MB)
+const SLICE_MS = 8;           // ms a frame gives to a seek in progress
 function initState(t0) {
   time = t0;
   nextAuto = time + 2; autoWaves = 0;
@@ -699,6 +711,7 @@ function initState(t0) {
   rainSway = createSway({ fastest: 2, octaves: 6, random: randomFor(2) });
   sway = 0;
   breathPhase = 0;
+  flowTurns = 0;
   show.reset();
   flowGoal = show.flow(time);
   direction = createDirection(flowOf(flowGoal));
@@ -710,7 +723,7 @@ function saveState() {
   return {
     ...structuredClone({
       time, nextAuto, autoWaves, ripples: [...ripples], rippleIndex, look, bandShift, sway, densityGoal,
-      goals, looks, side, sideNow, flowGoal, flowDir, skyClock, breathPhase, camBlend, camFrom, camW, camClock, lastDir,
+      goals, looks, side, sideNow, flowGoal, flowDir, flowTurns, skyClock, breathPhase, camBlend, camFrom, camW, camClock, lastDir,
       gap: rippleGap.save(), rain: rainSway.save(), direction: direction.save(),
     }),
     show: show.save(), episode: { ...episode }, weather, colorMode, camMode,
@@ -718,7 +731,7 @@ function saveState() {
 }
 function loadState(d) {
   const c = structuredClone({ ...d, show: null, episode: null, weather: null, colorMode: null, camMode: null });
-  ({ time, nextAuto, autoWaves, rippleIndex, look, bandShift, sway, side, sideNow, flowGoal, flowDir, skyClock, breathPhase, camBlend, camFrom, camClock, lastDir } = c);
+  ({ time, nextAuto, autoWaves, rippleIndex, look, bandShift, sway, side, sideNow, flowGoal, flowDir, flowTurns, skyClock, breathPhase, camBlend, camFrom, camClock, lastDir } = c);
   ripples.set(c.ripples);
   densityGoal.splice(0, 2, ...c.densityGoal);
   goals.splice(0, 2, ...c.goals); looks.splice(0, 2, ...c.looks);
@@ -729,43 +742,54 @@ function loadState(d) {
   Object.assign(episode, d.episode);
   ({ weather, colorMode, camMode } = d);
 }
-const snaps = new Map();      // k -> the state after k * SNAP_EVERY steps, made on the way by a replay from 0
-let seekMs = 0, replayed = 0;             // steps the last seek took (for the readout)
-// From the state after step n0 on to `target`, leaving a snapshot every SNAP_EVERY steps.
-function replayFrom(n0, target) {
-  const whole = Math.floor(target / REPLAY_STEP + 1e-9);
-  for (let n = n0 + 1; n <= whole; n++) {
-    time += REPLAY_STEP;   // (summed like the frames' time, so a frame at 0.05 s and a step are the same)
-    advance(REPLAY_STEP, REPLAY_STEP, true);
-    replayed++;
-    if (n % SNAP_EVERY === 0 && !snaps.has(n / SNAP_EVERY)) snaps.set(n / SNAP_EVERY, saveState());
-  }
-  const rest = target - time;
-  if (whole >= n0 && rest > 1e-6) { time = target; advance(rest, rest, true); replayed++; }
+const snaps = new Map();      // k -> the state when the show's time first passed k * SNAP_S
+let seekMs = 0, replayed = 0;             // the last seek: its time and steps (for the readout)
+function snapshot() {
+  const k = Math.floor(time / SNAP_S);
+  if (k > 0 && !snaps.has(k) && snaps.size < MAX_SNAPS) snaps.set(k, saveState());
 }
-// The show at time t (the lab). Ahead of now: stepped on from the state as it is. Behind: made
-// again from the nearest snapshot before it (or from 0).
-function seekTo(t) {
-  t = Math.max(0, t);
+let job = null;               // the seek in progress: { target, from, began }
+// Begin a seek to time t (the lab). Ahead of now: stepped on from the state as it is. Behind: from
+// the latest snapshot at or before t (or from 0). A time that is not a number is ignored.
+function startSeek(t) {
+  if (!Number.isFinite(t)) return;
+  t = clampT(t);
+  if (t === time) return;   // already there
   replayed = 0;
-  if (t >= time) {
-    while (t - time > REPLAY_STEP + 1e-9) { time += REPLAY_STEP; advance(REPLAY_STEP, REPLAY_STEP, true); replayed++; }
-    const rest = t - time;
-    if (rest > 1e-6) { time = t; advance(rest, rest, true); replayed++; }
-    return;
+  if (t < time) {
+    let k = Math.floor(t / SNAP_S);
+    while (k > 0 && !(snaps.get(k)?.time <= t)) k--;
+    if (k > 0) loadState(snaps.get(k)); else initState(0);
   }
-  let k = Math.floor(t / REPLAY_STEP / SNAP_EVERY);
-  while (k > 0 && !snaps.has(k)) k--;
-  if (k === 0) initState(0); else loadState(snaps.get(k));
-  replayFrom(k * SNAP_EVERY, t);
+  job = { target: t, from: time, began: performance.now() };
+}
+// Step the seek on for about `budget` ms; true when it has arrived. A step is REPLAY_STEP, except the
+// last when less is left (so a time is reached to within a millionth of a second, and the same
+// steps are taken from wherever a seek begins).
+function pumpSeek(budget) {
+  const until = performance.now() + budget;
+  for (;;) {
+    for (let i = 0; i < 100; i++) {
+      const rest = job.target - time;
+      if (rest <= 1e-6) {
+        seekMs = performance.now() - job.began;
+        job = null;
+        return true;
+      }
+      const d = rest > REPLAY_STEP - 1e-6 ? REPLAY_STEP : rest;   // (a whole step unless less is left)
+      time = d === REPLAY_STEP ? time + d : job.target;   // (summed like the frames' time, so a frame of 0.05 s and a step are the same)
+      advance(d, d, true);
+      replayed++;
+      snapshot();
+    }
+    if (performance.now() >= until) return false;
+  }
 }
 let pendingSeek = null;
 clock.onSeek = (t) => { pendingSeek = t; };
 if (lab) {
   initState(0);
-  snaps.set(0, saveState());
-  resize();
-  replayFrom(0, START);
+  startSeek(START);
 } else initState(START);
 
 let last = performance.now();
@@ -815,15 +839,17 @@ function frame(now) {
   if (clock.paused && settle > 0) settle--;
   last = now;
   if (!clock.paused) adapt(rawDt, now);   // a paused picture keeps its render scale
-  if (pendingSeek !== null) {
-    const t0 = performance.now();
-    seekTo(pendingSeek);
-    seekMs = performance.now() - t0;
-    pendingSeek = null;
+  if (pendingSeek !== null) { startSeek(pendingSeek); pendingSeek = null; }
+  let note = '';
+  if (job) {
+    resize();   // (the camera needs the canvas's shape)
+    const from = job.from, target = job.target, began = job.began;
+    pumpSeek(Math.max(SLICE_MS, Math.min(250, rawDt * 500)));   // (a slow frame can give more)
+    if (job && performance.now() - began > 100) note = `seeking ${Math.round(100 * (time - from) / Math.max(1e-9, target - from))}%`;
     dt = 0; edt = clock.paused && settle > 0 ? 1e3 : 0;   // the frame of a seek shows the moment itself
     settleUntil = performance.now() + SETTLE_MS;   // a seek's frame says little about the speed
   } else time += dt;
-  clock.show(time);
+  clock.show(time, note);
   hud.frame(now);
   resize();
 
@@ -831,6 +857,7 @@ function frame(now) {
   pointer.sx += (pointer.x - pointer.sx) * 0.03;
   pointer.sy += (pointer.y - pointer.sy) * 0.03;
   const { shown, breath } = advance(dt, edt);
+  if (lab && !job) snapshot();
   const view = viewM, proj = projM, fit = lastFit;
   const rk = shown.rain;                 // how much rain falls now: 0 a still room .. 1 a rain passage
   placeImages();

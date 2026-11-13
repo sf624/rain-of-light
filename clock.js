@@ -88,10 +88,10 @@ export function createClock({ lab, params, seed }) {
       if (stepped) { stepped = false; return STEP * rate; }
       return paused ? 0 : dt * rate;
     },
-    show(t) {
+    show(t, note = '') {
       now = t;
       if (t > top) top = t;
-      const s = `t ${t.toFixed(1)} s`;
+      const s = `t ${t.toFixed(1)} s${note ? `  ${note}` : ''}`;
       if (readout.textContent !== s) readout.textContent = s;
       if (!pop.hidden && document.activeElement !== scrub) { scrub.max = String(Math.max(1, top)); scrub.value = String(t); }
     },
@@ -152,8 +152,11 @@ export function createClock({ lab, params, seed }) {
     } else if (e.key === '.') step();   // held, it steps on
     else if (e.key === '[') stepRate(-1);
     else if (e.key === ']') stepRate(1);
-    else if (e.key === 'Escape' && !pop.hidden) setOpen(false);
-    else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !(e.target instanceof HTMLElement && e.target.closest('button, a, input, select, textarea'))) {
+    else if (e.key === 'Escape' && !pop.hidden) {
+      const inside = pop.contains(document.activeElement);
+      setOpen(false);
+      if (inside) rateBtn.focus();   // the focus goes back to the button, not to nowhere
+    } else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !(e.target instanceof HTMLElement && e.target.closest('input, select, textarea'))) {   // (a button keeps the arrows for the seek; a slider, select or field has them for itself)
       e.preventDefault();
       seekBy((e.key === 'ArrowLeft' ? -1 : 1) * (e.shiftKey ? 30 : 5));
     }
