@@ -287,10 +287,34 @@ async function visit(cdp, base, query, interact, full = false) {
   const clockText = () => evalJs(`document.querySelector('.clock-time')?.textContent ?? ''`);
   const press = (key) => evalJs(`dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)} }))`);
   if (lab && query.includes('pause=1')) {
-    const t0text = query.includes('t=Infinity') ? 't 0.0 s' : 't 20.0 s';   // (a start time that is not a number is no time)
+    const tq = Number(new URLSearchParams(query.split('?')[1]).get('t'));
+    const t0text = `t ${(Number.isFinite(tq) ? tq : 0).toFixed(1)} s`;   // (a start time that is not a number is no time)
     if (await clockText() !== t0text) fail(`[${label}] the paused clock reads ${await clockText()}, not ${t0text}`);
     await framesAfter(await evalJs('window.__frames'), 'while paused');
     if (await clockText() !== t0text) fail(`[${label}] the show moved while paused: ${await clockText()}`);
+    if (query.includes('hud=1')) {
+      // A change in the settings while paused shows the same moment again: the HUD's forms row still names the
+      // form at the same weight (here part-way through its coming, where an easing run to its end would show), and the picture shows it.
+      const formsRow = () => evalJs(`[...document.querySelectorAll('.hud-row')].find((r) => r.textContent.startsWith('forms'))?.textContent ?? ''`);
+      const settled = async (what) => {   // (the HUD reads a few times a second: after a frame, give it a moment)
+        await framesAfter(await evalJs('window.__frames'), what);
+        await poll(`the clock to settle at ${t0text} ${what} [${label}]`, async () => await clockText() === t0text, { tick: () => check(what) });
+        await sleep(700);
+        return formsRow();
+      };
+      const before = await settled('before the changes');
+      if (!/ring \d\.\d\d/.test(before)) fail(`[${label}] the HUD names no ring at ${t0text}: ${before}`);
+      const change = (key, value) => evalJs(`(() => { const i = document.querySelector('.tuner-row[data-key=${JSON.stringify(key)}]').querySelector('input, select');
+        i.value = ${JSON.stringify(value)}; i.dispatchEvent(new Event(i.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true })); })()`);
+      for (const [key, value] of [['exposure', '1.2'], ['twinkle', '0.1'], ['color', 'cloud'], ['weather', 'downpour'], ['layout', 'scatter']]) {
+        await change(key, value);
+        const after = await settled(`after ${key}`);
+        if (after !== before) fail(`[${label}] changing ${key} while paused changed the moment: ${before} -> ${after}`);
+        const lit = nonBlackShare(Buffer.from((await s('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+        if (lit < 0.001) fail(`[${label}] the picture is black after changing ${key} while paused`);
+      }
+      await press('h');   // (the HUD off again for the rest)
+    }
     await press(' ');
     await poll(`the show clock to run after Space [${label}]`, async () => await clockText() !== t0text, { tick: () => check('after Space') });
     await press(' ');
@@ -328,6 +352,35 @@ async function visit(cdp, base, query, interact, full = false) {
     await seekBy(() => arrow('ArrowRight', true), 30, 'Shift+ArrowRight');
     // A button that has the focus (after a click on it) keeps the arrows for the seek.
     await seekBy(() => evalJs(`(() => { const b = document.querySelector('.clock-step'); b.focus(); b.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })); })()`), -5, 'ArrowLeft on a focused button');
+    // The clock's keys work with the focus in the settings panel (trusted keys: a native Space or arrow would scroll or move it).
+    // Space pauses and resumes and does not scroll the panel; after a pointer has used a slider the arrows seek; a slider the
+    // focus came to by Tab keeps them to move itself.
+    const trusted = async (key, code, vk) => {
+      for (const type of ['keyDown', 'keyUp']) await s('Input.dispatchKeyEvent', { type, key, code, windowsVirtualKeyCode: vk, ...(key === ' ' && type === 'keyDown' ? { text: ' ' } : {}) });
+    };
+    await press('p');   // the panel
+    if (await evalJs(`document.querySelector('.tuner').hidden`)) fail(`[${label}] p did not open the panel`);
+    const here = await clockText();
+    await evalJs(`document.querySelector('.tuner select').focus()`);
+    await trusted(' ', 'Space', 32);
+    await poll(`Space in the panel to run the clock [${label}]`, async () => await clockText() !== here, { tick: () => check('after Space in the panel') });
+    await trusted(' ', 'Space', 32);
+    const still = await clockText();
+    await framesAfter(await evalJs('window.__frames'), 'after Space in the panel');
+    if (await clockText() !== still || await evalJs(`document.querySelector('.tuner').scrollTop`) !== 0) fail(`[${label}] Space in the panel did not pause the clock without scrolling`);
+    cur = num(still);
+    const where = await evalJs(`(() => { const r = document.querySelector('.tuner input[type="range"]').getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })()`);
+    for (const type of ['mousePressed', 'mouseReleased']) await s('Input.dispatchMouseEvent', { type, x: where[0], y: where[1], button: 'left', clickCount: 1 });
+    if (await evalJs(`!!document.activeElement?.closest('.tuner')`)) fail(`[${label}] a slider kept the focus after the mouse used it`);
+    await seekBy(() => trusted('ArrowLeft', 'ArrowLeft', 37), -5, 'ArrowLeft after a mouse drag on a slider');
+    await evalJs(`dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))`);   // (the focus came by the keyboard)
+    const v0 = await evalJs(`(() => { const i = document.querySelector('.tuner input[type="range"]'); i.focus(); return i.value; })()`);
+    await trusted('ArrowLeft', 'ArrowLeft', 37);
+    await framesAfter(await evalJs('window.__frames'), 'after an arrow on a focused slider');
+    const v1 = await evalJs(`document.querySelector('.tuner input[type="range"]').value`);
+    if (Number(v1) >= Number(v0) || Math.abs(num(await clockText()) - cur) > 0.15) fail(`[${label}] an arrow on a slider reached by Tab: slider ${v0} -> ${v1}, clock ${cur} -> ${await clockText()}`);
+    await evalJs(`document.activeElement.blur()`);
+    await press('p');   // the panel closes
     // The readout (HUD): h shows it with the seed, h hides it again.
     await press('h');
     const hud = await poll(`the HUD to show its rows [${label}]`, async () => { const r = await evalJs(`(() => { const h = document.querySelector('.hud'); return h && !h.hidden ? h.textContent : ''; })()`); return r.includes('seed') ? r : null; }, { tick: () => check('while the HUD opens') });
@@ -375,6 +428,7 @@ await visit(cdp, base, '#tune', false);
 // The pinned scenes (the rain in the lab), and the mix part-way through (a form, rain going or coming).
 await visit(cdp, base, 'lab.html?scene=rain', true);
 await visit(cdp, base, 'lab.html?pause=1&t=20&scene=rain', false);   // the lab's clock
+await visit(cdp, base, 'lab.html?pause=1&t=45&seed=7&hud=1', false);   // paused part-way through a form's coming: settings keep the moment
 await visit(cdp, base, 'lab.html?pause=1&t=Infinity&scene=rain', false);   // a start time that is no number
 await visit(cdp, base, '?scene=crystal', true);
 await visit(cdp, base, '?seed=7&t=100', false);

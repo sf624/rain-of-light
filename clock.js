@@ -6,6 +6,8 @@
 
 // The speed: from slow motion to fast forward. The slider runs on a log scale
 // from MIN_RATE to SLIDER_MAX and sticks to the SNAPS; ?rate= may go up to MAX_RATE.
+import { isTyping, ownsArrows, letGo } from './keys.js';
+
 const SNAPS = [0.1, 0.25, 0.5, 1, 2, 4, 12, 30];
 const MIN_RATE = 0.1, SLIDER_MAX = 30, MAX_RATE = 60;
 const STEP = 0.1;   // seconds of the show per step, at rate 1
@@ -143,10 +145,13 @@ export function createClock({ lab, params, seed }) {
     }, () => {});
   });
 
+  // The keys work wherever the focus is (the settings panel too), except Space in a text field and
+  // the arrows where a control has them for itself (see keys.js). Space does not press a focused button.
+  letGo(bar);
   addEventListener('keydown', (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === ' ') {
-      if (e.target instanceof HTMLElement && e.target.closest('button, a, input, select, textarea')) return; // Space belongs to a focused control
+      if (isTyping(e.target)) return;
       e.preventDefault();
       if (!e.repeat) togglePause();
     } else if (e.key === '.') step();   // held, it steps on
@@ -156,11 +161,12 @@ export function createClock({ lab, params, seed }) {
       const inside = pop.contains(document.activeElement);
       setOpen(false);
       if (inside) rateBtn.focus();   // the focus goes back to the button, not to nowhere
-    } else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !(e.target instanceof HTMLElement && e.target.closest('input, select, textarea'))) {   // (a button keeps the arrows for the seek; a slider, select or field has them for itself)
+    } else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !ownsArrows(e.target)) {
       e.preventDefault();
       seekBy((e.key === 'ArrowLeft' ? -1 : 1) * (e.shiftKey ? 30 : 5));
     }
   });
+  addEventListener('keyup', (e) => { if (e.key === ' ' && !isTyping(e.target)) e.preventDefault(); });   // (a button would press on the key's release)
 
   render();
   return state;

@@ -242,6 +242,7 @@ body.idle .full-toggle:focus-visible, body.idle .rotate-toggle:focus-visible, bo
 .tuner-sha { font-family: ui-monospace, Menlo, Consolas, monospace; }
 
 .tuner-row {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr 44px;
   grid-template-areas: "name out" "input input";
@@ -250,6 +251,17 @@ body.idle .full-toggle:focus-visible, body.idle .rotate-toggle:focus-visible, bo
   cursor: default;
 }
 .tuner-name { grid-area: name; }
+/* The lab: each row names its default (a button back to it), and a row that is not at its default
+   has a dot and a brighter value. */
+.tuner .tuner-row button.tuner-def {
+  min-width: 0; min-height: 0; margin: 0 0 0 4px; padding: 0 2px;
+  border: 0; border-radius: 3px; background: none;
+  font: inherit; font-size: 10.5px; color: var(--dim); opacity: 0.55; cursor: default;
+}
+.tuner .tuner-row button.tuner-def:not(:disabled) { color: #9cc8ff; opacity: 1; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.tuner .tuner-row button.tuner-def:not(:disabled):hover { background: rgba(156, 200, 255, 0.14); }
+.tuner-row.changed .tuner-name::before { content: ""; position: absolute; left: -9px; top: 0.45em; width: 5px; height: 5px; border-radius: 50%; background: #9cc8ff; }
+.tuner-row.changed output { color: var(--fg); }
 .tuner-row output {
   grid-area: out;
   text-align: right;

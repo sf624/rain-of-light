@@ -5,6 +5,8 @@
 // Toggled by the HUD button in the clock bar, the `h` key or ?hud=1 (?hud=0
 // forces it off); the choice is kept in this browser.
 
+import { isTyping } from './keys.js';
+
 const KEY = 'rain-of-light-hud';
 const SAMPLE_MS = 250;   // the readout's rate
 
@@ -110,7 +112,7 @@ export function createHud({ lab, params, bar, snapshot }) {
   btn.addEventListener('click', () => set(!on));
   addEventListener('keydown', (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
-    if (e.key === 'h' && !(e.target instanceof HTMLElement && e.target.closest('input[type="text"], textarea, select'))) set(!on);
+    if (e.key === 'h' && !isTyping(e.target)) set(!on);
   });
   set(on, false);
 

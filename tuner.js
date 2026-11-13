@@ -3,6 +3,7 @@
 // The viewer page (index.html) shows a few of them; the lab (lab.html), all.
 
 import { view } from './rotate.js';
+import { CLOCK_KEYS, letGo } from './keys.js';
 
 export function createTuner({ schema, lab = false, settings, defaults, storageKey, onChange }) {
   const toggle = document.createElement('button');
@@ -47,7 +48,15 @@ export function createTuner({ schema, lab = false, settings, defaults, storageKe
       row.dataset.key = item.key;
       const name = document.createElement('span');
       name.className = 'tuner-name';
-      name.textContent = item.label;
+      name.append(item.label);
+      let def = null;
+      if (lab) {   // the default that applies on this device, and a way back to it
+        def = document.createElement('button');
+        def.type = 'button';
+        def.className = 'tuner-def';
+        def.addEventListener('click', () => { set(item.key, defaults[item.key]); refresh(); });
+        name.append(' ', def);
+      }
       if (item.hint) row.title = item.hint;
       let input, out = null;
       if (item.options) {
@@ -72,7 +81,7 @@ export function createTuner({ schema, lab = false, settings, defaults, storageKe
       row.append(name, input);
       if (out) row.append(out);
       section.append(row);
-      inputs.set(item.key, { input, out, item });
+      inputs.set(item.key, { input, out, item, row, def });
     }
     root.append(section);
   }
@@ -169,7 +178,9 @@ export function createTuner({ schema, lab = false, settings, defaults, storageKe
     return el;
   }
 
+  // What a value reads as: a number to its step, an option by its label.
   function format(item, v) {
+    if (item.options) return item.labels?.[item.options.indexOf(String(v))] ?? String(v);
     const decimals = Math.max(0, -Math.floor(Math.log10(item.step)));
     return Number(v).toFixed(decimals);
   }
@@ -179,6 +190,7 @@ export function createTuner({ schema, lab = false, settings, defaults, storageKe
     if (value === defaults[key]) delete kept[key]; else kept[key] = value;
     const entry = inputs.get(key);
     if (entry && entry.out) entry.out.textContent = format(entry.item, value);
+    mark(key);
     save();
     onChange(key, value);
   }
@@ -187,7 +199,21 @@ export function createTuner({ schema, lab = false, settings, defaults, storageKe
     for (const [key, { input, out, item }] of inputs) {
       input.value = settings[key];
       if (out) out.textContent = format(item, settings[key]);
+      mark(key);
     }
+  }
+
+  // A row whose value is not the default says so, and offers the way back.
+  function mark(key) {
+    const entry = inputs.get(key);   // (the viewer's panel shows few settings, and no defaults)
+    if (!entry?.def) return;
+    const { row, def, item } = entry;
+    const changed = settings[key] !== defaults[key];
+    const text = format(item, defaults[key]);
+    row.classList.toggle('changed', changed);
+    def.textContent = `default ${text}`;
+    def.disabled = !changed;
+    def.title = changed ? `Back to the default, ${text}` : 'This is the default';
   }
 
   function save() {
@@ -227,8 +253,10 @@ export function createTuner({ schema, lab = false, settings, defaults, storageKe
     }
   });
 
-  // Keys typed into the panel must not reach the page's own shortcuts.
-  root.addEventListener('keydown', (e) => e.stopPropagation());
+  // Keys typed into the panel must not reach the page's own shortcuts. In the lab the clock's
+  // keys do (see keys.js), and a pointer's use of a control lets go of its focus.
+  root.addEventListener('keydown', (e) => { if (!(lab && CLOCK_KEYS.has(e.key))) e.stopPropagation(); });
+  if (lab) letGo(root);
 
   if (location.hash === '#tune') show(true); // a link that opens with the panel
 

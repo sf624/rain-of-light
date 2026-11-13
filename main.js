@@ -370,7 +370,7 @@ addEventListener('keydown', (e) => {
   if (e.key === 'f') controls.toggleFullscreen(); // full screen
   if (e.key === 'r') rotation.toggle();         // landscape / portrait
   if (e.key === 'w') step('weather', WEATHER);   // next weather
-  if (e.key === 'c') { step('color', COLOR_MODES); show.recolor(); snaps.clear(); } // next colour, of the rain and the forms
+  if (e.key === 'c') { show.recolor(); step('color', COLOR_MODES); } // next colour, of the rain and the forms
   if (e.key === 'd') {                           // switch direction (and hold it)
     tuner.set('flow', flowOf(flowGoal) ? 'down' : 'across');
     tuner.refresh();
@@ -380,7 +380,7 @@ addEventListener('keydown', (e) => {
 });
 // A key moves on to another episode while the setting is auto, else to the next choice.
 function step(key, list) {
-  if (S[key] === 'auto') { trackOf(key).skip(time); snaps.clear(); return; }   // (the lab's snapshots hold the old track)
+  if (S[key] === 'auto') { trackOf(key).skip(time); restate(); return; }
   const i = list.findIndex((x) => x.name === S[key]);
   tuner.set(key, list[(i + 1) % list.length].name);
   tuner.refresh();
@@ -537,18 +537,20 @@ function skyColors() {
 
 // What a change in the panel does at once. The scene, form and layer need
 // nothing here: the show reads them every frame and blends into the change.
+// Only the picture reads these: the show's state does not depend on them, so a change leaves it as it is.
+const LATTICE = ['leds', 'aspect', 'grid', 'rows', 'layout', 'jitter'];
+const DRAW_ONLY = ['volume', 'quality', 'exposure', 'twinkle', 'haze', 'burn', 'mirror', 'walls', 'size', 'maxPx', 'rest',
+  'wire', 'rainGain', 'tipGain', 'bloom', 'fog', 'rays', 'rayLength', 'blackFloor', 'saturation', 'rainbow'];
 let rebuildTimer = 0;
 function apply(key) {
-  settle = 3;
-  if (key !== 'volume') {
-    snaps.clear();   // the lab's snapshots were made with the old setting (see startSeek)
-    if (job) { const t = job.target; initState(0); startSeek(t); }
-  }
-  if (['leds', 'aspect', 'grid', 'rows', 'layout', 'jitter'].includes(key)) {
+  const redone = !DRAW_ONLY.includes(key) && !LATTICE.includes(key) && restate();
+  if (LATTICE.includes(key)) {
+    snaps.clear();
     clearTimeout(rebuildTimer);
     rebuildTimer = setTimeout(buildLattice, 250); // wait for the slider to settle
   }
   if (key === 'volume') { sound.volume(); controls.setVolume(S.volume); }
+  if (redone) return;   // (the moment was made again with the setting: nothing is left to hand over)
   // The setting takes over from the running episode, or hands back to it.
   const track = ['palette', 'set'].includes(key) ? 'color'
     : ['strandShare', 'rowShare', 'strandMin', 'rowMin'].includes(key) ? 'density' : key;
@@ -569,25 +571,25 @@ let rainSway = null;
 let sway = 0;
 
 // Ease the current look towards the targets, over about tau seconds.
-function ease(dt, edt = dt) {   // edt: the time the easings take (dt, or long when a change settles at once)
-  const kw = 1 - Math.exp(-edt / 2.5);
-  const kc = 1 - Math.exp(-edt / 3.0);
+function ease(dt) {
+  const kw = 1 - Math.exp(-dt / 2.5);
+  const kc = 1 - Math.exp(-dt / 3.0);
   sway = rainSway(dt);
   look.flowRate += (weather.flow * (1 + 0.22 * sway) - look.flowRate) * kw;
   look.rain += (weather.rain - look.rain) * kw;
-  if (direction.update(edt, flowOf(flowGoal), look.flow) === 1) {
+  if (direction.update(dt, flowOf(flowGoal), look.flow) === 1) {
     // (With the setting the way is the show's next one, or one from the seed.)
     const a = flowGoal.toward ? flowGoal.angle : hash(SEED * 5.3 + (lab ? 7.31 * ++flowTurns : time)) * Math.PI * 2;   // (the lab counts the turns: the same way however the steps fall)
     flowDir = [Math.cos(a), Math.sin(a)];
   }
-  const kd = 1 - Math.exp(-edt / 5.0); // density drifts slowly
+  const kd = 1 - Math.exp(-dt / 5.0); // density drifts slowly
   for (let i = 0; i < 2; i++) look.density[i] += (densityGoal[i] - look.density[i]) * kd;
   looks.forEach((l, n) => {
     for (const key of Object.keys(l)) {
       for (let i = 0; i < l[key].length; i++) l[key][i] += (goals[n][key][i] - l[key][i]) * kc;
     }
   });
-  sideNow = Math.max(0, Math.min(1, sideNow + Math.sign(side - sideNow) * edt / SWITCH));
+  sideNow = Math.max(0, Math.min(1, sideNow + Math.sign(side - sideNow) * dt / SWITCH));
   if (Math.abs(side - sideNow) < 1e-3) sideNow = side;
   skyClock = (skyClock + dt / Math.max(1, S.skyDay)) % 1;
   const advance = dt * look.flowRate * SPEED * S.speed;
@@ -620,12 +622,12 @@ function placeImages() {
 // ---------- frame ----------
 // One step of the show's state, without drawing or sound: the camera, the waves that come by
 // themselves, the director's episodes, the easings, the show. dt: the show's time that goes by;
-// edt: the time the easings take (see frame); replay: stepping to a time (no bell for a wave, and a
+// replay: stepping to a time (no bell for a wave, and a
 // neutral pointer, so that a time comes out the same whatever the mouse did).
 let viewM = null, projM = null, lastFit = null;
-function advance(dt, edt, replay = false) {
+function advance(dt, replay = false) {
   camClock += dt * SPEED * (S.orbit / DEFAULTS.orbit); // integrated: a new speed never jumps
-  camBlend = Math.min(1, camBlend + edt / CAMERA_BLEND);
+  camBlend = Math.min(1, camBlend + dt / CAMERA_BLEND);
   const kb = smooth(camBlend);
   let eye = [0, 0, 0], dir = [0, 0, 0];
   // The eye stands on the floor, with a little sway.
@@ -671,8 +673,8 @@ function advance(dt, edt, replay = false) {
   }
 
   direct(time);
-  ease(dt, edt);
-  const shown = show.update(time, edt, camera);
+  ease(dt);
+  const shown = show.update(time, dt, camera);
   flowGoal = shown.flow;
   // Breath: light and pad swell as you breathe in and ease as you breathe out.
   const breath = S.breath === 'on' ? breathAt(dt) : 1;
@@ -778,12 +780,23 @@ function pumpSeek(budget) {
       }
       const d = rest > REPLAY_STEP - 1e-6 ? REPLAY_STEP : rest;   // (a whole step unless less is left)
       time = d === REPLAY_STEP ? time + d : job.target;   // (summed like the frames' time, so a frame of 0.05 s and a step are the same)
-      advance(d, d, true);
+      advance(d, true);
       replayed++;
       snapshot();
     }
     if (performance.now() >= until) return false;
   }
+}
+// The state depends on a setting that changed (or on the colour key, or a skipped episode): the
+// snapshots were made without it. A paused lab shows the same moment again with it, by a seek to
+// it (the same as a seek there gives); a running show blends into the change. True when it seeks.
+function restate() {
+  snaps.clear();
+  if (!lab || !(job || clock.paused)) return false;
+  const t = job ? job.target : time;
+  initState(0);
+  startSeek(t);
+  return true;
 }
 let pendingSeek = null;
 clock.onSeek = (t) => { pendingSeek = t; };
@@ -793,7 +806,6 @@ if (lab) {
 } else initState(START);
 
 let last = performance.now();
-let settle = 0;   // frames left to settle the easings after a change while paused
 
 let checked = false;
 
@@ -834,9 +846,6 @@ function frame(now) {
   const rawDt = (now - last) / 1000;
   // rAF time may precede `last`. The lab's clock may stand the show still or run it faster.
   let dt = clock.tick(Math.min(0.05, Math.max(0, rawDt)));
-  // A change in the panel while paused settles the easings at once (the show itself stays at its moment).
-  let edt = clock.paused && settle > 0 ? 1e3 : dt;
-  if (clock.paused && settle > 0) settle--;
   last = now;
   if (!clock.paused) adapt(rawDt, now);   // a paused picture keeps its render scale
   if (pendingSeek !== null) { startSeek(pendingSeek); pendingSeek = null; }
@@ -846,7 +855,7 @@ function frame(now) {
     const from = job.from, target = job.target, began = job.began;
     pumpSeek(Math.max(SLICE_MS, Math.min(250, rawDt * 500)));   // (a slow frame can give more)
     if (job && performance.now() - began > 100) note = `seeking ${Math.round(100 * (time - from) / Math.max(1e-9, target - from))}%`;
-    dt = 0; edt = clock.paused && settle > 0 ? 1e3 : 0;   // the frame of a seek shows the moment itself
+    dt = 0;   // the frame of a seek shows the moment itself
     settleUntil = performance.now() + SETTLE_MS;   // a seek's frame says little about the speed
   } else time += dt;
   clock.show(time, note);
@@ -856,7 +865,7 @@ function frame(now) {
   // Camera: the eye follows the pointer a little more each frame.
   pointer.sx += (pointer.x - pointer.sx) * 0.03;
   pointer.sy += (pointer.y - pointer.sy) * 0.03;
-  const { shown, breath } = advance(dt, edt);
+  const { shown, breath } = advance(dt);
   if (lab && !job) snapshot();
   const view = viewM, proj = projM, fit = lastFit;
   const rk = shown.rain;                 // how much rain falls now: 0 a still room .. 1 a rain passage
