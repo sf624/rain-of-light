@@ -25,7 +25,7 @@ const ROWS = [
   ['show', 'show', true, (s) => {
     const w = s.show;
     const held = [s.form !== 'auto' && `form ${s.form}`, s.layer !== 'auto' && `layer ${s.layer}`].filter(Boolean).join(' ');
-    return `${w.scene}${held ? ` (${held})` : ''}  ${w.next === null ? w.passage : `${w.passage}, next in ${sec(Math.max(0, w.next))}`}`;
+    return `${w.scene}${held ? ` (${held})` : ''}  ${w.next === null ? w.passage : `${w.passage}, next in ${sec(Math.max(0, w.next))}`}${s.egg ? `  egg ${s.egg}` : ''}`;
   }],
   ['rain', 'rain', true, (s) => `${f2(s.show.rain)}  storm ${f2(s.show.storm)} (rain through a form)`],
   ['forms', 'forms', true, (s) => {

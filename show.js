@@ -231,7 +231,8 @@ export function createShow(S, { feet, seed = Math.random() * 1000, eggs = true }
   };
 
   // What the settings ask for at t: the rain, and the episodes with their weights.
-  function wanted(t) {
+  // egg: an easter egg in the form slot (see eggs.js): { w, age, form, rain, layer }.
+  function wanted(t, egg) {
     const scene = S.scene === 'rain' || S.scene === 'crystal' ? S.scene : 'mix';
     const now = scene === 'rain' ? { rain: 1, items: [] } : timeline(scene).at(t);
     const rain = scene === 'crystal' ? 0 : now.rain;
@@ -247,6 +248,18 @@ export function createShow(S, { feet, seed = Math.random() * 1000, eggs = true }
       items = items.filter((x) => x.e.form !== LAYER);
       if (S.layer === 'on') items.push({ e: holdOf(LAYER), w: 1, age: t, out: false });
     }
+    if (egg) return eggWants(egg, rain, items, flow);
+    return { rain, items, flow };
+  }
+  // While an egg holds the form slot, the forms give way to it (and the layer,
+  // unless it keeps it); an egg that is a form of the show is held there; the
+  // rain goes to what the egg wants.
+  function eggWants(egg, rain, items, flow) {
+    const k = 1 - egg.w;
+    items = items.map((x) => (x.e.form === LAYER && egg.layer ? x : { ...x, w: x.w * k }));
+    const form = egg.form && (FORMS.find((f) => f.name === egg.form) || (eggs && EGGS.find((f) => f.name === egg.form)));
+    if (form) items.push({ e: holdOf(form), w: egg.w, age: egg.age, out: false });
+    if (egg.rain !== null && egg.rain !== undefined) rain += (egg.rain - rain) * egg.w;
     return { rain, items, flow };
   }
 
@@ -323,8 +336,10 @@ export function createShow(S, { feet, seed = Math.random() * 1000, eggs = true }
   }
 
   // view: the camera ({ eye, rise }): the forms turn towards the eye, and float higher in a tall view.
-  function update(t, dt, view) {
-    const want = wanted(t);
+  let eggHeld = null;                         // the form an easter egg holds now (its name), if any
+  function update(t, dt, view, egg = null) {
+    eggHeld = egg?.form ?? null;
+    const want = wanted(t, egg);
     const first = rainNow === null;
     const k = first ? 1 : 1 - Math.exp(-dt / EASE);
     rainNow = first ? want.rain : rainNow + (want.rain - rainNow) * k;
@@ -433,6 +448,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000, eggs = true }
   // The eggs about to show, or showing, at t (within `ahead` seconds): a held one, or the timeline's.
   function eggsNear(t, ahead = 40) {
     if (!eggs) return [];
+    if (eggHeld && EGGS.some((f) => f.name === eggHeld)) return [eggHeld];   // (an easter egg holds a baked form, see eggs.js)
     if (S.form !== 'auto') return EGGS.some((f) => f.name === S.form) ? [S.form] : [];
     return S.scene === 'rain' ? [] : timeline(S.scene === 'crystal' ? 'crystal' : 'mix').eggsNear(t, ahead);
   }

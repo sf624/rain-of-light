@@ -4,6 +4,8 @@
 import { FIELD } from './fields.js';
 
 // The falling time wraps at this many flow units (see drop() in POINT_VS).
+import { EGG_GLSL } from './egg-shaders.js';
+
 export const FLOW_WRAP = 1000;
 // A light ray is at most this many times the Ray length setting (see POINT_VS: rayK).
 export const RAY_CAP = 2.5;
@@ -591,6 +593,9 @@ vec3 formsAt(vec3 p, float id, float v, out vec3 thread, out float around) {
   return c;
 }
 
+#ifdef EGGS
+${EGG_GLSL}
+#endif
 void main() {
   float seed = aData.w;
   float u = aData.y;
@@ -654,6 +659,9 @@ void main() {
   vec3 thread;
   float around;
   vec3 form = formsAt(pos, id, u, thread, around);
+#ifdef EGGS
+  if (uEgg[0].y + uEgg[1].y + uEgg[2].y > 0.0) form += eggsAt(pos, seed, id, u, thread);   // an easter egg (egg-shaders.js)
+#endif
   float fm = max(form.r, max(form.g, form.b));
   vec3 flare = form * min(1.0, 1.0 / max(fm, 1e-3));
   float inForm = clamp(fm, 0.0, 1.0);                // drops in a form take its colour

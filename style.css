@@ -263,6 +263,9 @@ body.idle .full-toggle:focus-visible, body.idle .rotate-toggle:focus-visible, bo
 .tuner .tuner-row button.tuner-def:not(:disabled):hover { background: rgba(156, 200, 255, 0.14); }
 .tuner-row.changed .tuner-name::before { content: ""; position: absolute; left: -9px; top: 0.45em; width: 5px; height: 5px; border-radius: 50%; background: #9cc8ff; }
 .tuner-row.changed output { color: var(--fg); }
+/* The lab's pin of an easter egg (eggs.js): laid out as a row of the panel. */
+.tuner-egg { display: grid; grid-template-columns: 1fr; gap: 3px; margin: 6px 0; }
+.tuner-egg select { width: 100%; padding: 3px 4px; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 5px; background: #11151c; color: inherit; font: inherit; }
 .tuner-row output {
   grid-area: out;
   text-align: right;

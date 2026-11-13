@@ -457,6 +457,7 @@ for (const f of ['ring', 'veil', 'solid', 'knot']) await visit(cdp, base, `?scen
 await visit(cdp, base, 'lab.html?scene=crystal&form=teapot&seed=2&t=40', false, false, 'fields/teapot.bin');
 // LEDs spaced per strand: some LEDs are never lit, and the wires skip them.
 await visit(cdp, base, '?jitter=pitch', false);
+await visit(cdp, base, 'lab.html?egg=glider,clock&t=30', false);   // two easter eggs pinned at once (a form's and an overlay's)
 
 // The sound follows the show: rendered offline on the page's own clock (see
 // render-audio.mjs), a held orb sounds (its voice, the pad) and a still room

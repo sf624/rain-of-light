@@ -23,6 +23,9 @@ import { createClock, rateText } from './clock.js';
 import { createHud } from './hud.js';
 import { keepAwake } from './wakelock.js';
 import { view, createRotation } from './rotate.js';
+import { createEggs } from './eggs.js';
+import { eggShader } from './egg-shaders.js';
+import './egg-kinds.js';
 
 // Errors show on the page (see the inline script in index.html), so a black screen is never silent.
 const showError = window.showError;
@@ -99,11 +102,29 @@ function viewFit() {
 }
 const fovRad = () => viewFit().fov;
 
-const { program, target, freeTarget } = createGL(gl);
+const { program, programLater, target, freeTarget } = createGL(gl);
 
 // ---------- the lattice ----------
-const pointProg = program(POINT_VS, POINT_FS);
-const wireProg = program(POINT_VS, WIRE_FS);
+const plain = { point: program(POINT_VS, POINT_FS), wire: program(POINT_VS, WIRE_FS) };
+// The same with the light of the easter eggs that show (egg-shaders.js), built the first time those
+// eggs show, without waiting for the GPU: until they are done (a few frames, as the egg fades in) the
+// plain programs draw. While no egg shows, the LEDs are drawn by programs with no egg in them at all.
+const withEggs = new Map();   // the eggs' types, as 'n,m' -> { point, wire }: each gives its program when done
+function eggProgs(types) {
+  const key = types.join();
+  if (!withEggs.has(key)) {
+    const vs = eggShader(POINT_VS, types);
+    withEggs.set(key, { point: programLater(vs, POINT_FS), wire: programLater(vs, WIRE_FS) });
+  }
+  const p = withEggs.get(key);
+  if (!p.done) {
+    const point = p.point(), wire = p.wire();
+    if (!point || !wire) return plain;
+    fieldsUnit(point); fieldsUnit(wire);
+    p.done = { point, wire };
+  }
+  return p.done;
+}
 const downProg = program(QUAD_VS, DOWN_FS);
 const blurProg = program(QUAD_VS, BLUR_FS);
 const compProg = program(QUAD_VS, COMPOSITE_FS);
@@ -111,7 +132,8 @@ const MAX_POINT = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1]; // the larges
 // The baked forms' fields (see fields.js), on a texture unit of their own (0 .. 4: the composite's).
 const FIELD_UNIT = 5;
 const fields = createFields(gl, FIELD_UNIT);
-for (const prog of [pointProg, wireProg]) { gl.useProgram(prog.p); gl.uniform1i(prog.u.uFields, FIELD_UNIT); }
+const fieldsUnit = (prog) => { gl.useProgram(prog.p); gl.uniform1i(prog.u.uFields, FIELD_UNIT); };
+for (const prog of [plain.point, plain.wire]) fieldsUnit(prog);
 
 const lattice = createLattice(gl);
 let count = 0, GRID = 0, ROWS = 0, wireCount = 0, light = null;
@@ -401,6 +423,9 @@ const MAX_T = 86400;     // the lab's last time: 24 h (a seek or ?t= beyond it g
 const clampT = (t) => (Number.isFinite(t) ? Math.min(MAX_T, Math.max(0, t)) : 0);
 const START = lab ? clampT(Number(params.get('t'))) : Number(params.get('t')) || 0;
 let time = START;
+// The easter eggs (eggs.js): a pin in the lab, the secret, or the date and time bring one. A change
+// of pin or a summons is a change of setting (the lab's snapshots go).
+const eggs = createEggs({ lab, params, canvas, start: START, now: () => time, onChange: () => apply('egg') });
 // The lab draws every random number of the show from the seed, so that a moment can be
 // made again (see seekTo); the viewer page keeps Math.random.
 const randomFor = (salt) => (lab ? createRandom(SEED + salt) : Math.random);
@@ -568,6 +593,7 @@ const tuner = createTuner({
   settings: S, defaults: DEF, storageKey: STORAGE_KEY,
   onChange: (key) => apply(key),
 });
+if (lab) eggs.labSelect(document.querySelector('.tuner'));   // the lab's pin of an egg (not a setting: never saved)
 let bandShift = 0;
 
 // The rain swells and eases within its weather, with 1/f fluctuation
@@ -631,6 +657,7 @@ function placeImages() {
 // neutral pointer, so that a time comes out the same whatever the mouse did).
 let viewM = null, projM = null, lastFit = null;
 function advance(dt, replay = false) {
+  const egg = eggs.at(time);
   camClock += dt * SPEED * (S.orbit / DEFAULTS.orbit); // integrated: a new speed never jumps
   camBlend = Math.min(1, camBlend + dt / CAMERA_BLEND);
   const kb = smooth(camBlend);
@@ -657,6 +684,10 @@ function advance(dt, replay = false) {
   eye = turn(eye);
   eye[1] -= py * 2.0;
   dir = turn(dir);
+  if (egg.view) {                                  // an egg that wants to be seen from higher up
+    eye[1] += egg.view.lift;
+    dir = norm([dir[0], dir[1] + egg.view.pitch, dir[2]]);
+  }
   eye[1] = Math.max(FLOOR + 0.4, eye[1]);          // above the floor, looking a little up
   dir = norm([dir[0], dir[1] + fit.pitch, dir[2]]);
   const at = [eye[0] + dir[0], eye[1] + dir[1], eye[2] + dir[2]];
@@ -679,11 +710,19 @@ function advance(dt, replay = false) {
 
   direct(time);
   ease(dt);
-  const shown = show.update(time, dt, camera);
+  const shown = show.update(time, dt, camera, egg.show);
   flowGoal = shown.flow;
   // Breath: light and pad swell as you breathe in and ease as you breathe out.
   const breath = S.breath === 'on' ? breathAt(dt) : 1;
-  return { shown, breath };
+  return { shown, breath, egg };
+}
+// Where the eye will be in dt seconds of the show, as the camera move goes on (for an egg that is
+// set for where the eye will be; no blend of moves, no pointer).
+function eyeAt(dt) {
+  const fit = lastFit || viewFit(), ground = FLOOR + ROOM.eye;
+  const pose = cameraPose(camMode.name, camClock + dt * SPEED * (S.orbit / DEFAULTS.orbit), fit.radius,
+    ground + Math.sin((time + dt) * 0.05) * 0.2, ground);
+  return [pose.eye[0], Math.max(FLOOR + 0.4, pose.eye[1]), pose.eye[2]];
 }
 
 // ---------- the state at a time: set up, save, bring back, seek ----------
@@ -829,7 +868,7 @@ function hudSnapshot() {
     seek: { steps: replayed, ms: seekMs, snaps: snaps.size },
     scale: renderScale, adaptive: S.quality !== 'full', canvas: [W, H],
     grid: GRID, rows: ROWS, leds: count,
-    scene: S.scene, form: S.form, layer: S.layer, show: info,
+    scene: S.scene, form: S.form, layer: S.layer, show: info, egg: eggs.info(),
     weather: { name: weather.name, rain: look.rain, fall: look.flowRate },
     density: look.density, rainShare: rainShareNow,
     flow: { down: w0, across: w1, mix: direction.mix, goal: flowOf(flowGoal) },
@@ -844,7 +883,7 @@ function hudSnapshot() {
   };
 }
 // For tests of the lab: the whole state as text, and a seek.
-if (lab) window.__lab = { state: () => JSON.stringify(saveState()), seek: (t) => { pendingSeek = t; } };
+if (lab) window.__lab = { state: () => JSON.stringify(saveState()), seek: (t) => { pendingSeek = t; }, eggs: () => ({ on: eggs.info(), ...eggs.uniforms(), eye: camera?.eye }) };
 const hud = createHud({ lab, params, bar: clock.bar, snapshot: hudSnapshot });
 
 function frame(now) {
@@ -870,7 +909,7 @@ function frame(now) {
   // Camera: the eye follows the pointer a little more each frame.
   pointer.sx += (pointer.x - pointer.sx) * 0.03;
   pointer.sy += (pointer.y - pointer.sy) * 0.03;
-  const { shown, breath } = advance(dt);
+  const { shown, breath, egg } = advance(dt);
   // A baked form's field loads as it draws near, and the form shows once it is there.
   fields.frame(show.eggsNear(time), shown, Math.min(0.1, Math.max(0, rawDt)));
   if (lab && !job) snapshot();
@@ -886,7 +925,8 @@ function frame(now) {
 
   // For the lab's readout (see hudSnapshot): the frame's last state.
   lastShown = shown; lastGlow = glow; lastBreath = S.breath === 'on' ? breath : null;
-  rainShareNow = sparseShare() + (S.rainShare * (1 - 0.35 * shown.storm) - sparseShare()) * rk;
+  rainShareNow = (sparseShare() + (S.rainShare * (1 - 0.35 * shown.storm) - sparseShare()) * rk) * (1 - egg.dry);
+  eggs.frame(time, { camera, fov: fovRad(), SPAN, HEIGHT, FLOOR, lane: [SPAN / (GRID - 1), HEIGHT / ROWS], eyeAt });
   fallLightNow = rk * (1 - direction.mix);
 
   // Points.
@@ -900,6 +940,8 @@ function frame(now) {
   // Every LED's light casts rays (see POINT_VS: rayK), drawn with the LED into
   // the second buffer. Without float buffers there are none.
   const rays = S.rays === 'off' || !hasFloat ? 0 : Number(S.rays);
+  const eggTypes = eggs.showing();
+  const { point: pointProg, wire: wireProg } = eggTypes.length ? eggProgs(eggTypes) : plain;
   const progs = [pointProg];
   if (wiresOn) progs.push(wireProg);
   const rayScale = H / 1080;   // rays scale with the view like the lattice: their length is set for a 1080 px tall view
@@ -926,8 +968,8 @@ function frame(now) {
   gl.uniform1f(u.uRest, S.rest);
   gl.uniform3f(u.uLight, light.room, light.wire, light.twinkle);
   gl.uniform2fv(u.uRainK, [...light.share, ...light.fall, ...light.side]);
-  gl.uniform1f(u.uRainGain, S.rainGain);
-  gl.uniform1f(u.uTipGain, S.tipGain);
+  gl.uniform1f(u.uRainGain, S.rainGain * (1 - egg.hush));   // (an overlay egg dims the rain's light while it shows)
+  gl.uniform1f(u.uTipGain, S.tipGain * (1 - egg.hush));
   gl.uniform1f(u.uTrail, S.trail);
   gl.uniform1f(u.uBandShift, bandShift);
   gl.uniform1f(u.uBandScale, S.bandScale);
@@ -981,6 +1023,7 @@ function frame(now) {
   gl.uniform1f(u.uTwinkle, S.twinkle);
   gl.uniform4fv(u.uCopy, copies);
   gl.uniform1fv(u.uCopyGain, copyGain);
+  if (pointProg !== plain.point) eggs.bind(gl, u);
   }
   // The light itself, then its image in the floor mirror. Wall mirrors draw
   // the lattice again per image, as instances. Every LED, wire and ray adds

@@ -38,6 +38,7 @@ reload.
 | `clock.js` | the lab's show clock: pause, step, speed, seek (see below) |
 | `keys.js` | which keys a focused control keeps in the lab (see the clock's keys) |
 | `hud.js` | the lab's readout of the show's state (see below) |
+| `eggs.js`, `egg-kinds.js`, `egg-life.js`, `egg-shaders.js` | the easter eggs: the registry and triggers, the eggs, the Game of Life, their light (see Easter eggs) |
 | `rotate.js` | the landscape / portrait button |
 | `audio.js` | the music: pad, bells, rain, the forms' voices, reverb |
 | `sway.js` | 1/f fluctuation, used by the music and the rain |
@@ -131,8 +132,8 @@ about 11 s to 3 s. It visits:
   a setting the lab saved and its Reset clears it;
 - the pinned scenes (`rain` in the lab, `crystal`, both with the click,
   keys and Reset), a time part-way through the show
-  (with and without the colour story), four of the forms held, and
-  `?jitter=pitch`, and the lab's clock (opened paused, it stands still;
+  (with and without the colour story), four of the forms held,
+  `?jitter=pitch`, two easter eggs pinned at once, and the lab's clock (opened paused, it stands still;
   Space runs and stops it, also with the focus in the panel; the arrows seek
   after a mouse drag on a slider and move a slider the focus came to by Tab;
   and part-way through a form's coming, a change of exposure, twinkle, colour
@@ -302,6 +303,69 @@ lines:
 
 On a screen narrower than 700 px only the main lines show, and with the
 settings panel open the HUD steps aside.
+
+## Easter eggs
+
+Rare scenes that the page does not announce. `eggs.js` holds the registry
+and decides which egg shows; `egg-kinds.js` registers the eggs and works
+out each one's uniforms per frame; `egg-shaders.js` is their light, a chunk
+of `POINT_VS` (`eggsAt`, added to the forms' light); `egg-life.js` steps
+the Game of Life.
+
+| Egg | What | Comes |
+| --- | --- | --- |
+| `glider` | Conway's Life on a low sheet of the strands' lattice (32 x 32 cells): a glider, a lightweight spaceship and a pulsar; the eye rises and looks down | pin, secret |
+| `penrose` | the Penrose tribar: three beams at right angles that close into an impossible triangle from one way only; it turns to and fro and rests there | pin, secret |
+| `penrose-still` | the same, standing still, set for where the eye will be halfway through each 40 s | pin |
+| `clock` | the time of day, HH:MM in 5 x 7 dot glyphs facing the eye (two lines in a tall view) | pin, secret, 20 s at each full hour |
+| `pi` | the digits of pi fall in lines of glyphs, 3.141 59265 ... | pin, secret |
+| `pi-rhythm` | 7% of the strands drop in step, in groups that count the digits (3, a pause, 1, a pause, 4 ...; a zero is a longer pause) | pin, secret |
+| `fireworks` | shells rise along the strands and burst into spheres of sparks that fall and fade; no sound | pin, secret, 1 January, 31 December from 23:00 |
+| `snow` | slow snow in place of the rain, and a tree of light with a garland and a star | pin, secret, 24 and 25 December |
+| `tanabata` | the Milky Way rising slantwise over the room, with a dark rift, Vega and Altair on either side | pin, secret, 7 July |
+| `teapot` (each baked form) | that form, held in the form slot | pin, secret |
+
+- **Pins** (the lab only): `?egg=<name>` shows that egg for as long as the
+  page is open, `?egg=glider,clock` an egg of the form slot and an overlay
+  at once, `?egg=off` no egg at all (not even one the date brings). The
+  select *Easter egg* at the end of the lab's panel does the same and puts
+  it in the URL; it is not a setting, so it is never saved and the viewer
+  page never sees it. `?date=2026-12-31T23:30` (local time) sets the wall
+  clock at load, to try the eggs of a date.
+- **The secret** (both pages): typing `glint` (no letter of it is a key of
+  the page), or five quick taps (or clicks) in the top right corner of the
+  picture, summons the next egg of the registry at once, for its `hold`
+  seconds.
+- **Slots**: one egg holds the form slot (`slot: 'form'`): the show's forms
+  give way to it (and the layer, with `layer: false`), and the rain goes to
+  what it asks (`rain`: 0 none, not even the pale drops; 1 a rain passage).
+  Two overlays (`slot: 'overlay'`: the clock, tanabata) add their light over
+  whatever shows and leave the show's state alone; `hush` dims the rain's
+  light while one shows (the light only). Between kinds of trigger the pin
+  comes first, then the summons, then the date.
+- **Time**: an egg's weight and age are a function of the show's time:
+  pinned, its age is the show's time; summoned, the time since; by date,
+  the wall clock, which is the clock at page load plus the show's time
+  since. So the lab's pause, step and seek show every egg as it was (the
+  Life board starts again every 112 generations, so a seek steps it at most
+  that far). A pin or a summons counts as a change of setting (the
+  snapshots go); a seek back before a summons shows no egg, as with a
+  click's wave. `window.__lab.eggs()` gives the tests the eggs that show
+  and their uniforms.
+- **Registry**: `registerEgg({ name, slot, type, form, rain, layer, hold,
+  when, view, hush, params, secret })` (the top of `eggs.js` describes the
+  fields). A form of the show becomes an egg with one line,
+  `registerEgg({ name: 'teapot', form: 'teapot' })`: the show then holds that
+  form in the form slot while the egg shows (a baked form's field loads
+  first). `egg-kinds.js` registers each baked form of `config.js: EGGS` so.
+- **Cost**: none while no egg shows: the LEDs and wires are drawn by
+  programs without the eggs' code (`POINT_VS` holds it behind `#ifdef
+  EGGS`, and each egg's function behind `EGG_<type>`). The first time some
+  eggs show, the page builds programs with their functions only
+  (`eggShader`), without waiting for them (`gl.js: programLater`; the plain
+  programs draw until they are done), and draws with them while those eggs
+  show. Each egg skips the LEDs far from it first (the sheet's height,
+  the tribar's reach, the glyph panel's slab, a shell's sphere).
 
 ## Capturing the page
 
