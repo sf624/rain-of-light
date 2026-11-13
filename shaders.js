@@ -4,6 +4,7 @@
 import { FIELD } from './fields.js';
 import { SOLIDS, KNOTS, MOBIUS_RULINGS } from './figures.js';
 import { EGG_GLSL } from './egg-shaders.js';
+import { PLANET_GLSL } from './planets.js';
 
 // The falling time wraps at this many flow units (see drop() in POINT_VS).
 export const FLOW_WRAP = 1000;
@@ -634,6 +635,10 @@ vec3 bakedLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
   return vec3(light * 2.4, skin * 0.12 + deep * deep * 0.2, clamp(0.3 + deep, 0.0, 1.0));
 }
 
+#ifdef PLANET
+${PLANET_GLSL}
+#endif
+
 // The light of the forms at p (v: 0 at the top .. 1 at the floor). Each comes
 // and goes LED by LED in a random order, or, while rain falls, from the top down.
 // A form that rises away as points (e.w) is seen by each LED a random way
@@ -668,9 +673,16 @@ vec3 formsAt(vec3 p, float id, float v, out vec3 thread, out float around) {
     if (k < 2) around = max(around, a.y * (1.0 - smoothstep(ff.w * 0.8, ff.w * 2.2, far)));
     if (far > ff.w) continue;                        // too far from it for any of its light
     int type = int(a.x + 0.5);
-    vec3 f;
+    vec3 f = vec3(0.0);
+    vec3 own = vec3(0.0);   // (the planet gives its own colour)
+    // While a planet shows, no other sky form does (one comes only once the
+    // other has gone): its programs hold only it and the layer (planets.js: planetShader).
+#ifdef PLANET
+    if (type == 8) f = planetLight(q, a, b, ff, k, own);
+#else
     if (type == 0) f = orbLight(q, a, b);
     else if (type == 1) f = spiralLight(q, a, b, e.z, ff);
+#endif
     else if (type == 2) {
       // Where a sky form already lights this LED the layer gives way, so the
       // two never add up to a white flare where a form meets the layer.
@@ -680,17 +692,20 @@ vec3 formsAt(vec3 p, float id, float v, out vec3 thread, out float around) {
       vec3 eye = -(transpose(mat3(uView)) * uView[3].xyz);
       f.x *= smoothstep(LAYER_NEAR.x, LAYER_NEAR.y, length(q.xz - eye.xz));
     }
+#ifndef PLANET
     else if (type == 3) f = ringLight(q, a, b, e.z, ff);
     else if (type == 4) f = veilLight(q, a, b, e.z, ff);
     else if (type == 5) f = solidLight(q, a, b, e.z, ff);
     else if (type == 6) f = knotLight(q, a, b, e.z, ff);
-    else f = bakedLight(q, a, b, e.z, ff);
+    else if (type == 7) f = bakedLight(q, a, b, e.z, ff);
+#endif
     if (type != 2) f.x *= FORM_BODY;
     float order = mix(hash(id + float(k) * 7.7), e.y > 0.0 ? v : 1.0 - v, e.x * 0.8);
     float on = clamp((a.y * 1.25 - order) / 0.25, 0.0, 1.0) * smoothstep(0.0, 0.4, a.y);
-    vec3 light = mix(mix(uFormC[k], uFormD[k], f.z), WHITE_HOT, clamp(f.y, 0.0, 1.0)) * f.x * on * keep;
+    vec3 base = type == 8 ? own : mix(uFormC[k], uFormD[k], f.z);
+    vec3 light = mix(base, WHITE_HOT, clamp(f.y, 0.0, 1.0)) * f.x * on * keep;
     c += light;
-    thread += light * (type == 2 || type == 3 || type >= 5 ? 0.5 : 1.0);   // a hoop or a line is not its strands
+    thread += light * (type == 8 ? 0.2 : type == 2 || type == 3 || type >= 5 ? 0.5 : 1.0);   // a hoop or a line is not its strands; a planet's face is not either
   }
   return c;
 }
@@ -710,6 +725,9 @@ void main() {
   vec4 cp = uCopy[gl_InstanceID];
   vec3 seen = vec3(cp.x * pos.x + cp.y, pos.y, cp.z * pos.z + cp.w);
   if (uMirror.y > 0.0) seen.y = 2.0 * uMirror.x - pos.y;
+#ifdef PLANET
+  Eye = vec3(cp.x * (uEye.x - cp.y), uMirror.y > 0.0 ? 2.0 * uMirror.x - uEye.y : uEye.y, cp.z * (uEye.z - cp.w));
+#endif
   vec4 mv = uView * vec4(seen, 1.0);
   float dist = -mv.z;
   vec4 clip = uProj * mv;
