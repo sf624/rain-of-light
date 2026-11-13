@@ -2,9 +2,59 @@
 // full-screen passes (downsample, blur, composite) that share QUAD_VS.
 
 import { FIELD } from './fields.js';
+import { SOLIDS, KNOTS, MOBIUS_RULINGS } from './figures.js';
 
 // The falling time wraps at this many flow units (see drop() in POINT_VS).
 export const FLOW_WRAP = 1000;
+
+// The figures' tables for POINT_VS, from figures.js, in one uniform block
+// (Figures: uFig, FIGURES below, set up once in main.js). Tables of
+// constants indexed at run time are copied for every LED on some GPUs
+// (SwiftShader), so the shader keeps only their places (FIG_*) as
+// constants. Each entry is a vec4:
+// FIG_SOLID: per solid, its first edge, its edges, its first corner, its
+//   corners; FIG_NEAR: how near its edges come to its centre (corners are 1 away);
+// FIG_CORNER, FIG_EDGE: all the solids' corners, and their edges (the two
+//   corners' places), one solid after another;
+// FIG_KNOT: per knot, four: its curve (0: Lissajous, 1: rings, 2: Moebius
+//   band) and a Lissajous curve's u, v, w or a band's radius and half
+//   width; a Lissajous curve's measures; how far it reaches along x, y, z
+//   (in units of its size); a link's first ring and rings;
+// FIG_RING: per ring, three: its centre and radius, its axes u and v.
+const num = (v) => (Number.isInteger(v) ? `${v}.0` : `${+v.toFixed(5)}`);
+function figureTables() {
+  const at = {}, rows = [];
+  const put = (name, items) => { at[name] = rows.length; for (const v of items) rows.push([0, 1, 2, 3].map((i) => v[i] ?? 0)); };
+  let e = 0, c = 0;
+  put('SOLID', SOLIDS.map((x) => { const r = [e, x.edges.length, c, x.corners.length]; e += x.edges.length; c += x.corners.length; return r; }));
+  put('NEAR', SOLIDS.map((x) => [x.near * 0.999]));
+  put('CORNER', SOLIDS.flatMap((x) => x.corners));
+  c = 0;
+  put('EDGE', SOLIDS.flatMap((x) => { const o = c; c += x.corners.length; return x.edges.map(([i, j]) => [i + o, j + o]); }));
+  let ring = 0;
+  put('KNOT', KNOTS.flatMap((k) => {
+    const rings = k.rings ? [ring, k.rings.length] : [0, 0];
+    ring += k.rings?.length || 0;
+    return [[{ lissajous: 0, rings: 1, band: 2 }[k.curve], ...(k.curve === 'band' ? [0, k.R, k.r] : k.w || [0, 0, 0])],
+      k.box || [1, 1, 1], k.reach, rings];
+  }));
+  put('RING', KNOTS.flatMap((k) => (k.rings || []).flatMap((r) => [[...r.centre, r.radius], r.u, r.v])));
+  const most = (xs) => Math.max(...xs);
+  const glsl = [
+    `layout(std140) uniform Figures { vec4 uFig[${rows.length}]; };`,
+    `const int ${Object.entries(at).map(([k, v]) => `FIG_${k} = ${v}`).join(', ')};`,
+    `const int SOLID_EDGES = ${most(SOLIDS.map((x) => x.edges.length))}, SOLID_CORNERS = ${most(SOLIDS.map((x) => x.corners.length))};`,
+    `const int KNOT_PLACES = ${most(KNOTS.filter((k) => k.curve === 'lissajous').map((k) => 2 * k.w[1]))};`,
+    `const int KNOT_RINGS = ${most(KNOTS.map((k) => k.rings?.length || 0))};`,
+    `const float MOBIUS_RULINGS = ${num(MOBIUS_RULINGS)};`,
+    'ivec4 figInts(int i) { return ivec4(uFig[i] + 0.5); }',
+  ].join('\n');
+  return { glsl, data: new Float32Array(rows.flat()) };
+}
+const FIGURE_TABLES = figureTables();
+// The data of the uniform block Figures (see figureTables).
+export const FIGURES = FIGURE_TABLES.data;
+
 // A light ray is at most this many times the Ray length setting (see POINT_VS: rayK).
 export const RAY_CAP = 2.5;
 
@@ -424,32 +474,31 @@ float rod(float d2) { return 1.0 - smoothstep(0.13, 0.25, d2); }
 // that fades over a length (trail), and a short rise before the head, never lit at once.
 float runner(float back, float trail) { return exp(-back / trail) + exp(-(1.0 - back) / (trail * 0.06)); }
 
-// A solid: the edges of a regular solid as rods of light, a bright point at
-// each corner: a tetrahedron or an octahedron (f.x: which, see SOLID), their
-// corners a.z from the centre. It stands on a corner's axis (the solid's y),
-// leaning a little (tilt, towards yaw) and turning about that axis (a.w), so
-// its edges run aslant or level, never along a strand. The edges are drawn
-// out from the corners (f.y: how far, 0 .. 1).
-const vec3 CORNER[10] = vec3[10](
-  vec3(0.0, 1.0, 0.0), vec3(0.94281, -0.33333, 0.0), vec3(-0.47140, -0.33333, 0.81650), vec3(-0.47140, -0.33333, -0.81650),
-  vec3(1.0, 0.0, 0.0), vec3(-1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), vec3(0.0, -1.0, 0.0), vec3(0.0, 0.0, 1.0), vec3(0.0, 0.0, -1.0));
-const ivec2 EDGE[18] = ivec2[18](
-  ivec2(0, 1), ivec2(0, 2), ivec2(0, 3), ivec2(1, 2), ivec2(1, 3), ivec2(2, 3),
-  ivec2(4, 6), ivec2(4, 7), ivec2(4, 8), ivec2(4, 9), ivec2(5, 6), ivec2(5, 7), ivec2(5, 8), ivec2(5, 9), ivec2(6, 8), ivec2(6, 9), ivec2(7, 8), ivec2(7, 9));
-const ivec4 SOLID[2] = ivec4[2](ivec4(0, 6, 0, 4), ivec4(6, 12, 4, 6));   // first edge, edges, first corner, corners
+${FIGURE_TABLES.glsl}
+
+// A solid: the edges of a solid as rods of light, a bright point at each
+// corner: one of SOLIDS (figures.js; f.x: which), its corners a.z from the
+// centre. It stands on its own axis (the solid's y), leaning a little (tilt,
+// towards yaw) and turning about that axis (a.w), so its edges run aslant
+// or level, never along a strand. The edges are drawn out from the corners
+// (f.y: how far, 0 .. 1). Nearer the centre than its nearest edge, or
+// beyond its corners, an LED is near no edge and skips them all.
 vec3 solidLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
   float cs = cos(a.w), sn = sin(a.w);
   vec3 q = turned(p - b.xyz, yaw, b.w) / a.z;
+  int v = int(f.x + 0.5);
+  ivec4 which = figInts(FIG_SOLID + v);
+  float r = length(q), reach = 0.8 / a.z;            // (a rod's and a corner's reach, in units of its size)
+  if (r < uFig[FIG_NEAR + v].x - reach || r > 1.0 + reach) return vec3(0.0);
   vec3 up = turned(vec3(0.0, 1.0, 0.0), 0.0, b.w);   // the vertical, as the solid sees it
   q = vec3(cs * q.x - sn * q.z, q.y, sn * q.x + cs * q.z);
   up = vec3(cs * up.x - sn * up.z, up.y, sn * up.x + cs * up.z);
   float fine = fineness() * a.z * a.z;
-  ivec4 which = SOLID[int(f.x + 0.5)];
   float light = 0.0, hot = 0.0, along = 0.0;
-  for (int e = 0; e < 12; e++) {
+  for (int e = 0; e < SOLID_EDGES; e++) {
     if (e >= which.y) break;
-    ivec2 ends = EDGE[which.x + e];
-    vec3 A = CORNER[ends.x], ba = CORNER[ends.y] - A;
+    ivec4 ends = figInts(FIG_EDGE + which.x + e);
+    vec3 A = uFig[FIG_CORNER + ends.x].xyz, ba = uFig[FIG_CORNER + ends.y].xyz - A;
     vec3 pa = q - A;
     float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
     vec3 off = pa - ba * h;
@@ -461,43 +510,92 @@ vec3 solidLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
     light += g;
     along += g * m * 2.0;
   }
-  for (int v = 0; v < 6; v++) {
-    if (v >= which.w) break;
-    vec3 d = q - CORNER[which.z + v];
+  for (int c = 0; c < SOLID_CORNERS; c++) {
+    if (c >= which.w) break;
+    vec3 d = q - uFig[FIG_CORNER + which.z + c].xyz;
     hot += rod(dot(d, d) * fine * 0.45);
   }
   return vec3(min(light, 1.6) * 8.0 + hot * 9.0, hot * 0.5, along / max(light, 1e-4));
 }
 
-// A knot: a Lissajous curve in three dimensions, x = sin(u t + a.w),
-// y = sin(v t), z = sin(w t + phase), a closed line whose loops open and
-// close a little as its phase sways. It swings twice across while it goes
-// once up and down (a figure of eight, woven in depth), so it runs mostly
-// aslant or level, hardly ever along a strand, and its loops are few and wide.
-// Two lights run round it. f.x .. f.y: the part of the curve that shows (0 .. 1 of the way round).
-// The curve passes the LED's height at 2 v places: the nearest place on it
-// is sought from each (one step along the curve), so the cost does not grow
-// with the curve's length.
-const vec3 KNOT = vec3(2.0, 1.0, 3.0);               // u, v, w: how often it swings across, up and down, and in depth
-const vec3 KNOT_BOX = vec3(1.0, 0.9, 0.4);          // its half width, height and depth, in units of its size: its broad side shows the figure
+// A knot: one of KNOTS (figures.js; f.z: which), one closed line or a few
+// (a link), each from t = 0 to 2 pi once round, its broad side to the room.
+// Two lights run round each line. f.x .. f.y: the part of each line that
+// shows (0 .. 1 of the way round; a link's rings all at once).
+// - A Lissajous curve: x = sin(u t + a.w), y = sin(v t), z = sin(w t + phase),
+//   whose loops open and close a little as its phase (a.w) sways. It passes
+//   the LED's height at 2 v places: from each the shader steps along the
+//   curve's tangent towards the LED and keeps the nearest place found.
+// - A link of rigid rings (circles): the distance to each is worked out
+//   exactly. It spins about the axis that faces the room (a.w) and leans a
+//   little (tilt).
+// - A Moebius band (see below).
 vec3 knotLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
   const float TAU = 6.2831853;
-  vec3 w = KNOT;
-  vec3 amp = a.z * KNOT_BOX;
-  vec3 ph = vec3(a.w, 0.0, a.w * 0.618 + 1.0);
-  vec3 q = turned(p - b.xyz, yaw, 0.0);
-  if (any(greaterThan(abs(q), amp + 1.2))) return vec3(0.0);   // the curve comes nowhere near
-  float ys = asin(clamp(q.y / amp.y, -1.0, 1.0));
-  float best = 1e9, at = 0.0, level = 0.0;
-  for (int i = 0; i < 2; i++) {                      // (2 v places, and v is 1)
-    float t = (i == 0 ? ys : 3.14159265 - ys) / w.y;
-    vec3 ang = w * t + ph;
-    vec3 c = amp * sin(ang), T = amp * w * cos(ang);
-    t += clamp(dot(q - c, T) / max(dot(T, T), 1e-4), -0.3, 0.3);
-    vec3 d = q - amp * sin(w * t + ph);
-    float d2 = dot(d, d);
-    if (d2 < best) { best = d2; at = t; level = 1.0 - abs(T.y) / max(length(T), 1e-4); }
+  int which = int(f.z + 0.5);
+  int kn = FIG_KNOT + 4 * which;                     // its four entries
+  vec4 k = uFig[kn];
+  vec3 q = turned(p - b.xyz, yaw, b.w);
+  if (any(greaterThan(abs(q), a.z * uFig[kn + 2].xyz + 1.2))) return vec3(0.0);   // the curve comes nowhere near
+  vec3 up = turned(vec3(0.0, 1.0, 0.0), 0.0, b.w);   // the vertical, as the knot sees it
+  float best = 1e9, at = 0.0;
+  vec3 T = vec3(1.0, 0.0, 0.0);                      // the line's way there
+  if (k.x < 0.5) {
+    vec3 w = k.yzw;
+    vec3 amp = a.z * uFig[kn + 1].xyz;
+    vec3 ph = vec3(a.w, 0.0, a.w * 0.618 + 1.0);
+    float ys = asin(clamp(q.y / amp.y, -1.0, 1.0));
+    for (int i = 0; i < KNOT_PLACES; i++) {
+      if (float(i) >= 2.0 * w.y) break;
+      float t = ((i % 2 == 0 ? ys : 3.14159265 - ys) + TAU * float(i / 2)) / w.y;
+      vec3 ang = w * t + ph;
+      vec3 c = amp * sin(ang), dc = amp * w * cos(ang);
+      t += clamp(dot(q - c, dc) / max(dot(dc, dc), 1e-4), -0.3, 0.3);
+      vec3 d = q - amp * sin(w * t + ph);
+      float d2 = dot(d, d);
+      if (d2 < best) { best = d2; at = t; T = dc; }
+    }
+  } else if (k.x > 1.5) {
+    // A Moebius band about the axis that faces the room: at each angle phi
+    // about the axis its cross-section is a straight piece (k.z out from
+    // the axis, k.w each way, in units of its size) turned phi / 2, so it
+    // turns half round as it goes once round. Its one edge is a rod of
+    // light; the band between is a faint sheet, brighter along a few of its
+    // straight lines (rulings).
+    float cs = cos(a.w), sn = sin(a.w);
+    q.xy = vec2(cs * q.x + sn * q.y, -sn * q.x + cs * q.y);
+    vec3 u = q / a.z;
+    float phi = atan(u.y, u.x);
+    vec2 c = vec2(length(u.xy) - k.z, u.z), dir = vec2(cos(phi * 0.5), sin(phi * 0.5));
+    float h = clamp(dot(c, dir), -k.w, k.w);
+    float band = length(c - dir * h), edge = min(length(c - dir * k.w), length(c + dir * k.w));
+    float fine = fineness() * a.z * a.z;
+    float rule = pow(0.5 + 0.5 * cos(phi * MOBIUS_RULINGS), 16.0);
+    float sheet = rod(band * band * fine * 2.0) * (0.25 + 0.75 * rule), rim = rod(edge * edge * fine);
+    float s = fract(phi / TAU + 1.0);
+    float shown = smoothstep(f.x, f.x + 0.04, s) * (1.0 - smoothstep(f.y - 0.04, f.y, s));
+    float run = runner(fract((uTime * 0.021 - s) * 2.0), 0.3);
+    sheet *= shown; rim *= shown;
+    return vec3(sheet * (2.5 + 3.0 * run) + rim * (7.0 + 9.0 * run), rim * run * run * 0.3, clamp(run * 1.3, 0.0, 1.0));
+  } else {
+    ivec4 link = figInts(kn + 3);                    // first ring, rings
+    float cs = cos(a.w), sn = sin(a.w);              // its spin
+    q.xy = vec2(cs * q.x + sn * q.y, -sn * q.x + cs * q.y);
+    up.xy = vec2(cs * up.x + sn * up.y, -sn * up.x + cs * up.y);
+    vec3 u = q / a.z;
+    for (int i = 0; i < KNOT_RINGS; i++) {
+      if (i >= link.y) break;
+      int r = FIG_RING + 3 * (link.x + i);
+      vec4 c = uFig[r];
+      vec3 ru = uFig[r + 1].xyz, rv = uFig[r + 2].xyz, d = u - c.xyz;
+      vec2 xy = vec2(dot(d, ru), dot(d, rv));        // (in its plane; and off it, along u x v)
+      float off = length(xy) - c.w, z = dot(d, cross(ru, rv));
+      float d2 = off * off + z * z;
+      if (d2 < best) { best = d2; at = atan(xy.y, xy.x); T = cos(at) * rv - sin(at) * ru; }
+    }
+    best *= a.z * a.z;
   }
+  float level = 1.0 - abs(dot(T, up)) / max(length(T), 1e-4);
   float s = fract(at / TAU);
   float shown = smoothstep(f.x, f.x + 0.04, s) * (1.0 - smoothstep(f.y - 0.04, f.y, s));
   float run = runner(fract((uTime * 0.021 - s) * 2.0), 0.3);
@@ -546,7 +644,11 @@ vec3 formsAt(vec3 p, float id, float v, out vec3 thread, out float around) {
   vec3 c = vec3(0.0);
   thread = vec3(0.0);
   around = 0.0;
-  for (int k = 0; k < 3; k++) {
+  // Only as far as the last slot that shows a form: some GPUs (SwiftShader)
+  // run a loop's body for every LED, those that skip it masked, as long as
+  // any goes on; so where no form shows, none of the forms' code runs.
+  int slots = uFormA[2].y >= 0.001 ? 3 : uFormA[1].y >= 0.001 ? 2 : uFormA[0].y >= 0.001 ? 1 : 0;
+  for (int k = 0; k < slots; k++) {
     vec4 a = uFormA[k];
     if (a.y < 0.001) continue;
     vec4 b = uFormB[k];

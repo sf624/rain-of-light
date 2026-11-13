@@ -14,7 +14,7 @@ import {
 import { createShow } from './show.js';
 import { createDirector, hash } from './director.js';
 import { createDirection } from './direction.js';
-import { FLOW_WRAP, RAY_CAP, POINT_VS, POINT_FS, WIRE_FS, QUAD_VS, DOWN_FS, BLUR_FS, COMPOSITE_FS } from './shaders.js';
+import { FLOW_WRAP, RAY_CAP, FIGURES, POINT_VS, POINT_FS, WIRE_FS, QUAD_VS, DOWN_FS, BLUR_FS, COMPOSITE_FS } from './shaders.js';
 import { createGL, sub, cross, dot, norm, perspective, lookAt } from './gl.js';
 import { createFields } from './fields.js';
 import { createLattice, fillLattice, latticeLight } from './lattice.js';
@@ -104,6 +104,12 @@ const { program, target, freeTarget } = createGL(gl);
 // ---------- the lattice ----------
 const pointProg = program(POINT_VS, POINT_FS);
 const wireProg = program(POINT_VS, WIRE_FS);
+// The figures' tables (shaders.js: FIGURES), one uniform block for both.
+const figureBuffer = gl.createBuffer();
+gl.bindBuffer(gl.UNIFORM_BUFFER, figureBuffer);
+gl.bufferData(gl.UNIFORM_BUFFER, FIGURES, gl.STATIC_DRAW);
+gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, figureBuffer);
+for (const prog of [pointProg, wireProg]) gl.uniformBlockBinding(prog.p, gl.getUniformBlockIndex(prog.p, 'Figures'), 0);
 const downProg = program(QUAD_VS, DOWN_FS);
 const blurProg = program(QUAD_VS, BLUR_FS);
 const compProg = program(QUAD_VS, COMPOSITE_FS);

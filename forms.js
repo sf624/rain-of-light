@@ -15,6 +15,7 @@
 // keep beyond their path as the eye sees it (see BACK).
 
 import { ROOM, EGGS } from './config.js';
+import { SOLIDS, KNOTS } from './figures.js';
 
 const FLOOR = -ROOM.height / 2 - ROOM.foot;        // the mirror floor
 const TAU = Math.PI * 2;
@@ -101,42 +102,46 @@ function veil(age, w, leave, ph, face) {
   };
 }
 
-// A solid: bright points come first, the corners of a regular solid; its
-// edges are drawn out from them until they meet. It stands on the axis of
-// a corner, leaning a little, and turns slowly about that axis, while the
-// way it leans goes slowly round: no edge ever runs along a strand. It goes
-// as its edges draw back into the corners. Each time it is one of two, for
-// its whole life: a tetrahedron, point up, or an octahedron on its point
-// (SOLID in shaders.js).
+// A solid: bright points come first, the corners of a solid; its edges are
+// drawn out from them until they meet. It stands on an axis of its own,
+// leaning a little, and turns slowly about that axis, while the way it leans
+// goes slowly round: no edge ever runs along a strand. It goes as its edges
+// draw back into the corners. Each time it is one of SOLIDS (figures.js),
+// for its whole life (v).
 // f[0]: which solid; f[1]: how far the edges are drawn (0 .. 1).
-const SOLIDS = [{ size: 5.0, y: -3.7 }, { size: 4.5, y: -3.0 }];   // per solid: how far its corners are from its centre, and how high that is
-function solid(age, w, leave, ph) {
-  const which = Math.floor(ph / TAU * 7 * SOLIDS.length) % SOLIDS.length;
-  const { size, y } = SOLIDS[which], drift = 1.3;
+function solid(age, w, leave, ph, face, go, v) {
+  const { size, y } = SOLIDS[v], drift = 1.3;
   return {
     centre: [drift * Math.sin(0.024 * age + ph), y + 0.3 * Math.sin(0.027 * age + ph), drift * Math.cos(0.019 * age + ph)],
     size, turn: 0.055 * age + ph,
     yaw: 0.04 * age + 2 * ph,
     tilt: 0.3 + 0.1 * Math.sin(0.05 * age + 3 * ph),
-    f: [which, smooth((age - 5) / 17) * (1 - smooth(leave * 1.25)), 0],
+    f: [v, smooth((age - 5) / 17) * (1 - smooth(leave * 1.25)), 0],
     bound: size + 1.2,
   };
 }
 
-// A knot: a Lissajous curve, drawn once round as it comes, its broad side
-// to the room, swaying. Its phase sways about the place where its loops
-// stand widest open, never as far as where they close into one line. It
-// goes as the curve is undone from where it began.
-// turn: its phase; f[0] .. f[1]: the part of the curve that shows.
-const KNOT_SWAY = 0.55;                             // how far the phase sways from 0, where the loops stand widest (they close at pi / 2)
-function knot(age, w, leave, ph, face) {
-  const size = 4.6, drift = 1.3;
+// A knot: a closed curve (or a few, a link), drawn once round as it comes,
+// its broad side to the room, swaying; it goes as the curve is undone from
+// where it began (a link: each of its rings at once). Each time it is one of
+// KNOTS (figures.js), for its whole life (v). A Lissajous curve's phase
+// sways about the place where its loops stand widest open, never as far as
+// where they close into one line; a rigid figure (a link, a band) spins
+// slowly about the axis that faces the room, and leans a little to and fro,
+// so that its crossings show which way they pass.
+// turn: its phase, or its spin; f[0] .. f[1]: the part of the curve that
+// shows; f[2]: which knot.
+function knot(age, w, leave, ph, face, go, v) {
+  const k = KNOTS[v], drift = 1.3;
+  const rigid = k.curve !== 'lissajous';
   return {
-    centre: [drift * Math.sin(0.022 * age + ph), -3.2 + 0.3 * Math.sin(0.03 * age + ph), drift * Math.cos(0.018 * age + ph)],
-    size, turn: KNOT_SWAY * Math.sin(0.04 * age + ph),
-    yaw: face + 0.35 * Math.sin(0.027 * age + 2 * ph),
-    f: [-0.1 + 1.2 * smooth(leave * 1.1), -0.05 + 1.15 * smooth(age / 18), 0],
-    bound: size * 1.4 + 0.8,
+    centre: [drift * Math.sin(0.022 * age + ph), k.y + 0.3 * Math.sin(0.03 * age + ph), drift * Math.cos(0.018 * age + ph)],
+    size: k.size,
+    turn: rigid ? 0.05 * age + ph : k.widest + k.sway * Math.sin(0.04 * age + ph),
+    yaw: face + (rigid ? 0.2 : 0.35) * Math.sin(0.027 * age + 2 * ph),
+    tilt: rigid ? (k.lean || 0) + 0.15 * Math.sin(0.023 * age + 3 * ph) : 0,
+    f: [-0.1 + 1.2 * smooth(leave * 1.1), -0.05 + 1.15 * smooth(age / 18), v],
+    bound: k.size * Math.hypot(...k.reach) + 0.8,
   };
 }
 
@@ -180,9 +185,10 @@ export const FADING = new Set(['orb', ...EGGS.map((egg) => egg.name)]);
 // gives `face`); centre is where it shows.
 // rise: how many times higher over the floor it floats (a tall view has the
 // room for it; see viewFit in main.js), unless it sits on the floor (onFloor).
-export function motion(name, age, w, go, r, face, rise = 1) {
+// v: which of its figures it is (the solid, the knot, see figures.js).
+export function motion(name, age, w, go, r, face, rise = 1, v = 0) {
   const leave = go ? smooth((age - go.at) / go.fade) : 0;
-  const m = MOTIONS[name](age, w, leave, r * TAU, face, go);
+  const m = MOTIONS[name](age, w, leave, r * TAU, face, go, v);
   const [x, y, z] = m.centre, back = BACK[name] || 0;
   const lift = m.onFloor ? 1 : rise;                // (a baked form stays on the floor)
   return { turn: 0, tilt: 0, yaw: 0, f: [0, 0, 0], dissolve: 0, ...m,

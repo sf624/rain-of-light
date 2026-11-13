@@ -3,7 +3,8 @@
 // mode and palette comes, and how far the mood wanders. With and without the story.
 // It also measures how long the picture stays in one colour family, and how
 // much of the rain flows sideways (see show.js, drift), and how much of the
-// time a form shows, and two at once (0: one form at a time, see show.js).
+// time a form shows, and two at once (0: one form at a time, see show.js),
+// and how often each figure of the solid and the knot comes.
 //   node tools/story-stats.mjs [seeds=50] [hours=1]
 globalThis.innerWidth = globalThis.innerHeight = 1000;
 const { COLOR_MODES, PALETTES, SETS, FORMS, EGGS } = await import('../config.js');
@@ -166,6 +167,8 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
   let side = 0, down = 0, all = 0, steps = 0, drifts = 0, lengths = [], next = 0;
   let lit = 0, full = 0, two = 0;     // steps with a form's light (shown weight above 0), with one wholly there, with two at once
   const came = {}, stayed = {};       // per form: how many times it came, and for how many seconds it showed
+  const figures = {}, lastFigure = {};   // per form with figures: how many times each came; and per seed, the latest
+  let twice = 0;                      // a figure that came again the next time its form did
   const eggAt = [];                   // when each egg came (s into its seed's show)
   for (let seed = 1; seed <= SEEDS; seed++) {
     const show = createShow({ ...DEFAULTS }, { feet: 0, seed });
@@ -181,11 +184,20 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
     }
     let from = null, kind = null;
     let form = null;
+    for (const f in lastFigure) delete lastFigure[f];
     for (let t = 0; t < SPAN; t++) {
       const c = show.cast(t), k = c.kind;
-      const f = c.items.find((i) => i.form !== 'layer')?.form;
+      const sky = c.items.find((i) => i.form !== 'layer'), f = sky?.form;
       if (f) count(stayed, f);
-      if (f && f !== form) { count(came, f); if (EGGS.some((e) => e.name === f)) eggAt.push(t); }
+      if (f && f !== form) {
+        count(came, f);
+        if (EGGS.some((e) => e.name === f)) eggAt.push(t);
+        if (sky.figure) {
+          count(figures[f] ||= {}, sky.figure);
+          if (lastFigure[f] === sky.figure) twice++;
+          lastFigure[f] = sky.figure;
+        }
+      }
       form = f;
       if (k === kind) continue;
       if (k === 'drift') { drifts++; from = t; if (['rain', 'storm'].includes(kind)) next++; }
@@ -205,6 +217,11 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
   for (const f of [...FORMS, ...EGGS]) out.push(`  ${f.name.padEnd(10)} ${((came[f.name] || 0) / hours).toFixed(1).padStart(5)}  ${pct(stayed[f.name] || 0, SEEDS * SPAN)}`);
   const sum = (k) => Object.values(k).reduce((a, b) => a + b, 0);
   out.push(`  ${'all'.padEnd(10)} ${(sum(came) / hours).toFixed(1).padStart(5)}  ${pct(sum(stayed), SEEDS * SPAN)}`);
+  out.push('', 'Figures (times each comes in an hour)');
+  for (const f of FORMS.filter((x) => x.variants)) {
+    out.push(`  ${f.name.padEnd(10)} ${f.variants.map((v) => `${v} ${((figures[f.name]?.[v] || 0) / hours).toFixed(1)}`).join(', ')}`);
+  }
+  out.push(`  the same figure as its form's time before: ${twice}`);
   const eggs = EGGS.reduce((n, e) => n + (came[e.name] || 0), 0);
   out.push('', `Eggs (the baked forms): ${eggs} in ${hours} h, one every ${eggs ? (hours / eggs).toFixed(1) : '-'} h;`
     + ` the earliest at ${eggAt.length ? Math.min(...eggAt) : '-'} s`);
