@@ -1013,7 +1013,10 @@ function frame(now) {
   }
   gl.disable(gl.BLEND);
 
-  if (hasFloat) {
+  // The glow and the haze: the haze is made from the glow's buffer, so with
+  // both at 0 none of their passes runs, and the composite reads the scene alone.
+  const glowOn = S.bloom > 0 || S.haze > 0;
+  if (hasFloat && glowOn) {
     gl.bindVertexArray(emptyVao);
     // Downsample to a quarter.
     gl.bindFramebuffer(gl.FRAMEBUFFER, bloomA.fb);
@@ -1082,6 +1085,9 @@ function frame(now) {
         gl.drawArrays(gl.TRIANGLES, 0, 3);
       }
     }
+  }
+  if (hasFloat) {
+    gl.bindVertexArray(emptyVao);
     // Composite to the screen.
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, W, H);
@@ -1104,7 +1110,7 @@ function frame(now) {
     gl.uniform1i(compProg.u.uHazeWide, 3);
     gl.uniform1f(compProg.u.uHazeK, S.haze);
     gl.uniform1f(compProg.u.uBurn, S.burn);
-    gl.uniform1f(compProg.u.uBloomK, S.bloom);
+    gl.uniform1f(compProg.u.uBloomK, S.bloom);   // (0: the glow's buffer is not read)
     gl.uniform1f(compProg.u.uExposure, S.exposure * glow);
     gl.uniform1f(compProg.u.uFloor, S.blackFloor / 255);
     gl.drawArrays(gl.TRIANGLES, 0, 3);

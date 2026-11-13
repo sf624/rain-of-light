@@ -200,7 +200,7 @@ things that are not in the panel:
 | Layer of light | `layer` | `auto`, `on`, `off` | `auto` | `auto`: the layer comes and goes with the show (about 70% of the time). `on` holds it, `off` removes it. |
 | Floor mirror (0: off) | `mirror` | 0 to 1 | `0.6` | How bright the image in the floor is. |
 | Wall mirrors (copies per side) | `walls` | 0 or 1 | `0` | `1`: the room repeats beyond its walls, one copy on each side. Each copy draws the lattice again, so it is costly. |
-| Haze (0: off) | `haze` | 0 to 2 | `1.5` | A wide, soft glow around the brightest light. |
+| Haze (0: off) | `haze` | 0 to 2 | `0` | A wide, soft glow around the brightest light. Off by default: the picture has no blur. |
 | Burn-out (0: off) | `burn` | 0 to 1 | `0.7` | The brightest light loses its colour and burns out to white. |
 | Twinkle | `twinkle` | 0 to 2 | `0.4` | In a still room, some LEDs flash now and then: as many per volume of the room whatever the density (one in five on a lattice of 72 strands a side). It fades out as a rain passage comes. |
 | Share of strands with rain | `rainShare` | 0 to 1 | `1` | The share of strands that carry rain. At 1, rain falls on every strand of a lattice of up to 72 strands a side; a denser one carries it on as many strands per area, not on all. |
@@ -322,7 +322,8 @@ the copies beyond the walls show.
 
 Query: `scene=crystal&form=none&layer=off&t=30` with `twinkle=0`,
 `twinkle=0.4`, `twinkle=2`. Twinkle belongs to the still room: it fades
-out as a rain passage comes.
+out as a rain passage comes. The glitter of sideways rain (see Direction)
+is the rain's own and does not follow it.
 
 ### Share of strands with rain
 
@@ -456,12 +457,12 @@ with `wire=0`, `wire=0.2`, `wire=2`.
 | --- | --- | --- | --- | --- |
 | Trail brightness | `rainGain` | 0 to 12 | `4` | How bright the trail behind each drop is. |
 | Head brightness | `tipGain` | 0 to 15 | `5` | How bright the head of each drop is. |
-| **Exposure** (viewer page: Brightness) | `exposure` | 0.2 to 4 | `1.8` | The brightness of the whole picture. |
-| Glow | `bloom` | 0 to 2 | `0.8` | The soft glow around bright light. |
+| **Exposure** (viewer page: Brightness) | `exposure` | 0.2 to 4 | `2.2` | The brightness of the whole picture. |
+| Glow | `bloom` | 0 to 2 | `0` | A soft glow around bright light. Off by default: even a weak glow shows as soft patches around near drop heads, and the light rays give bright points their sparkle without blur. |
 | Visible distance | `fog` | 6 to 40 | `34` | How far into the room you see before light fades out. While rain falls, the room closes in a little, and the falling rain's light fades all along the way. |
 | Light rays | `rays` | `off`, `2`, `4`, `6`, `8` | `2` | Star-like rays from every bright point: drop heads, forms, the layer, waves and twinkles. `2` is up and down only. |
-| Ray length (px at 1080 tall, bright point) | `rayLength` | 2 to 60 | `20` | How long the rays of a bright point are. A ray grows with its point's light: a dimmer or farther point casts a shorter ray, down to none. It scales with the view, like the LEDs and their spacing. |
-| Black floor (/255, 0: off) | `blackFloor` | 0 to 16 | `3` | Glow fainter than this is dropped, so the space between the points is true black (most visible on OLED screens). |
+| Ray length (px at 1080 tall, bright point) | `rayLength` | 2 to 60 | `10` | How long the rays of a bright point are. A ray grows with its point's light: a dimmer or farther point casts a shorter ray, down to none. It scales with the view, like the LEDs and their spacing. |
+| Black floor (/255, 0: off) | `blackFloor` | 0 to 16 | `3` | Glow fainter than this is dropped, so the space between the points is true black (most visible on OLED screens). It acts only with Glow above 0. |
 
 ### Trail and head brightness
 
@@ -476,11 +477,11 @@ Query: `scene=rain&flow=down&t=30&color=mono&palette=aurora` with
 ![A veil over the layer, darker, as by default, and brighter](img/exposure.jpg)
 
 Query: `t=110` (a veil passage of the whole show) with `exposure=0.8`,
-`exposure=1.8`, `exposure=3.5`.
+`exposure=2.2`, `exposure=3.5`.
 
 ### Glow
 
-![An orb with no glow, showing its separate strands; with the default glow; with a strong glow that blurs its heart](img/glow.jpg)
+![An orb with no glow (the default), showing its separate strands; with some glow; with a strong glow that blurs its heart](img/glow.jpg)
 
 Query: `scene=crystal&form=orb&layer=off&t=30` with `bloom=0`, `bloom=0.8`,
 `bloom=2`.
@@ -540,6 +541,11 @@ Query: `scene=rain&flow=down&t=30&color=mono&palette=deep+sea` with
 Query: `t=30` with `scene=rain&flow=down`, `scene=rain&flow=across`; and
 `seed=4&t=225`, a drift passage of the whole show.
 
+- Sideways rain glitters. Each LED flashes as a drop crosses its strand,
+  as bright as a falling drop's head, and fades within about a tenth of a
+  second; each flashes at its own strength and moment, and now and then
+  one glints brighter, with long rays. The trail behind the drop twinkles.
+  So the field sparkles as it flows, instead of sliding evenly.
 - In the whole show, about one rain passage in seven is a drift (a passage
   of half a minute or so), always between two form passages. A rain keeps
   its direction for its whole life, and falling and sideways rain never
@@ -750,7 +756,7 @@ How the sound is made is in [design.md](design.md#6-sound).
 ## Not shown in pictures
 
 - **Haze** and **Burn-out**: at the default exposure the difference is too
-  faint to see in a picture of this size.
+  faint to see in a picture of this size (Haze is off by default).
 - **Black floor**: it drops glow fainter than a few levels out of 255; a
   picture cannot show that difference on most screens.
 - **Quality** and `?dpr=`: they change how sharp the picture is, which a
