@@ -448,6 +448,8 @@ await visit(cdp, base, 'lab.html?scene=rain', true);
 await visit(cdp, base, 'lab.html?pause=1&t=20&scene=rain', false);   // the lab's clock
 await visit(cdp, base, 'lab.html?pause=1&t=45&seed=7&hud=1', false);   // paused part-way through a form's coming: settings keep the moment
 await visit(cdp, base, 'lab.html?pause=1&t=Infinity&scene=rain', false);   // a start time that is no number
+// The rain along rays, out from a point and in to it (the lab's prototypes), with the HUD's flow row.
+for (const f of ['out', 'out2', 'in', 'in2']) await visit(cdp, base, `lab.html?scene=rain&flow=${f}&t=20&hud=1`, false);
 await visit(cdp, base, '?scene=crystal', true);
 await visit(cdp, base, '?seed=7&t=100', false);
 await visit(cdp, base, '?seed=7&t=100&story=off', false);   // without the colour story

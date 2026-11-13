@@ -77,6 +77,13 @@ uniform vec3 uLight;
 // strand, [2] along a lane: how many times as many LEDs per length lie there
 // as on the lattice the light is set for, and each one's light.
 uniform vec2 uRainK[3];
+// The same for the rain along rays (see radialRain): LEDs per length, each one's light, the share of rays that carry rain.
+uniform vec3 uRayK;
+// The rain along rays, out from a point or in to it (prototypes, see radialRain).
+uniform vec4 uRadW;       // out, in: how much of their rain shows; their shares of the flow's colour
+uniform vec4 uRadGate;    // out, in: their gates (from, span), as uGate
+uniform vec4 uHole;       // the point (xyz), how far the rays reach (w)
+uniform float uRadStyle;  // which of two looks (0, 1)
 // The show: how much of the rain's look there is, forms of light, and the mirrors.
 uniform float uRainMix;   // 0: the still room's look (pale drops, the room's tint) .. 1: the rain's colours
 uniform float uStorm;     // 0 .. 1: how much rain falls through a form (the rain gives way to it)
@@ -301,6 +308,113 @@ float sidewaysRain(inout Lit L, vec3 pos, float trailK, float w, float dist) {
   gather(L, sparkle(drop(lane, along, k, uGate.zw, uRainK[2]), dist), lane, w);
   gather(L, sparkle(drop(lane + 97.0, along, k, uGate.zw, uRainK[2]), dist), lane + 97.0, w * smoothstep(0.2, 0.8, uRain));
   return along;
+}
+
+// ---------- rain along rays (prototypes) ----------
+// Drops run along rays from a point in all directions: out from it (a white
+// hole) or in to it (a black hole). The sphere of directions round the point
+// is cut into cells of even size (bands of even height along an axis, each cut
+// into as many cells as fit), and each cell is a lane: a thin tube along one
+// ray (its place in the cell is random, so the rays never line up in rings),
+// as wide as an LED at any distance. So the rays lie RAY_GAP LEDs apart at
+// their reach, and closer in, near the point, where every LED is in some ray.
+// Along a ray a drop runs as if under gravity: out, fast from the point and
+// slowing as it goes (u = x^1.5, x: the distance over the reach); in, the same
+// run backwards, faster and faster as it falls in. A drop's head stays about
+// one LED long, so where it runs fast its trail is long. A ray crosses each
+// strand at one LED, which flashes as the head passes, as in the sideways rain (sparkle).
+// Styles: out 0, a soft bright heart, the drops fading as they spread; out 1,
+// the same in pulses, shells of brighter drops; in 0, straight in to a dark
+// core; in 1, the rays wound into spirals, most of the rain falling in near a
+// tilted disc, brighter in a ring round the core. Both ins cast a shadow (holeShadow).
+// Returns the place along the ray (0 .. 1 the way the drops run), for the colour.
+// In: the dark core, a share of the reach; at least a few LEDs wide, or a sparse lattice would not show it.
+const float CORE = 0.11;
+float coreShare() { return max(CORE, 2.5 * uLane.x / uHole.w); }
+const float RAY_GAP = 4.0, RAY_TUBE = 0.8;   // in LED spacings
+// Trails, over a strand's; a head's light, over its: a long trail shows the way a ray runs, a bright
+// head would only cast its rays (up and down) across it.
+const float RAY_TRAIL = 3.0, RAY_HEAD = 0.6, RAY_GAIN = 4.0;
+const float RAY_SPEED = 1.4;                 // drops run this much faster than along a strand (a ray is half as long)
+const vec3 HOLE_AXIS = vec3(0.34, 0.86, -0.38);   // the bands' axis: in 1's disc is level to it
+float radialRain(inout Lit L, vec3 pos, float trailK, float w, float inward, vec2 gate, float dist) {
+  vec3 rel = pos - uHole.xyz;
+  float R = uHole.w, r = length(rel), x = r / R;
+  float a = uLane.x;                                 // the LEDs' spacing
+  bool swirl = inward > 0.5 && uRadStyle > 0.5;
+  // The heart (out): a steady light, no drop's, breathing slowly.
+  if (inward < 0.5 && uRadStyle < 0.5) {
+    float heart = exp(-r * r / 0.8) * (0.75 + 0.25 * sin(uTime * 1.3)) * 1.2;
+    gather(L, vec4(heart, 0.0, heart * 0.3, 0.0), 3.7, w);
+  }
+  float u = pow(min(x, 1.0), 1.5);
+  if (x >= 1.0) return inward > 0.5 ? 0.0 : 1.0;
+  vec3 A = normalize(HOLE_AXIS), B1 = normalize(cross(A, vec3(0.0, 0.0, 1.0))), B2 = cross(A, B1);
+  vec3 d = rel / max(r, 1e-4);
+  float z = clamp(dot(d, A), -1.0, 1.0);
+  float phi = atan(dot(d, B2), dot(d, B1)) / 6.2831853;
+  if (swirl) phi -= 0.22 * (inversesqrt(max(x, 0.02)) - 1.0);   // wound: a ray turns about the axis as it nears the point
+  float nb = max(6.0, floor(2.45 * R / (RAY_GAP * a)));           // bands: about (2 pi / 3) nb^2 cells in all
+  float band = min(floor((z + 1.0) * 0.5 * nb), nb - 1.0);
+  float zc = (band + 0.5) / nb * 2.0 - 1.0;
+  float cells = max(3.0, floor(3.14159 * nb * (1.0 - zc * zc) + 0.5));
+  float turn = hash(band * 3.1 + inward);
+  float cell = floor(fract(phi + turn) * cells);
+  float lane = band * 157.3 + cell * 7.31 + inward * 0.37 + 11.0;
+  // The ray's place in its cell, and the LED's distance from it.
+  float zr = zc + (hash(lane + 1.0) - 0.5) * 1.2 / nb;
+  float pr = ((cell + 0.5 + (hash(lane + 2.0) - 0.5) * 0.6) / cells - turn) * 6.2831853;
+  vec3 ray = zr * A + sqrt(max(0.0, 1.0 - zr * zr)) * (cos(pr) * B1 + sin(pr) * B2);
+  float ph = phi * 6.2831853;
+  vec3 dw = swirl ? z * A + sqrt(max(0.0, 1.0 - z * z)) * (cos(ph) * B1 + sin(ph) * B2) : d;   // the LED's direction, unwound
+  vec3 off = cross(dw, ray);
+  float tube = exp(-dot(off, off) * r * r / (RAY_TUBE * RAY_TUBE * a * a));
+  // How much rain a ray carries, and how bright it is along the way.
+  float k = uRayK.z, glow;
+  if (inward < 0.5) {
+    glow = smoothstep(0.03, 0.12, x) * (1.0 - smoothstep(0.5, 1.0, x)) * mix(1.6, 0.5, x);
+    if (uRadStyle > 0.5) glow *= 0.15 + 2.5 * pow(0.5 + 0.5 * cos(6.2831853 * 3.0 * (u - uFlow * 0.18)), 8.0);
+  } else {
+    float core = coreShare();
+    glow = (1.0 - smoothstep(0.7, 1.0, x)) * smoothstep(core, core * 1.6, x) * min(2.5, 0.5 * inversesqrt(x));
+    if (swirl) {
+      float level = exp(-zr * zr / 0.03);           // how near the disc the ray is
+      k *= mix(0.3, 2.0, level);
+      glow *= mix(0.6, 1.4, level) * (1.0 + 2.0 * level * exp(-pow((x - 0.28) / 0.08, 2.0)));
+    }
+  }
+  w *= rainOn(lane, k) * tube * glow;
+  float along = inward > 0.5 ? 1.0 - u : u;
+  if (w < 1e-4) return along;
+  float run = along / RAY_SPEED;                     // (the drop's own place: it runs past the reach sooner)
+  // (A head about one LED long wherever it runs: u runs fast near the point.)
+  vec2 led = vec2(uRayK.x * R / uHeight * RAY_SPEED / (1.5 * sqrt(max(x, 0.01))), uRayK.y);
+  float trail = trailK * RAY_TRAIL;
+  const vec4 TO = vec4(RAY_GAIN, RAY_GAIN, RAY_GAIN * RAY_HEAD, 1.0);
+  gather(L, sparkle(drop(lane, run, trail / RAY_SPEED, gate, led), dist) * TO, lane, w);
+  gather(L, sparkle(drop(lane + 97.0, run, trail / RAY_SPEED, gate, led), dist) * TO, lane + 97.0, w * smoothstep(0.2, 0.8, uRain));
+  return along;
+}
+
+// The black hole's shadow (in): the light of every LED behind the point, as
+// the eye sees it (or its image in the floor), within SHADOW times the dark
+// core, goes out; just outside, a faint ring of light lies on the LEDs a little way behind.
+// Returns (how much light is left, the ring's light).
+const float SHADOW = 1.6;
+vec2 holeShadow(vec3 pos) {
+  vec3 eye = uMirror.y > 0.0 ? vec3(uEye.x, 2.0 * uMirror.x - uEye.y, uEye.z) : uEye;
+  vec3 toC = uHole.xyz - eye;
+  float dc = length(toC);
+  vec3 v = toC / dc, pe = pos - eye;
+  float depth = dot(pe, v);
+  if (depth < dc - 0.5) return vec2(1.0, 0.0);      // in front of the point: nothing hides it
+  float behind = smoothstep(dc - 0.5, dc + 0.5, depth);
+  float q = length(pe - v * depth) * dc / depth;     // off the line to the point, as seen at its distance
+  float rs = coreShare() * uHole.w * SHADOW;
+  float wide = max(rs * 0.12, uLane.x * 0.5);         // (at least about an LED wide, or a sparse lattice misses it)
+  float ring = exp(-pow((q - rs - wide) / wide, 2.0)) * (0.6 + 0.4 * noise3(pos * 1.5 + uTime * 0.3));
+  float near = 1.0 - smoothstep(2.0, 6.0, depth - dc);   // (not all the way back: there it would pile up into a solid line)
+  return vec2(1.0 - behind * (1.0 - smoothstep(rs * 0.85, rs, q)), behind * near * ring);
 }
 
 // ---------- forms of light ----------
@@ -628,8 +742,17 @@ void main() {
   float trailK = mix(1.0, 1.7, uRain) * uTrail;
   vec3 col = vec3(0.0);
   if (uDirW.x > 0.001) strandRain(L, seed, u, trailK, uDirW.x);
-  if (uTurn < 0.999) col += flowColor(u, spatial, h) * (1.0 - uTurn);
+  float downShare = 1.0 - uTurn - uRadW.z - uRadW.w;
+  if (downShare > 0.001) col += flowColor(u, spatial, h) * downShare;
   if (uDirW.y > 0.001 || uTurn > 0.001) col += flowColor(sidewaysRain(L, pos, trailK, uDirW.y, dist), spatial, h) * uTurn;
+  if (uRadW.x > 0.001 || uRadW.z > 0.001) col += flowColor(radialRain(L, pos, trailK, uRadW.x, 0.0, uRadGate.xy, dist), spatial, h) * uRadW.z;
+  if (uRadW.y > 0.001 || uRadW.w > 0.001) col += flowColor(radialRain(L, pos, trailK, uRadW.y, 1.0, uRadGate.zw, dist), spatial, h) * uRadW.w;
+  float hidden = 1.0;                                // what the black hole's shadow leaves
+  if (uRadW.y > 0.001) {
+    vec2 sh = holeShadow(pos);
+    hidden = 1.0 - uRadW.y * (1.0 - sh.x);
+    gather(L, vec4(sh.y * 0.3, 0.0, sh.y * 0.08, 0.0), hash(seed + u * 37.0), uRadW.y);   // (each LED its own colour)
+  }
   float rain = L.rain;
   float tip = L.tip;
   // Spherical waves of light.
@@ -758,7 +881,7 @@ void main() {
 
   float fog = 1.0 - smoothstep(uFogFar * 0.3, uFogFar, dist);
   // Each mirror dims its image a little; the floor's image fades with the height above it.
-  float g = uCopyGain[gl_InstanceID] * fog;
+  float g = uCopyGain[gl_InstanceID] * fog * hidden;
   if (uMirror.y > 0.0) g *= uMirror.y * exp(-(pos.y - uMirror.x) / uMirror.z);
   c *= g;
   glint *= g;

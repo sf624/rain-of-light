@@ -188,3 +188,14 @@ export function motion(name, age, w, go, r, face, rise = 1) {
   return { turn: 0, tilt: 0, yaw: 0, f: [0, 0, 0], dissolve: 0, ...m,
     anchor: m.centre, centre: [x + back * Math.sin(face), FLOOR + (y - FLOOR) * lift, z + back * Math.cos(face)] };
 }
+
+// The point the rain along rays runs out from, or in to (a prototype, see
+// radialRain in shaders.js): at a form's height near the middle of the room,
+// drifting slowly as an orb does, higher in a tall view (rise). It follows
+// from the time alone. reach: how far its rays reach, farther in a tall view,
+// whose eye stands farther back.
+const HOLE_REACH = 7;
+export function hole(t, rise = 1) {
+  const y = -3.0 + 0.4 * Math.sin(0.025 * t);
+  return { centre: [1.5 * Math.sin(0.021 * t), FLOOR + (y - FLOOR) * rise, 1.5 * Math.cos(0.017 * t)], reach: HOLE_REACH * Math.sqrt(rise) };
+}

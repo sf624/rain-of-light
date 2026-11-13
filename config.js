@@ -22,10 +22,19 @@ export const WEATHER = [
 ];
 // Direction: rain falls from above, or flows sideways. Which one belongs to the
 // passage (see PASSAGES, drift): a rain keeps its direction for its whole life.
+// Prototypes, in the lab only (lab: true), not cast by the show: rain that runs
+// out along rays from a point (a white hole), or in to it (a black hole); style
+// picks one of two looks of each (see radialRain in shaders.js).
 export const FLOWS = [
   { name: 'down',   toward: 0 },
   { name: 'across', toward: 1 },
+  { name: 'out',    toward: 2, style: 0, lab: true },
+  { name: 'out2',   toward: 2, style: 1, lab: true },
+  { name: 'in',     toward: 3, style: 0, lab: true },
+  { name: 'in2',    toward: 3, style: 1, lab: true },
 ];
+// How many directions there are (see direction.js).
+export const DIRECTIONS = Math.max(...FLOWS.map((f) => f.toward)) + 1;
 // Colour modes. Their order is the order of the weights uW in the shader.
 // many: rain of many colours at once, whatever the mood (see director.js, the colour story).
 export const COLOR_MODES = [
@@ -218,8 +227,9 @@ export const SCHEMA = [
     { key: 'weather', label: 'Weather', options: ['auto', 'drizzle', 'rain', 'shower', 'downpour'] },
     { key: 'speed', label: 'Speed (x)', min: 0, max: 4, step: 0.05 },
     { key: 'trail', label: 'Trail length (x)', min: 0.2, max: 4, step: 0.05 },
-    { key: 'flow', label: 'Direction', options: ['auto', 'down', 'across'],
-      hint: 'auto: as the passage has it (now and then a passage of sideways rain) / down: from above / across: sideways' },
+    { key: 'flow', label: 'Direction', options: ['auto', ...FLOWS.map((f) => f.name)],
+      hint: 'auto: as the passage has it (now and then a passage of sideways rain) / down: from above / across: sideways'
+        + ' / out, out2: out from a point (prototypes) / in, in2: in to a point (prototypes)' },
   ] },
   { title: 'Colour', items: [
     { key: 'color', label: 'Colour mode', options: ['auto', ...COLOR_MODES.map((m) => m.name)], viewer: 2,

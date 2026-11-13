@@ -187,11 +187,11 @@ export function latticeSize(S, SPAN, HEIGHT) {
 // there, seen one by one), so the room is as much darker as it has fewer LEDs.
 //   room     the light of the forms, waves and rest per LED
 //   wire     the light per wire: by the floor area each strand stands for, only less
-//   fall, side  along a strand, and along a lane of sideways rain: how many times
+//   fall, side, ray  along a strand, along a lane of sideways rain, and along a ray (see radialRain): how many times
 //            as many LEDs per length (a head stays about one LED long), and each
 //            LED's light: a drop is as bright on fewer LEDs, but no LED more than
 //            DROP_MAX times as bright as there
-//   share    the share of strands, and of lanes, that carry rain: so that the
+//   share    the share of strands, of lanes, and of rays, that carry rain: so that the
 //            rain gives as much light per volume as the room does
 //   twinkle  the share of LEDs that twinkle: one in five, fewer on a denser lattice
 export const LIGHT_LATTICE = { grid: 72, rows: 96 };
@@ -202,9 +202,10 @@ export function latticeLight(GRID, ROWS, SPAN, HEIGHT) {
   const volume = (h * h * v) / (h0 * h0 * v0);          // the volume per LED, over that there
   const room = Math.min(1, volume);
   const fall = [v0 / v, Math.min(DROP_MAX, v / v0)], side = [h0 / h, Math.min(DROP_MAX, h / h0)];
+  const a = Math.cbrt(h * h * v), ray = [v0 / a, Math.min(DROP_MAX, a / v0)];   // along a ray: the LEDs' mean spacing
   return {
-    room, wire: Math.min(1, (h * h) / (h0 * h0)), fall, side,
-    share: [Math.min(1, room / fall[1]), Math.min(1, room / side[1])],
+    room, wire: Math.min(1, (h * h) / (h0 * h0)), fall, side, ray,
+    share: [Math.min(1, room / fall[1]), Math.min(1, room / side[1]), Math.min(1, room / ray[1])],
     twinkle: 0.2 * room,
   };
 }

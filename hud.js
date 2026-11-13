@@ -38,7 +38,7 @@ const ROWS = [
     return l ? `on ${f2(l.w)} ${l.palette}` : 'off';
   }, (s) => s.show.items.filter((i) => i.form === 'layer').flatMap((i) => i.colors)],
   ['weather', 'weather', true, (s) => `${s.weather.name}  rain ${f2(s.weather.rain)}  fall ${f2(s.weather.fall)}  density ${f2(s.density[0])}/${f2(s.density[1])}  share ${f2(s.rainShare)}`],
-  ['flow', 'flow', false, (s) => `down ${pct(s.flow.down)}  across ${pct(s.flow.across)}  blend ${f2(s.flow.mix)}  ${s.flow.goal ? 'goal across' : 'goal down'}`],
+  ['flow', 'flow', false, (s) => `${s.flow.weights.filter(([n, w], i) => i < 2 || w > 0).map(([n, w]) => `${n} ${pct(w)}`).join('  ')}  blend ${f2(s.flow.mix)}  goal ${s.flow.goal}`],
   ['color', 'colour', false, (s) => `${s.color.mode}  ${s.color.palette ?? ''}`, (s) => s.color.swatches],
   ['bright', 'bright', true, (s) => `exposure ${f2(s.light.exposure)} x breath ${s.light.breath === null ? 'off' : f2(s.light.glow)} = ${f2(s.light.applied)}`],
   ['light', 'light', false, (s) => `room ${f2(s.light.room)}  wire ${f2(s.light.wire)}  twinkle ${f2(s.light.twinkle)}  fall light ${f2(s.light.fall)}  form gain x${f2(s.light.stormGain)}`],

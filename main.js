@@ -8,9 +8,10 @@ import { createTuner, loadSettings } from './tuner.js';
 import { createAudio } from './audio.js';
 import { createSway, createRandom } from './sway.js';
 import {
-  PALETTES, WEATHER, FLOWS, COLOR_MODES, SETS, SKY, CAMERAS,
+  PALETTES, WEATHER, FLOWS, DIRECTIONS, COLOR_MODES, SETS, SKY, CAMERAS,
   DEFAULTS, STORAGE_KEY, SCHEMA, ROOM,
 } from './config.js';
+import { hole } from './forms.js';
 import { createShow } from './show.js';
 import { createDirector, hash } from './director.js';
 import { createDirection } from './direction.js';
@@ -377,7 +378,7 @@ addEventListener('keydown', (e) => {
   if (e.key === 'w') step('weather', WEATHER);   // next weather
   if (e.key === 'c') { show.recolor(); step('color', COLOR_MODES); } // next colour, of the rain and the forms
   if (e.key === 'd') {                           // switch direction (and hold it)
-    tuner.set('flow', flowOf(flowGoal) ? 'down' : 'across');
+    tuner.set('flow', flowOf(flowGoal) === 0 ? 'across' : 'down');
     tuner.refresh();
   }
   if (e.key === 'v') step('camera', CAMERAS);    // next camera move
@@ -422,7 +423,9 @@ let weather = null, colorMode = null;
 const densityGoal = [1, 1];
 // The rain falls or flows sideways, as the passage has it or the Direction
 // setting; a change never shows both at once (see direction.js).
-const flowOf = (flow) => { const f = FLOWS.find((x) => x.name === forced('flow')); return f ? f.toward : flow.toward; };
+// (The rain along rays, out from a point or in to it, is a prototype of the lab's.)
+const forcedFlow = () => FLOWS.find((x) => x.name === forced('flow') && (lab || !x.lab));
+const flowOf = (flow) => { const f = forcedFlow(); return f ? f.toward : flow.toward; };
 let flowGoal = { toward: 0, angle: 0 };     // the show's direction now (see show.js, flowAt)
 let flowDir = [0, 1];
 let flowTurns = 0;                          // the lab: how many times a rain began with its own way                       // the way the sideways rain flows: a new one each time it begins
@@ -721,7 +724,7 @@ function initState(t0) {
   flowTurns = 0;
   show.reset();
   flowGoal = show.flow(time);
-  direction = createDirection(flowOf(flowGoal));
+  direction = createDirection(flowOf(flowGoal), DIRECTIONS);
   flowDir = [0, 1];
   if (flowGoal.toward) flowDir = [Math.cos(flowGoal.angle), Math.sin(flowGoal.angle)];
 }
@@ -822,7 +825,7 @@ const RIPPLE_LIFE = 7;   // seconds a wave lives (POINT_VS)
 function hudSnapshot() {
   const info = show.info(time);
   const lookNow = looks[sideNow < 0.5 ? 0 : 1], goalNow = goals[sideNow < 0.5 ? 0 : 1];
-  const [w0, w1] = direction.weights;
+  const dw = direction.weights;
   const moves = CAMERAS.map((c, i) => [c.name, camW[i]]).filter(([, w]) => w > 0.01).map(([n, w]) => `${n} ${w.toFixed(2)}`).join(' ');
   return {
     time, seed: SEED, rateText: rateText(clock.rate), paused: clock.paused,
@@ -832,7 +835,8 @@ function hudSnapshot() {
     scene: S.scene, form: S.form, layer: S.layer, show: info,
     weather: { name: weather.name, rain: look.rain, fall: look.flowRate },
     density: look.density, rainShare: rainShareNow,
-    flow: { down: w0, across: w1, mix: direction.mix, goal: flowOf(flowGoal) },
+    flow: { weights: FLOWS.filter((f) => !f.style).map((f) => [f.name, dw[f.toward]]), mix: 1 - direction.shares[0],
+      goal: forcedFlow()?.name ?? FLOWS[flowGoal.toward].name },
     color: { mode: colorMode.name, palette: PALETTES.find((p) => p.a.every((v, i) => v === goalNow.a[i]))?.name, swatches: [lookNow.a, lookNow.b] },
     light: {
       exposure: S.exposure, breath: lastBreath, glow: lastGlow, applied: S.exposure * lastGlow,
@@ -887,7 +891,9 @@ function frame(now) {
   // For the lab's readout (see hudSnapshot): the frame's last state.
   lastShown = shown; lastGlow = glow; lastBreath = S.breath === 'on' ? breath : null;
   rainShareNow = sparseShare() + (S.rainShare * (1 - 0.35 * shown.storm) - sparseShare()) * rk;
-  fallLightNow = rk * (1 - direction.mix);
+  const shares = direction.shares, dirW = direction.weights, dirGates = direction.gates;
+  fallLightNow = rk * shares[0];
+  const holeNow = hole(time, fit.rise);   // the point the rain along rays runs from, or to
 
   // Points.
   gl.bindFramebuffer(gl.FRAMEBUFFER, hasFloat ? scene.fb : null);
@@ -925,7 +931,8 @@ function frame(now) {
   gl.uniform1f(u.uMaxPx, S.maxPx * renderScale); // pixels shrink with the scale
   gl.uniform1f(u.uRest, S.rest);
   gl.uniform3f(u.uLight, light.room, light.wire, light.twinkle);
-  gl.uniform2fv(u.uRainK, [...light.share, ...light.fall, ...light.side]);
+  gl.uniform2fv(u.uRainK, [...light.share.slice(0, 2), ...light.fall, ...light.side]);
+  gl.uniform3f(u.uRayK, ...light.ray, light.share[2]);
   gl.uniform1f(u.uRainGain, S.rainGain);
   gl.uniform1f(u.uTipGain, S.tipGain);
   gl.uniform1f(u.uTrail, S.trail);
@@ -937,9 +944,14 @@ function frame(now) {
   gl.uniform1f(u.uBowStyle, { bands: 0, drop: 1, led: 2 }[S.rainbow] ?? 1);
   gl.uniform1f(u.uFlow, look.flow);
   gl.uniform1f(u.uRain, look.rain);
-  gl.uniform1f(u.uTurn, direction.mix);
-  gl.uniform2fv(u.uDirW, direction.weights);
-  gl.uniform4fv(u.uGate, direction.gates);
+  gl.uniform1f(u.uTurn, shares[1]);
+  gl.uniform2fv(u.uDirW, dirW.subarray(0, 2));
+  gl.uniform4fv(u.uGate, dirGates.subarray(0, 4));
+  // The rain along rays (out, in): weights and shares of the colour, gates, the point and how far the rays reach.
+  gl.uniform4f(u.uRadW, dirW[2], dirW[3], shares[2], shares[3]);
+  gl.uniform4fv(u.uRadGate, dirGates.subarray(4, 8));
+  gl.uniform4f(u.uHole, ...holeNow.centre, holeNow.reach);
+  gl.uniform1f(u.uRadStyle, forcedFlow()?.style ?? 0);
   gl.uniform2fv(u.uFlowDir, flowDir);
   gl.uniform2f(u.uLane, SPAN / (GRID - 1), HEIGHT / ROWS);
   gl.uniform1f(u.uSpan, SPAN);

@@ -130,7 +130,8 @@ about 11 s to 3 s. It visits:
   `config.js`), the link to the other page, and that the viewer page sees
   a setting the lab saved and its Reset clears it;
 - the pinned scenes (`rain` in the lab, `crystal`, both with the click,
-  keys and Reset), a time part-way through the show
+  keys and Reset), the rain along rays (each of the four prototypes, see
+  below), a time part-way through the show
   (with and without the colour story), four of the forms held, and
   `?jitter=pitch`, and the lab's clock (opened paused, it stands still;
   Space runs and stops it, also with the focus in the panel; the arrows seek
@@ -302,6 +303,38 @@ lines:
 
 On a screen narrower than 700 px only the main lines show, and with the
 settings panel open the HUD steps aside.
+
+## Prototypes: rain along rays
+
+The lab's Direction setting also has four prototypes, which the show does
+not cast: rain that runs along rays from one point in the room, out from
+it like a white hole, or in to it like a black hole. Pin one with
+`lab.html?scene=rain&flow=out` (or `out2`, `in`, `in2`); the viewer page
+ignores them. The HUD's flow row shows their weight while they show.
+
+- **The point**: `hole` in `forms.js`, at a form's height near the middle
+  of the room, drifting slowly as an orb does, higher in a tall view. It
+  follows from the time alone. The rays reach `HOLE_REACH` (7) from it,
+  farther in a tall view, whose eye stands farther back.
+- **The rays** (`radialRain` in `shaders.js`): the sphere of directions
+  round the point is cut into cells of even size, and each cell is a lane,
+  a tube one LED wide along one ray. So the rays stand about `RAY_GAP` LEDs
+  apart at their reach and closer in near the point. A drop runs along its
+  ray as under gravity: out, fast from the point and slowing as it goes;
+  in, the same backwards, faster and faster as it falls. Trails are longer
+  than a strand's and heads dimmer, so a ray shows its way and a head's
+  light rays (up and down) do not cross it out.
+- **The looks**: `out`, a soft heart at the point, drops fading as they
+  spread; `out2`, the same in pulses, shells of brighter drops going out;
+  `in`, straight in to a dark core with a faint rim; `in2`, the rays wound
+  into spirals, most of the rain falling in near a tilted disc, brighter in
+  a ring round the core.
+- **The rain's machinery**: the colour modes, the weather (more or fewer
+  rays carry drops, `rainOn`), trails, the lattice's light (`latticeLight`:
+  `ray`), rays from the heads, and the gates of a change of direction
+  (`direction.js` keeps a weight, a gate and a share of the colour for each
+  of the four directions). A change from or to falling rain fades as any
+  change of direction does.
 
 ## Capturing the page
 
