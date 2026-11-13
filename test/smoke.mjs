@@ -311,25 +311,23 @@ async function visit(cdp, base, query, interact, full = false) {
     // Seek: the arrow keys go 5 s (30 s with Shift) forward and back, paused, and the picture is drawn again each time.
     const arrow = (key, shift = false) => evalJs(`dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, shiftKey: ${shift} }))`);
     const at = () => evalJs(`window.__frames`);
-    const seekTo = async (key, shift, want) => {
+    // The clock's reading is rounded to 0.1 s, and a seek lands within a millionth of a second: compare near.
+    const num = (text) => Number(text.match(/[\d.]+/)[0]);
+    let cur = num(held);
+    const seekBy = async (go, delta, what) => {
       const f = await at();
-      await arrow(key, shift);
-      await poll(`the clock to read ${want} after ${shift ? 'Shift+' : ''}${key} [${label}]`, async () => await clockText() === want, { tick: () => check('while seeking') });
-      await framesAfter(f, 'after a seek');
+      const want = Math.max(0, cur + delta);
+      await go();
+      await poll(`the clock to read about ${want.toFixed(1)} after ${what} [${label}]`, async () => Math.abs(num(await clockText()) - want) <= 0.15, { tick: () => check('while seeking') });
+      cur = num(await clockText());
+      await framesAfter(f, `after ${what}`);
     };
-    const base0 = await clockText();   // t X s, paused
-    if (base0 !== held) fail(`[${label}] the clock moved to ${base0} while paused`);
-    const x = Number(held.match(/[\d.]+/)[0]);
-    await seekTo('ArrowRight', false, `t ${(x + 5).toFixed(1)} s`);
-    await seekTo('ArrowLeft', true, `t ${Math.max(0, x - 25).toFixed(1)} s`);   // 30 s back, from x + 5
-    await seekTo('ArrowRight', true, `t ${(Math.max(0, x - 25) + 30).toFixed(1)} s`);
+    if (await clockText() !== held) fail(`[${label}] the clock moved to ${await clockText()} while paused`);
+    await seekBy(() => arrow('ArrowRight'), 5, 'ArrowRight');
+    await seekBy(() => arrow('ArrowLeft', true), -30, 'Shift+ArrowLeft');
+    await seekBy(() => arrow('ArrowRight', true), 30, 'Shift+ArrowRight');
     // A button that has the focus (after a click on it) keeps the arrows for the seek.
-    {
-      const f = await at();
-      await evalJs(`(() => { const b = document.querySelector('.clock-step'); b.focus(); b.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })); })()`);
-      await poll(`the arrow key to seek with a button focused [${label}]`, async () => await clockText() === `t ${((Math.max(0, x - 25) + 30) - 5).toFixed(1)} s`, { tick: () => check('while seeking') });
-      await framesAfter(f, 'after a seek with a button focused');
-    }
+    await seekBy(() => evalJs(`(() => { const b = document.querySelector('.clock-step'); b.focus(); b.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })); })()`), -5, 'ArrowLeft on a focused button');
     // The readout (HUD): h shows it with the seed, h hides it again.
     await press('h');
     const hud = await poll(`the HUD to show its rows [${label}]`, async () => { const r = await evalJs(`(() => { const h = document.querySelector('.hud'); return h && !h.hidden ? h.textContent : ''; })()`); return r.includes('seed') ? r : null; }, { tick: () => check('while the HUD opens') });
