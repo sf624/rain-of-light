@@ -199,7 +199,6 @@ vec3 dropColor(float sd, float cycle) {
 // led: the line's LEDs per length, so that the head stays about one LED long,
 // and each LED's light (uRainK).
 vec3 DropD;   // set by drop(): how far behind the head the LED is, the drop's speed, whether it shows
-float Spark;  // how far a rare sideways glint raises the cap on a head's light (see sparkle)
 vec4 drop(float sd, float u, float trailK, vec2 gate, vec2 led) {
   float speed  = mix(0.07, 0.34, pow(hash(sd + 1.0), 1.5));
   float period = mix(1.3, 2.8, hash(sd + 2.0));
@@ -265,28 +264,27 @@ void strandRain(inout Lit L, float seed, float u, float trailK, float w) {
 // LED; a sideways one crosses each strand at one LED, which flashes as it
 // passes: a sharp rise, as bright as a falling head at its brightest
 // (SPARK_PEAK; the same HEAD_MAX caps both), and a quick fall (SPARK_DECAY,
-// in the falling time). Each LED flashes at its own strength and a little
-// late or early (SPARK_LAG), so the field scintillates instead of sliding
-// evenly; one in SPARK_RARE flashes SPARK_RARE_K times as bright, and its cap
-// is raised to match (Spark), so its rays are the longest. The wake behind
-// the head glitters too: each LED's trail light swells and sinks at its own
-// pace, about as bright on the whole as a steady trail.
-const float SPARK_PEAK = 2.0, SPARK_LAG = 0.06, SPARK_RARE = 0.06, SPARK_RARE_K = 2.5;
-const vec2 SPARK_DECAY = vec2(0.05, 0.14);
-vec4 sparkle(vec4 r, float id) {
-  float h1 = hash(id + 41.0), h2 = hash(id + 43.0), h3 = hash(id + 47.0);
-  float t = DropD.x / DropD.y - SPARK_LAG * h1;      // the falling time since the head passed this LED
-  float flash = t < 0.0 ? exp(t * 60.0) : exp(-t / mix(SPARK_DECAY.x, SPARK_DECAY.y, h2));
-  float rare = h3 < SPARK_RARE ? SPARK_RARE_K : 1.0;
-  Spark = max(Spark, (rare - 1.0) * flash * DropD.z);
-  float wake = 0.25 + 1.8 * pow(0.5 + 0.5 * sin(uTime * (4.0 + 8.0 * h1) + h3 * 6.2832), 6.0);
-  return vec4(r.xy * wake, flash * SPARK_PEAK * mix(0.45, 1.25, h2 * h2) * rare * DropD.z, r.w);
+// in the falling time). All flashes are alike, so the field is even. Far
+// away a flash is softer: its peak falls with the distance (dist, past
+// SPARK_NEAR, as (SPARK_NEAR / dist)^SPARK_FALL, at least SPARK_FAR) and it
+// lasts longer (by that, to the power SPARK_LASTS), so a far one keeps about
+// half its light: near, a crisp sparkle with rays; far, a calm, even field.
+// The wake behind the head glows as a steady trail, at SPARK_WAKE of its light.
+const float SPARK_PEAK = 2.0, SPARK_DECAY = 0.09, SPARK_WAKE = 0.65;
+const float SPARK_NEAR = 5.0, SPARK_FALL = 1.6, SPARK_FAR = 0.2, SPARK_LASTS = 0.6;
+vec4 sparkle(vec4 r, float dist) {
+  float soft = clamp(pow(SPARK_NEAR / dist, SPARK_FALL), SPARK_FAR, 1.0);
+  float t = DropD.x / DropD.y;                       // the falling time since the head passed this LED
+  float lasts = pow(soft, SPARK_LASTS);
+  float flash = t < 0.0 ? exp(t * 60.0 * lasts) : exp(-t * lasts / SPARK_DECAY);
+  return vec4(r.xy * SPARK_WAKE, flash * SPARK_PEAK * soft * DropD.z, r.w);
 }
 
 // Light flowing sideways, towards uFlowDir: LEDs in one thin tube along that
-// direction light up in turn, each glittering (sparkle; id: the LED's number).
+// direction light up in turn, each glittering (sparkle; dist: the LED's
+// distance from the eye).
 // Returns the place along the tube (0 .. 1), for the colour.
-float sidewaysRain(inout Lit L, vec3 pos, float trailK, float w, float id) {
+float sidewaysRain(inout Lit L, vec3 pos, float trailK, float w, float dist) {
   const float theta = 1.5707963;                     // (from straight down)
   vec3 hz = vec3(uFlowDir.x, 0.0, uFlowDir.y);
   float st = sin(theta), ct = cos(theta);
@@ -300,8 +298,8 @@ float sidewaysRain(inout Lit L, vec3 pos, float trailK, float w, float id) {
   float k = trailK * mix(1.0, 2.0, st);
   w *= rainOn(lane, uRainK[0].y);
   if (w == 0.0) return along;
-  gather(L, sparkle(drop(lane, along, k, uGate.zw, uRainK[2]), id), lane, w);
-  gather(L, sparkle(drop(lane + 97.0, along, k, uGate.zw, uRainK[2]), id + 5.0), lane + 97.0, w * smoothstep(0.2, 0.8, uRain));
+  gather(L, sparkle(drop(lane, along, k, uGate.zw, uRainK[2]), dist), lane, w);
+  gather(L, sparkle(drop(lane + 97.0, along, k, uGate.zw, uRainK[2]), dist), lane + 97.0, w * smoothstep(0.2, 0.8, uRain));
   return along;
 }
 
@@ -624,8 +622,6 @@ void main() {
   Accent = uAccent[look]; Near = uNear[look]; Far = uFar[look]; CloudHue = uCloudHue[look];
   Grad0 = uGrad0[look]; Grad1 = uGrad1[look]; ColA = uColA[look]; ColB = uColB[look];
   Lit L = Lit(0.0, 0.0, vec3(0.0), vec3(0.0));
-  float id = seed * 0.37 + u * 91.7;
-  Spark = 0.0;
 
   // The rain falling down, or flowing sideways; while one gives way to the
   // other the flow's colour goes over from one to the other.
@@ -633,7 +629,7 @@ void main() {
   vec3 col = vec3(0.0);
   if (uDirW.x > 0.001) strandRain(L, seed, u, trailK, uDirW.x);
   if (uTurn < 0.999) col += flowColor(u, spatial, h) * (1.0 - uTurn);
-  if (uDirW.y > 0.001 || uTurn > 0.001) col += flowColor(sidewaysRain(L, pos, trailK, uDirW.y, id), spatial, h) * uTurn;
+  if (uDirW.y > 0.001 || uTurn > 0.001) col += flowColor(sidewaysRain(L, pos, trailK, uDirW.y, dist), spatial, h) * uTurn;
   float rain = L.rain;
   float tip = L.tip;
   // Spherical waves of light.
@@ -654,6 +650,7 @@ void main() {
 
   // The forms' light. A wave lifts it at most to white: past that the LED
   // looks the same, and the extra light would only swell the glow around it.
+  float id = seed * 0.37 + u * 91.7;
   vec3 thread;
   float around;
   vec3 form = formsAt(pos, id, u, thread, around);
@@ -711,7 +708,7 @@ void main() {
   // gives more light in all than one at 1.5 px; farther heads keep theirs,
   // and dim with distance. (min is continuous: a head never jumps.)
   const float HEAD_MAX = 2.0;
-  float headTip = min(tip * phys, HEAD_MAX * (1.0 + Spark) * (1.5 / shown) * (1.5 / shown)) / max(phys, 1e-3);
+  float headTip = min(tip * phys, HEAD_MAX * (1.5 / shown) * (1.5 / shown)) / max(phys, 1e-3);
   float rk = uRainMix;
   if (rk > 0.001) {
     // The rain's look: its colour modes. Colours travel with each drop; an

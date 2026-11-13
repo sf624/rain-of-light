@@ -411,21 +411,21 @@ crosses each strand at a single LED, so it glitters instead
 (`shaders.js: sparkle`):
 
 - **A flash per LED.** As the head passes, the LED flashes: a sharp rise
-  and a quick fall, over 0.05 to 0.14 units of falling time (about a tenth
-  of a second in `rain` weather). Its peak (`SPARK_PEAK`, 2) is as bright as
-  a falling head at its brightest, and the same `HEAD_MAX` caps both, so a
-  sideways head is never dimmer than a falling one. The flash is in the
-  head's light (`tip`), so it casts rays.
-- **Each LED its own.** Each LED flashes at its own strength (0.45 to 1.25
-  of the peak) and up to 0.06 units late (`SPARK_LAG`). The field
-  scintillates instead of sliding evenly, while the order of the flashes
-  still shows which way the rain goes.
-- **Rare glints.** One LED in about 16 (`SPARK_RARE`) flashes 2.5 times as
-  bright (`SPARK_RARE_K`), with its cap raised to match (`Spark`), so it
-  casts the longest rays.
-- **A glittering wake.** Behind the head, each LED's trail swells and sinks
-  at its own pace (a sine raised to the power 6, 4 to 12 radians a second),
-  as bright on the whole as a steady trail would be at 0.65 of its light.
+  and a quick fall, over about 0.09 units of falling time (a tenth of a
+  second in `rain` weather). Its peak (`SPARK_PEAK`, 2) is as bright as a
+  falling head at its brightest, and the same `HEAD_MAX` caps both, so a
+  near sideways head is never dimmer than a falling one. The flash is in
+  the head's light (`tip`), so it casts rays.
+- **All alike.** Every LED flashes at the same strength, so the field is
+  even from one LED to the next.
+- **Softer far away.** Past 5 units from the eye (`SPARK_NEAR`) a flash's
+  peak falls as `(5 / distance)^1.6` (`SPARK_FALL`), down to a fifth of it
+  (`SPARK_FAR`, from about 14 units on), and the flash lasts longer (by
+  that factor to the power 0.6, `SPARK_LASTS`). So a far flash keeps about
+  half of a near one's light, without the peak or the long rays: near, the
+  rain is a crisp sparkle; far, a calm, even field that still flows.
+- **A steady wake.** Behind the head the trail glows as a falling trail
+  does, at 0.65 of its light (`SPARK_WAKE`).
 
 The flashes are short and spread over the whole field, so the picture's
 mean brightness holds steady from frame to frame (no pumping), at any
