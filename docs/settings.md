@@ -30,7 +30,7 @@ starts with a common part, left out below:
 ```
 
 So the first cell of the forms figure is
-`index.html?dpr=1&quality=full&ripples=0&breath=off&seed=1&scene=crystal&layer=off&t=30&form=orb`.
+`index.html?dpr=1&quality=full&ripples=0&breath=off&seed=1&rain=off&layer=off&t=30&form=orb`.
 Where a figure's part and a cell's part name the same key, the cell's wins.
 
 On the live page the same URL shows the same scene, colours and forms. It
@@ -56,15 +56,15 @@ pictures again (see [development.md](development.md#the-pictures-of-the-docs)).
 | **mirror image** | The room seen again, upside down, in the dark mirror floor. A thin dark line parts each strand from its image. |
 
 Queries, left to right, top row first:
-`scene=rain&weather=drizzle&color=mono&palette=ice&flow=down&t=30&fov=30&radius=16&grid=24&rows=48`
+`rain=on&form=none&layer=off&weather=drizzle&color=mono&palette=ice&flow=down&t=30&fov=30&radius=16&grid=24&rows=48`
 with `wire=1&rest=0.1` (strand), `wire=0&rest=0.1&size=0.03` (LED, cut out),
-`wire=2` (wire, cut out); `scene=rain&flow=down&t=30` (rain);
+`wire=2` (wire, cut out); `rain=on&form=none&layer=off&flow=down&t=30` (rain);
 `t=60` (a storm passage of the whole show);
-`scene=crystal&form=orb&layer=off&t=30` (form);
-`scene=crystal&form=none&layer=on&t=30` (layer);
-`scene=crystal&form=knot&knot=lissajous&layer=off&t=30` (knot);
-`scene=crystal&form=none&layer=off&t=30` and a click (ripple);
-`scene=crystal&form=orb&layer=off&t=30&mirror=1` (mirror image, lower half).
+`rain=off&form=orb&layer=off&t=30` (form);
+`rain=off&form=none&layer=on&t=30` (layer);
+`rain=off&form=knot&knot=lissajous&layer=off&t=30` (knot);
+`rain=off&form=none&layer=off&t=30` and a click (ripple);
+`rain=off&form=orb&layer=off&t=30&mirror=1` (mirror image, lower half).
 
 ## Controls
 
@@ -93,16 +93,16 @@ Query: `t=110`, with the page's buttons shown and a key pressed (cut out).
 The site has two pages, with the same picture, keys and URL parameters:
 
 - **The viewer page** (`index.html`, the address of the site) has a small
-  panel: Scene, Colour mode, Brightness (the Exposure setting), Quality,
-  and the levels of the sound (Pad, Bells, Rain, Forms). The volume is the
+  panel: Rain and Form, Colour mode, Brightness (the Exposure setting),
+  Quality, and the levels of the sound (Pad, Bells, Rain, Forms). The volume is the
   bar by the buttons. It has no link to the lab: the lab is opened by its
   address (`…/lab.html`).
 - **The lab** (`lab.html`) has every setting in its panel, in groups. Its
   link **Fewer settings** opens the viewer page.
 
-![The viewer page's small panel at the lower right: Scene, Colour mode, Brightness, Quality and four sound levels, and the GitHub link](img/viewer-panel.jpg)
+![The viewer page's small panel at the lower right: Rain, Form, Colour mode, Brightness, Quality and four sound levels, and the GitHub link](img/viewer-panel.jpg)
 
-![The lab's panel open on the right of the picture: Scene, Form, Which solid, Which knot, Layer of light, the mirror sliders and more, each row with its default; Twinkle and Quality are not at theirs, and are marked](img/panel.jpg)
+![The lab's panel open on the right of the picture: Rain, Form, Which solid, Which knot, Layer of light, the mirror sliders and more, each row with its default; Twinkle and Quality are not at theirs, and are marked](img/panel.jpg)
 
 The gear button or the `p` key opens the panel; a link that ends in
 `#tune` opens the page with it (`lab.html#tune`: the lab with its panel
@@ -179,7 +179,9 @@ viewer page's keys are as above.
 Every setting below can be given in the URL with its key, such as
 `?color=cloud&weather=drizzle`. A URL value wins over a saved one. A value
 that does not exist falls back to the default; a number is kept within the
-slider's range. Both pages take every parameter (`pause`, `rate` and `hud` only the lab). The URL also takes
+slider's range. Both pages take every parameter (`pause`, `rate` and `hud` only the lab). A `scene=`
+in an old link is still read: `rain` as `rain=on&form=none&layer=off`,
+`crystal` as `rain=off` (for settings the link leaves at `auto`). The URL also takes
 things that are not in the panel:
 
 | Parameter | Values | Default | Does |
@@ -196,8 +198,8 @@ things that are not in the panel:
 
 | Panel | URL key | Values | Default | What you see |
 | --- | --- | --- | --- | --- |
-| **Scene** | `scene` | `mix`, `rain`, `crystal` | `mix` | `mix`: the whole show, rain and forms come and go and blend. `rain`: only the rain, which never ends. `crystal`: only the forms of light. |
-| Form | `form` | `auto`, `orb`, `spiral`, `ring`, `veil`, `solid`, `knot`, `none` | `auto` | `auto`: as the scene brings them. A name holds that form for good. `none`: no form. A change fades the form that shows out over 4 s; the next fades in once it has gone. |
+| **Rain** | `rain` | `auto`, `on`, `off` | `auto` | `auto`: rain comes and goes with the show. `on`: rain always falls, and never ends. `off`: no rain; the forms of light have the room, on a timeline of their own. A change eases the rain in or out over a few seconds. |
+| **Form** | `form` | `auto`, `orb`, `spiral`, `ring`, `veil`, `solid`, `knot`, `none` | `auto` | `auto`: forms of light come and go with the show. A name holds that form for good. `none`: no form. A change fades the form that shows out over 4 s; the next fades in once it has gone. |
 | Which solid | `solid` | `auto`, `tetrahedron`, `cube`, `star` | `auto` | `auto`: each time the solid comes, another of its figures (see [Forms](#forms)). A name: always that one. |
 | Which knot | `knot` | `auto`, `lissajous`, `hopf`, `mobius` | `auto` | As for the solid. |
 | Layer of light | `layer` | `auto`, `on`, `off` | `auto` | `auto`: the layer comes and goes with the show (about 70% of the time). `on` holds it, `off` removes it. |
@@ -208,12 +210,34 @@ things that are not in the panel:
 | Twinkle | `twinkle` | 0 to 2 | `0.4` | In a still room, some LEDs flash now and then: as many per volume of the room whatever the density (one in five on a lattice of 72 strands a side). It fades out as a rain passage comes. |
 | Share of strands with rain | `rainShare` | 0 to 1 | `1` | The share of strands that carry rain. At 1, rain falls on every strand of a lattice of up to 72 strands a side; a denser one carries it on as many strands per area, not on all. |
 
-### Scenes
+### What plays: Rain and Form
 
-![The same moment in three scenes: mix shows a pink orb in rain; rain shows only the rain; crystal, with passages of its own, shows a pink spiral](img/scenes.jpg)
+![The same moment three ways: the whole show has a pink orb in rain; with rain on and no form or layer, only the rain falls; with rain off, the forms' own timeline shows a pink spiral](img/scenes.jpg)
 
-Query: `t=60` with `scene=mix`, `scene=rain`, `scene=crystal`. At this time
-of seed 1 the whole show has a storm passage: rain falls through an orb.
+Query: `t=60` with nothing more (the whole show), `rain=on&form=none&layer=off`,
+`rain=off`. At this time of seed 1 the whole show has a storm passage: rain
+falls through an orb.
+
+Rain and Form together choose what plays. Each `auto` lets the show
+decide that part; the others pin it.
+
+| Rain \ Form | `auto` | a form's name | `none` |
+| --- | --- | --- | --- |
+| `auto` | The whole show: rain, forms, rain through a form, still rooms and sideways rain come and go (the passages below). | The form held for good; the show's rain comes and goes around it, sideways now and then. | Passages of rain (sideways now and then) and still rooms take turns. |
+| `on` | Rain that never ends, with the whole show's forms coming and going through it: a lasting storm. | The form held in rain that never ends. | Rain that never ends, and no form (the layer when it comes). |
+| `off` | Only the forms, on a timeline of their own: form after form, with a still room now and then, so the room is seldom empty. | The form held in a room without rain. | A still room: a few pale drops, and the layer when it comes. |
+
+- While rain falls, a form glows brighter, to hold its own among the rain,
+  and it comes and goes from the top down (see below). With Rain `on`, so
+  does every form.
+- Only the show's own rain (Rain `auto`) flows sideways, in its drift
+  passages. With Rain `on` or `off` the rain falls, unless Direction says
+  otherwise (see [Direction](#direction)).
+- The layer of light, at `auto`, comes and goes as the passages of the
+  timeline that plays bring it: the whole show's with Rain `auto` or `on`,
+  the forms' own with Rain `off`, also beside a held form. `on` holds it,
+  `off` removes it: only the rain is `rain=on&form=none&layer=off`, an
+  empty room `rain=off&form=none&layer=off`.
 
 The whole show moves between five kinds of passage:
 
@@ -237,7 +261,7 @@ top down, as if rain gathered into it or ran off it as rain.
 
 ![The six forms alone in the still room: an amber orb, a blue spiral, an amber ring, a green veil, a pale cube of lines and a green knot; the seventh picture, form=none, is the empty room](img/forms.jpg)
 
-Query: `scene=crystal&layer=off&t=30` with `form=orb`, `form=spiral`,
+Query: `rain=off&layer=off&t=30` with `form=orb`, `form=spiral`,
 `form=ring&t=60` (its face to the room), `form=veil`, `form=solid&solid=cube`,
 `form=knot&knot=lissajous` and `form=none`.
 
@@ -289,7 +313,7 @@ figure about as often as the others.
 
 ![The figures of the two forms of mathematics: the solid's tetrahedron, cube and star; the knot's Lissajous figure, Hopf link and Möbius band](img/figures.jpg)
 
-Query: `scene=crystal&layer=off&t=40` with `form=solid&solid=tetrahedron`,
+Query: `rain=off&layer=off&t=40` with `form=solid&solid=tetrahedron`,
 `solid=cube`, `solid=star`; `form=knot&knot=lissajous`, `knot=hopf`,
 `knot=mobius`.
 
@@ -301,7 +325,7 @@ as you look at them.
 
 ![Three pictures: an orb alone; the same orb over a pink layer of light; the blue layer alone](img/layer.jpg)
 
-Query: `scene=crystal&t=30` with `form=orb&layer=off`, `form=orb&layer=on`,
+Query: `rain=off&t=30` with `form=orb&layer=off`, `form=orb&layer=on`,
 `form=none&layer=on`.
 
 The layer is a sea of light near the floor. Each time it comes, it has a
@@ -317,7 +341,7 @@ height, a thickness and a brightness of its own.
 
 ![An orb over the layer three times: with no image in the floor, with a dimmer image, and with a full image](img/mirrors.jpg)
 
-Query: `scene=crystal&form=orb&layer=on&t=30` with `mirror=0`, `mirror=0.6`,
+Query: `rain=off&form=orb&layer=on&t=30` with `mirror=0`, `mirror=0.6`,
 `mirror=1`.
 
 The strands hang a little above the mirror floor, so a thin dark line runs
@@ -328,7 +352,7 @@ its image, towards that line. The image fades with height, as on dark glass.
 
 ![Looking across the room at an orb: without wall mirrors one orb; with them, copies of the orb appear farther off, beyond the walls](img/walls.jpg)
 
-Query: `scene=crystal&form=orb&layer=on&t=30&camera=spin&radius=16&fov=100&fog=40`
+Query: `rain=off&form=orb&layer=on&t=30&camera=spin&radius=16&fov=100&fog=40`
 with `walls=0`, `walls=1`. The wide view and the far visible distance let
 the copies beyond the walls show.
 
@@ -336,7 +360,7 @@ the copies beyond the walls show.
 
 ![The dark still room three times: no flashes, a few, and many](img/twinkle.jpg)
 
-Query: `scene=crystal&form=none&layer=off&t=30` with `twinkle=0`,
+Query: `rain=off&form=none&layer=off&t=30` with `twinkle=0`,
 `twinkle=0.4`, `twinkle=2`. Twinkle belongs to the still room: it fades
 out as a rain passage comes. The glitter of sideways rain (see Direction)
 is the rain's own and does not follow it.
@@ -345,7 +369,7 @@ is the rain's own and does not follow it.
 
 ![Rain on a fifth of the strands, on more than half, and on all of them](img/rain-share.jpg)
 
-Query: `scene=rain&flow=down&t=30` with `rainShare=0.2`, `rainShare=0.6`,
+Query: `rain=on&form=none&layer=off&flow=down&t=30` with `rainShare=0.2`, `rainShare=0.6`,
 `rainShare=1`. While rain falls through a form, the share is lowered by
 about a third, so the form shows.
 
@@ -392,34 +416,34 @@ area whatever the lattice, with drops as long.
 
 ![A ring with 250, 1000 and 1700 thousand LEDs](img/leds.jpg)
 
-Query: `scene=crystal&layer=off&form=ring&t=60` with `leds=250`,
+Query: `rain=off&layer=off&form=ring&t=60` with `leds=250`,
 `leds=1000`, `leds=1700`.
 
 ### Spacing along and between strands
 
 ![A ring with the LEDs on a strand at half, once and twice the spacing of the strands](img/aspect.jpg)
 
-Query: `scene=crystal&layer=off&form=ring&t=60` with `aspect=0.5`,
+Query: `rain=off&layer=off&form=ring&t=60` with `aspect=0.5`,
 `aspect=1`, `aspect=2`.
 
 ### Strands per side
 
 ![Rain on a sparse lattice of strands, the default one, and a dense one, with 55 LEDs on each](img/grid.jpg)
 
-Query: `scene=rain&flow=down&t=30&rows=55` with `grid=40`, `grid=134`, `grid=160`.
+Query: `rain=on&form=none&layer=off&flow=down&t=30&rows=55` with `grid=40`, `grid=134`, `grid=160`.
 
 ### LEDs per strand
 
 ![Rain on 134 strands a side with few LEDs on each, the default number, and many](img/rows.jpg)
 
-Query: `scene=rain&flow=down&t=30&grid=134` with `rows=20`, `rows=55`, `rows=160`.
+Query: `rain=on&form=none&layer=off&flow=down&t=30&grid=134` with `rows=20`, `rows=55`, `rows=160`.
 
 ### Layout
 
 ![Close views of lit LEDs: in lines along strands, scattered at random, and on a regular lattice](img/layout.jpg)
 
 Query (close view, centre cut out):
-`scene=rain&flow=down&weather=downpour&trail=4&t=30&fov=30&radius=16&grid=24&rows=48&wire=0&exposure=3`
+`rain=on&form=none&layer=off&flow=down&weather=downpour&trail=4&t=30&fov=30&radius=16&grid=24&rows=48&wire=0&exposure=3`
 with `layout=strands`, `layout=scatter`, `layout=grid`.
 
 ### LED spacing
@@ -433,7 +457,7 @@ Query (close view, centre cut out): as for Layout, with `jitter=off`,
 
 ![Rain with a third of the strands, with a third of the LEDs on each strand, and with all](img/density.jpg)
 
-Query: `scene=rain&flow=down&t=30` with `density=manual&strandShare=0.3`,
+Query: `rain=on&form=none&layer=off&flow=down&t=30` with `density=manual&strandShare=0.3`,
 `density=manual&rowShare=0.3`, `density=manual&strandShare=1&rowShare=1`.
 
 ## LED
@@ -449,14 +473,14 @@ Query: `scene=rain&flow=down&t=30` with `density=manual&strandShare=0.3`,
 
 ![Rain with small, default and large LEDs; then large LEDs capped at 1.5, 4.5 and 12 pixels](img/led-size.jpg)
 
-Query: `scene=rain&flow=down&t=30` with `size=0.008`, `size=0.018`,
+Query: `rain=on&form=none&layer=off&flow=down&t=30` with `size=0.008`, `size=0.018`,
 `size=0.04`; then `size=0.04` with `maxPx=1.5`, `maxPx=4.5`, `maxPx=12`.
 
 ### Brightness at rest
 
 ![The still room with dark LEDs at rest, the default faint glow, and a bright lattice](img/rest.jpg)
 
-Query: `scene=crystal&form=none&layer=off&t=30` with `rest=0`, `rest=0.03`,
+Query: `rain=off&form=none&layer=off&t=30` with `rest=0`, `rest=0.03`,
 `rest=0.15`.
 
 ### Wire glow
@@ -464,7 +488,7 @@ Query: `scene=crystal&form=none&layer=off&t=30` with `rest=0`, `rest=0.03`,
 ![A close view of rain: points only; points with faint wires; bright lines along the strands](img/wire.jpg)
 
 Query (close view):
-`scene=rain&weather=rain&color=mono&palette=ice&flow=down&t=30&fov=30&radius=16&grid=24&rows=48`
+`rain=on&form=none&layer=off&weather=rain&color=mono&palette=ice&flow=down&t=30&fov=30&radius=16&grid=24&rows=48`
 with `wire=0`, `wire=0.2`, `wire=2`.
 
 ## Light
@@ -484,7 +508,7 @@ with `wire=0`, `wire=0.2`, `wire=2`.
 
 ![Green rain four times: with the defaults; without trails, only heads; without heads, only trails; and both much brighter](img/rain-light.jpg)
 
-Query: `scene=rain&flow=down&t=30&color=mono&palette=aurora` with
+Query: `rain=on&form=none&layer=off&flow=down&t=30&color=mono&palette=aurora` with
 `rainGain=4&tipGain=5` (the defaults), `rainGain=0`, `tipGain=0`,
 `rainGain=10&tipGain=12`.
 
@@ -499,21 +523,21 @@ Query: `t=110` (a veil passage of the whole show) with `exposure=0.8`,
 
 ![An orb with no glow (the default), showing its separate strands; with some glow; with a strong glow that blurs its heart](img/glow.jpg)
 
-Query: `scene=crystal&form=orb&layer=off&t=30` with `bloom=0`, `bloom=0.8`,
+Query: `rain=off&form=orb&layer=off&t=30` with `bloom=0`, `bloom=0.8`,
 `bloom=2`.
 
 ### Visible distance
 
 ![Rain where only the nearest strands show; more of the room; the whole room](img/fog.jpg)
 
-Query: `scene=rain&flow=down&t=30` with `fog=8`, `fog=20`, `fog=34`.
+Query: `rain=on&form=none&layer=off&flow=down&t=30` with `fog=8`, `fog=20`, `fog=34`.
 
 ### Light rays
 
 ![Close views of drop heads: no rays; long rays up and down; crosses; eight-pointed stars; then eight and four rays at the default length. Bright near heads cast long rays, dim far ones short rays](img/rays.jpg)
 
 Query (close view, centre cut out):
-`scene=rain&flow=down&color=comet&weather=drizzle&t=30&fov=30&radius=16&grid=24&rows=48&tipGain=12`
+`rain=on&form=none&layer=off&flow=down&color=comet&weather=drizzle&t=30&fov=30&radius=16&grid=24&rows=48&tipGain=12`
 with `rays=off`; `rays=2`, `rays=4`, `rays=8`, each with `rayLength=50`;
 `rays=8` and `rays=4` (default length).
 
@@ -540,21 +564,21 @@ pace.
 
 ![Blue rain in the four weathers, from a light drizzle to a dense downpour](img/weather.jpg)
 
-Query: `scene=rain&flow=down&t=30&color=mono&palette=deep+sea` with
+Query: `rain=on&form=none&layer=off&flow=down&t=30&color=mono&palette=deep+sea` with
 `weather=drizzle`, `weather=rain`, `weather=shower`, `weather=downpour`.
 
 ### Trail length
 
 ![Rain with short trails, default trails and long trails](img/trail.jpg)
 
-Query: `scene=rain&flow=down&t=30&color=mono&palette=deep+sea` with
+Query: `rain=on&form=none&layer=off&flow=down&t=30&color=mono&palette=deep+sea` with
 `trail=0.3`, `trail=1`, `trail=3`.
 
 ### Direction
 
 ![Rain falling; rain flowing sideways as a field of drifting points; a drift passage of the whole show over an amber layer](img/direction.jpg)
 
-Query: `t=30` with `scene=rain&flow=down`, `scene=rain&flow=across`; and
+Query: `t=30` with `rain=on&form=none&layer=off&flow=down`, `rain=on&form=none&layer=off&flow=across`; and
 `seed=4&t=225`, a drift passage of the whole show.
 
 - Sideways rain glitters. Each LED flashes as a drop crosses its strand,
@@ -569,8 +593,8 @@ Query: `t=30` with `scene=rain&flow=down`, `scene=rain&flow=across`; and
   drift passage.
 - With `d` or the Direction setting, the drops of the old direction stop
   coming and fade out; only then do the new ones set out.
-- `scene=rain` never ends, so it keeps falling unless Direction says
-  otherwise.
+- With Rain `on` the rain never ends, so it keeps falling unless Direction
+  says otherwise.
 
 ## Colour
 
@@ -594,7 +618,7 @@ blend into grey.
 
 ![Rain in each of the eleven colour modes, labelled mono, gradient, rainbow, palette, accent, comet, speed, cloud, depth, repaint and sky](img/colour-modes.jpg)
 
-Query: `scene=rain&flow=down&t=30&weather=rain` with `color=` each mode.
+Query: `rain=on&form=none&layer=off&flow=down&t=30&weather=rain` with `color=` each mode.
 The palette and the set are as seed 1 has them at that time.
 
 | Mode | What you see |
@@ -635,42 +659,42 @@ through blue, violet and pink to amber and back.
 
 ![Rainbow rain with a hue per drop, a hue per LED, and flowing bands](img/rainbow.jpg)
 
-Query: `scene=rain&flow=down&t=30&color=rainbow` with `rainbow=drop`,
+Query: `rain=on&form=none&layer=off&flow=down&t=30&color=rainbow` with `rainbow=drop`,
 `rainbow=led`, `rainbow=bands`.
 
 ### Palette
 
 ![Rain in each palette: pale blue ice, amber, pink sakura, green aurora, blue deep sea, and pale candle](img/palettes.jpg)
 
-Query: `scene=rain&flow=down&t=30&color=mono` with `palette=` `ice`,
+Query: `rain=on&form=none&layer=off&flow=down&t=30&color=mono` with `palette=` `ice`,
 `amber`, `sakura`, `aurora`, `deep+sea`, `candle`.
 
 ### Band scale
 
 ![Rainbow bands: one wide band; a few bands; many narrow ones](img/bands.jpg)
 
-Query: `scene=rain&flow=down&t=30&color=rainbow&rainbow=bands` with
+Query: `rain=on&form=none&layer=off&flow=down&t=30&color=rainbow&rainbow=bands` with
 `bandScale=0.3`, `bandScale=1`, `bandScale=3`.
 
 ### Saturation
 
 ![Rainbow rain nearly white, and in full colour](img/saturation.jpg)
 
-Query: `scene=rain&flow=down&t=30&color=rainbow` with `saturation=0.3`,
+Query: `rain=on&form=none&layer=off&flow=down&t=30&color=rainbow` with `saturation=0.3`,
 `saturation=1`.
 
 ### Colour set
 
 ![Rain in the five colour sets: pastel, neon, wa, sunset and ocean](img/sets.jpg)
 
-Query: `scene=rain&flow=down&t=30&color=palette` with `set=` `pastel`,
+Query: `rain=on&form=none&layer=off&flow=down&t=30&color=palette` with `set=` `pastel`,
 `neon`, `wa`, `sunset`, `ocean`.
 
 ### Length of a day
 
 ![Sky rain at four times of an 80-second day: pale blue, warm orange, deep blue and dusky pink](img/sky.jpg)
 
-Query: `scene=rain&flow=down&color=sky&skyDay=80` at `t=0`, `t=20`, `t=40`,
+Query: `rain=on&form=none&layer=off&flow=down&color=sky&skyDay=80` at `t=0`, `t=20`, `t=40`,
 `t=60`. Where in the day the show starts comes from the seed.
 
 ## Camera
@@ -701,7 +725,7 @@ one time; the moves themselves are slow motions.
 
 ![An orb over the layer: a narrow view close in; the default; a wide view; then the eye near the centre, at the default distance, and far back](img/view.jpg)
 
-Query: `scene=crystal&form=orb&layer=on&t=30` with `fov=40`, `fov=76`,
+Query: `rain=off&form=orb&layer=on&t=30` with `fov=40`, `fov=76`,
 `fov=100`; then `radius=2`, `radius=10`, `radius=16`.
 
 ## Ripples
@@ -712,8 +736,8 @@ Query: `scene=crystal&form=orb&layer=on&t=30` with `fov=40`, `fov=76`,
 
 ![A ripple after a click: in thin rain a round wave lights the drops it passes; in a still room a lit dome spreads level from where the click hit](img/ripple.jpg)
 
-Query: `scene=rain&flow=down&weather=drizzle&color=mono&palette=deep+sea&rainShare=0.3&t=30`
-(top) and `scene=crystal&form=none&layer=off&t=30` (bottom), with a click in
+Query: `rain=on&form=none&layer=off&flow=down&weather=drizzle&color=mono&palette=deep+sea&rainShare=0.3&t=30`
+(top) and `rain=off&form=none&layer=off&t=30` (bottom), with a click in
 the middle of the view.
 
 In the rain a ripple is a round wave. In a still room it is a ring that
@@ -730,7 +754,7 @@ sets it off about where the forms are. Each ripple rings a bell.
 
 ![An orb over the layer at the top of a breath, bright, and at the bottom, dim](img/breath.jpg)
 
-Query: `scene=crystal&form=orb&layer=on&t=30&breath=on&breathDepth=0.8`,
+Query: `rain=off&form=orb&layer=on&t=30&breath=on&breathDepth=0.8`,
 4 seconds and 10 seconds after the start (6 breaths a minute: one breath
 is 10 seconds). The default depth, 0.3, is gentler.
 

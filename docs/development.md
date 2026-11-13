@@ -121,8 +121,8 @@ visit adds `leds=20` (20 thousand LEDs) to its URL, which cuts a visit from
 about 11 s to 3 s. It visits:
 
 - the default page (the real lattice), with a click, the keys and turning the picture; it
-  changes the scene in the panel (the page must not reload) and checks that
-  Reset brings back the mix;
+  turns the rain off in the panel (the page must not reload) and checks that
+  Reset brings back Rain `auto`;
 - every colour mode;
 - both panels, the lab's (`lab.html#tune`) and then the viewer page's
   (`#tune`): the repository link and the commit link from a fake
@@ -130,14 +130,17 @@ about 11 s to 3 s. It visits:
   each panel shows (the viewer page: the items marked `viewer` in
   `config.js`), the lab's link to the viewer page (the viewer page has no link to the lab), and that the viewer page sees
   a setting the lab saved and its Reset clears it;
-- the pinned scenes (`rain` in the lab, `crystal`, both with the click,
-  keys and Reset), a time part-way through the show
+- rain alone (`rain=on&form=none&layer=off`, in the lab) and no rain
+  (`rain=off`), both with the click, keys and Reset; rain that never ends
+  with a form through it (`rain=on&seed=1&t=60`); a time part-way through the show
   (with and without the colour story), four of the forms held, and
   `?jitter=pitch`, and the lab's clock (opened paused, it stands still;
   Space runs and stops it, also with the focus in the panel; the arrows seek
   after a mouse drag on a slider and move a slider the focus came to by Tab;
   and part-way through a form's coming, a change of exposure, twinkle, colour
-  mode, weather or layout leaves the HUD's forms row as it was).
+  mode, weather or layout leaves the HUD's forms row as it was);
+- a `scene=` in a link or in saved settings: each is read as the settings
+  it stands for (`config.js: SCENES`), and a saved one is no more kept.
 
 It then renders a few seconds of sound offline and checks that a held orb
 sounds, a still room is much quieter, and nothing clips. GitHub Actions
@@ -169,8 +172,8 @@ to tune settings on one moment or to reach a late part of the show:
   shows at once on the frozen moment, and it is the same moment: a setting
   that only the picture reads (exposure, twinkle, glow, haze, the mirrors,
   the LEDs' size, rays, the lattice and the like; `DRAW_ONLY` and `LATTICE`
-  in `main.js`) leaves the show's state as it is, and any other (scene,
-  form, weather, colour, speed, camera ...; also the `c` key and a skipped
+  in `main.js`) leaves the show's state as it is, and any other (rain,
+  form, layer, weather, colour, speed, camera ...; also the `c` key and a skipped
   episode) makes that moment again with the new setting, by a seek to it
   (see below), so it has the forms at the weights a seek to this time with
   the setting gives. A running show blends into a change instead. The
@@ -263,7 +266,7 @@ over a second or so; the pad's chords go on by the real clock.
 `window.__lab.state()` and `window.__lab.seek(t)` give the tests the whole
 state as text and a seek.
 
-Limits: a seek uses the settings as they are now (change the scene, the
+Limits: a seek uses the settings as they are now (change the rain, the
 colour story or a form, and a seek back shows the show with the new
 setting from the start), and the colour key counts as a setting: all of
 the show, past and future, has its colours after a key press. The pointer
@@ -288,8 +291,10 @@ lines:
 - `frame`: fps and frame time, the render scale (the adaptive quality
   step), the canvas size; `seek`: the last seek's steps and time.
 - `lattice`: strands, LEDs per strand, LEDs in all.
-- `show`: the scene (with a held form or layer), the passage now (rain,
-  form, storm, still, drift) and the time to the next one.
+- `show`: the Rain, Form and Layer settings; what plays now (rain, form,
+  storm or still: a held form in rain plays a storm whatever the passage),
+  with the timeline's passage after it where that differs (rain, form,
+  storm, still, drift), and the time to the next passage.
 - `rain`: how much rain the show has now (0 .. 1), and `storm`, the rain
   through a form. `forms`: each form with its weight (0 .. 1), its palette,
   its age and whether it comes or goes, with swatches of its colours;
@@ -361,7 +366,7 @@ list.
 The share picture, `og-image.jpg` (1200x630, named in `index.html`), is
 made with the same tool, from a list of its own given by `DOC_SHOTS=`: one
 figure, `"w": 1200, "h": 675`, one cell with the query
-`scene=mix&form=orb&layer=on&weather=drizzle&color=cloud&seed=7&t=30`
+`form=orb&layer=on&weather=drizzle&color=cloud&seed=7&t=30`
 (plus `dpr=1&quality=full&ripples=0&breath=off`), cut to its middle 630
 rows. A bigger capture looks sparser, not sharper: near LEDs are capped at
 Largest size, which is in pixels.

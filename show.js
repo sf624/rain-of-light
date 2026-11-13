@@ -57,18 +57,22 @@ const SKY_GAP = 1;
 // Among rain or under a form the layer keeps this share of the glow it has alone.
 const LAYER_UNDER = 0.6;
 const LAYER_IN = { at: -6, fade: 12 }, LAYER_OUT = { at: 2, fade: 12 };
-const EASE = 2.5;                             // s: a change of scene blends the rain in about this long
+const EASE = 2.5;                             // s: a change of the Rain setting blends the rain in about this long
 // A form's or the layer's shown weight moves at most 1 / BLEND a second: it
 // follows the timeline's fades as they are (none is as steep), and a change
 // of setting fades a form in or out over BLEND seconds, down to 0 exactly.
 const BLEND = 4;
 
-// The scenes: the whole show, or only its forms (the rain is pinned in update).
+// The timelines: the whole show, and the show without rain (Rain off; Rain on
+// pins the rain of the whole show, see wanted).
 const POOLS = {
-  mix: PASSAGES,
-  // Only the forms: a still room between them now and then, less often.
-  crystal: PASSAGES.filter((p) => !p.rain).map((p) => (p.sky ? p : { ...p, weight: p.weight * 0.5 })),
+  all: PASSAGES,
+  // Without rain: the forms, and a still room between them now and then,
+  // less often (the passages of rain alone would leave the room empty).
+  dry: PASSAGES.filter((p) => !p.rain).map((p) => (p.sky ? p : { ...p, weight: p.weight * 0.5 })),
 };
+// Which timeline the Rain setting plays.
+const timelineFor = (rain) => (rain === 'off' ? 'dry' : 'all');
 
 // Rarely a baked form (an egg, see EGGS) takes the place of the form just
 // cast: from EGG.after on, by EGG.chance, one of them (each as likely) by the
@@ -262,11 +266,13 @@ export function createShow(S, { feet, seed = Math.random() * 1000, eggs = true }
 
   // What the settings ask for at t: the rain, and the episodes with their weights.
   function wanted(t) {
-    const scene = S.scene === 'rain' || S.scene === 'crystal' ? S.scene : 'mix';
-    const now = scene === 'rain' ? { rain: 1, items: [] } : timeline(scene).at(t);
-    const rain = scene === 'crystal' ? 0 : now.rain;
-    // (Rain alone never ends, so it never changes direction: it falls, unless the Direction setting says otherwise.)
-    const flow = scene === 'mix' ? timeline(scene).flowAt(t) : { toward: 0, angle: 0 };
+    const tl = timeline(timelineFor(S.rain));
+    const now = tl.at(t);
+    const rain = S.rain === 'on' ? 1 : S.rain === 'off' ? 0 : now.rain;
+    // Only the show's own rain turns sideways, between two form passages. Rain
+    // that never ends never changes direction (nor does none): it falls,
+    // unless the Direction setting says otherwise.
+    const flow = S.rain === 'auto' ? tl.flowAt(t) : { toward: 0, angle: 0 };
     let items = now.items;
     if (S.form !== 'auto') {
       items = items.filter((x) => x.e.form === LAYER);
@@ -280,8 +286,8 @@ export function createShow(S, { feet, seed = Math.random() * 1000, eggs = true }
     return { rain, items, flow };
   }
 
-  // The shown state eases to what is wanted, so a change of scene or of a
-  // form setting blends in rather than cutting. Per episode: its weight now.
+  // The shown state eases to what is wanted, so a change of the Rain, Form or
+  // Layer setting blends in rather than cutting. Per episode: its weight now.
   const shown = new Map();                    // id -> { x, w, col: [c, d, the room's colour with it] }
   let rainNow = null, shift = 0, skyShown = 0;
   const story = () => S.story === 'on';
@@ -428,7 +434,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000, eggs = true }
 
   // For the tools: what the timeline has at t (the passage's kind, and each form's palette).
   function cast(t) {
-    const tl = timeline('mix'), es = tl.at(t).items.filter((x) => x.w > 0.5).map((x) => x.e);
+    const tl = timeline('all'), es = tl.at(t).items.filter((x) => x.w > 0.5).map((x) => x.e);
     const top = es.find((e) => e.form !== LAYER);
     return { kind: tl.passage(t).kind.name, items: es.map((e) => ({ form: e.form.name, figure: e.form.variants?.[variantOf(e)], palette: shownIn(e, top) })) };
   }
@@ -445,27 +451,30 @@ export function createShow(S, { feet, seed = Math.random() * 1000, eggs = true }
   const reset = () => load({ rainNow: null, shift, skyShown: 0, shown: [] });   // (the colour key stays: it is not part of the show's time)
 
   // For the lab's readout: what the show plays now, read from its state (nothing is worked out for it every frame).
-  // passage / next: the timeline's passage at t and when the next begins (none for the rain scene, or a held form);
+  // passage / next: the passage at t of the timeline that plays (see timelineFor) and when the next
+  // begins; playing: what shows now, by the kinds of passage (rain, form, storm, still; the
+  // settings may pin the rain and the form: rain through a held form plays a storm whatever the passage);
   // rain, storm, gain: the eased rain, the rain through a form, and how much more a form glows among rain;
   // items: each episode that shows, with its weight, age, whether it goes, its figure (if its form has them),
   // its palette and its colours.
   function info(t) {
-    const scene = S.scene === 'rain' || S.scene === 'crystal' ? S.scene : 'mix';
-    const tl = scene === 'rain' ? null : timeline(scene);
+    const tl = timeline(timelineFor(S.rain));
     const top = [...shown.values()].filter((s) => s.x.e.form !== LAYER).sort((a, b) => b.w - a.w)[0]?.x.e;
     const items = [...shown.values()].sort((a, b) => b.w - a.w).map((s) => ({
       form: s.x.e.form.name, figure: s.x.e.form.variants?.[variantOf(s.x.e)], w: s.w, age: s.x.age, out: s.x.out, held: s.x.e.id.startsWith('held-'),
       palette: shownIn(s.x.e, top), colors: [s.col[0], s.col[1]],
     }));
-    return { scene, passage: tl?.passage(t).kind.name ?? 'rain', next: tl ? tl.upcoming(t) - t : null,
-      rain: rainNow ?? 0, storm: (rainNow ?? 0) * skyShown, gain: 1 + STORM_GAIN * (rainNow ?? 0), items };
+    const rain = rainNow ?? 0, sky = items.some((i) => i.form !== LAYER.name && i.w > 0.5);
+    const playing = rain > 0.5 ? (sky ? 'storm' : 'rain') : sky ? 'form' : 'still';
+    return { passage: tl.passage(t).kind.name, next: tl.upcoming(t) - t, playing,
+      rain, storm: rain * skyShown, gain: 1 + STORM_GAIN * rain, items };
   }
 
   // The eggs about to show, or showing, at t (within `ahead` seconds): a held one, or the timeline's.
   function eggsNear(t, ahead = 40) {
     if (!eggs) return [];
     if (S.form !== 'auto') return EGGS.some((f) => f.name === S.form) ? [S.form] : [];
-    return S.scene === 'rain' ? [] : timeline(S.scene === 'crystal' ? 'crystal' : 'mix').eggsNear(t, ahead);
+    return timeline(timelineFor(S.rain)).eggsNear(t, ahead);
   }
 
   // The rain's direction at t, as the show has it (for the start: update returns it too).

@@ -127,12 +127,14 @@ export const PASSAGES = [
   // ever between two form passages, so it never reads as a rain that turned.
   { name: 'drift',  rain: 1, sky: false, layer: 0.55, hold: [30, 48], weight: 1.3, across: true },
 ];
-// Scenes: the whole show, or only its rain, or only its forms.
-export const SCENES = ['mix', 'rain', 'crystal'];
+// Links and saved settings made before Rain and Form chose what plays name a
+// scene instead: its settings fill in those still at auto (see loadSettings
+// in tuner.js). The scene mix asks for nothing.
+export const SCENES = { rain: { rain: 'on', form: 'none', layer: 'off' }, crystal: { rain: 'off' } };
 
 // ---------- tunable settings (panel: p key or the gear button; also ?key=value) ----------
 export const DEFAULTS = {
-  scene: 'mix', form: 'auto', solid: 'auto', knot: 'auto', layer: 'auto', mirror: 0.6, walls: 0, haze: 0, burn: 0.7, twinkle: 0.4, rainShare: 1,
+  rain: 'auto', form: 'auto', solid: 'auto', knot: 'auto', layer: 'auto', mirror: 0.6, walls: 0, haze: 0, burn: 0.7, twinkle: 0.4, rainShare: 1,
   leds: small ? 210 : 1000, aspect: 1, grid: 0, rows: 0,
   layout: 'strands', jitter: 'off', density: 'auto', strandShare: 1.0, rowShare: 1.0, strandMin: 0.66, rowMin: 0.68,
   size: 0.018, maxPx: 4.5, rest: 0.03, wire: 0.2,
@@ -152,14 +154,16 @@ export const DEFAULTS = {
 export const STORAGE_KEY = 'rain-of-light:settings';
 
 // The panel. An item with `viewer: n` is also on the viewer page's small
-// panel (index.html), as its nth control, under `short` if it has one; the
-// lab (lab.html) shows every item.
+// panel (index.html), as its nth control, under `short` if it has one and
+// with `viewerOptions` if it has them; the lab (lab.html) shows every item. A group's `viewerTitle` is its heading
+// there, if it has one ('': none).
 export const SCHEMA = [
-  { title: 'Scene', items: [
-    { key: 'scene', label: 'Scene', options: SCENES, viewer: 1,
-      hint: 'mix: rain and forms of light come and go, and blend / rain: only the rain / crystal: only the forms of light' },
+  { title: 'Scene', viewerTitle: '', items: [
+    { key: 'rain', label: 'Rain', options: ['auto', 'on', 'off'], viewer: 1,
+      hint: 'auto: rain comes and goes with the show / on: rain always falls, and the forms come and go through it / off: no rain, the forms of light have the room' },
     { key: 'form', label: 'Form', options: ['auto', ...FORMS.map((f) => f.name), ...EGGS.map((f) => f.name), 'none'],
-      hint: 'auto: as the scene brings them / or hold one form (none: no form)' },
+      viewer: 2, viewerOptions: ['auto', ...FORMS.map((f) => f.name), 'none'],
+      hint: 'auto: forms of light come and go with the show / or hold one form (none: no form)' },
     ...FORMS.filter((f) => f.variants).map((f) => ({ key: f.name, label: `Which ${f.name}`, options: ['auto', ...f.variants],
       hint: `auto: each time the ${f.name} comes, another of its figures / or always this one` })),
     { key: 'layer', label: 'Layer of light', options: ['auto', 'on', 'off'] },
@@ -175,7 +179,7 @@ export const SCHEMA = [
       hint: 'At 1, every strand of a lattice of up to 72 a side; a denser one carries rain on as many strands per area, not on all' },
   ] },
   { title: 'Display', items: [
-    { key: 'quality', label: 'Quality', options: ['auto', 'full'], viewer: 4,
+    { key: 'quality', label: 'Quality', options: ['auto', 'full'], viewer: 5,
       hint: 'auto: lowers the sharpness if frames are slow, and raises it again when they are not / full: always as sharp as the screen allows' },
   ] },
   { title: 'Density', items: [
@@ -209,7 +213,7 @@ export const SCHEMA = [
   { title: 'Light', items: [
     { key: 'rainGain', label: 'Trail brightness', min: 0, max: 12, step: 0.1 },
     { key: 'tipGain', label: 'Head brightness', min: 0, max: 15, step: 0.1 },
-    { key: 'exposure', label: 'Exposure', min: 0.2, max: 4, step: 0.05, viewer: 3, short: 'Brightness' },
+    { key: 'exposure', label: 'Exposure', min: 0.2, max: 4, step: 0.05, viewer: 4, short: 'Brightness' },
     { key: 'bloom', label: 'Glow', min: 0, max: 2, step: 0.05 },
     { key: 'fog', label: 'Visible distance', min: 6, max: 40, step: 0.5 },
     { key: 'rays', label: 'Light rays', options: ['off', '2', '4', '6', '8'],
@@ -227,7 +231,7 @@ export const SCHEMA = [
       hint: 'auto: as the passage has it (now and then a passage of sideways rain) / down: from above / across: sideways' },
   ] },
   { title: 'Colour', items: [
-    { key: 'color', label: 'Colour mode', options: ['auto', ...COLOR_MODES.map((m) => m.name)], viewer: 2,
+    { key: 'color', label: 'Colour mode', options: ['auto', ...COLOR_MODES.map((m) => m.name)], viewer: 3,
       hint: 'mono: one palette / gradient: flowing gradient / rainbow: a hue per drop / '
         + 'palette: each drop picks from a set / accent: pale rain, now and then a coloured drop / '
         + 'comet: white heads, coloured trails / speed: colour by speed / cloud: drifting clouds of colour / '
@@ -263,10 +267,10 @@ export const SCHEMA = [
   ] },
   { title: 'Sound (m key or the note button)', items: [
     { key: 'volume', label: 'Volume', min: 0, max: 1, step: 0.01 },
-    { key: 'music', label: 'Pad', min: 0, max: 1, step: 0.05, viewer: 5 },
-    { key: 'chimes', label: 'Bells', min: 0, max: 1, step: 0.05, viewer: 6 },
-    { key: 'rainSound', label: 'Rain', min: 0, max: 1, step: 0.05, viewer: 7 },
-    { key: 'formSound', label: 'Forms', min: 0, max: 1, step: 0.05, viewer: 8,
+    { key: 'music', label: 'Pad', min: 0, max: 1, step: 0.05, viewer: 6 },
+    { key: 'chimes', label: 'Bells', min: 0, max: 1, step: 0.05, viewer: 7 },
+    { key: 'rainSound', label: 'Rain', min: 0, max: 1, step: 0.05, viewer: 8 },
+    { key: 'formSound', label: 'Forms', min: 0, max: 1, step: 0.05, viewer: 9,
       hint: 'The voice each form of light brings: the orb a low hum, the spiral a turning figure, the ring a glassy tone, the veil a soft air, the solid a chord of pure fifths, the knot two beating tones' },
   ] },
 ];

@@ -9,7 +9,7 @@ import { createAudio } from './audio.js';
 import { createSway, createRandom } from './sway.js';
 import {
   PALETTES, WEATHER, FLOWS, COLOR_MODES, SETS, SKY, CAMERAS,
-  DEFAULTS, STORAGE_KEY, SCHEMA, ROOM,
+  DEFAULTS, STORAGE_KEY, SCHEMA, ROOM, SCENES,
 } from './config.js';
 import { createShow } from './show.js';
 import { createDirector, hash } from './director.js';
@@ -60,7 +60,7 @@ const HEIGHT = ROOM.height; // height of the lattice
 // image are parted by a thin dark seam, so the floor line can be seen.
 const FLOOR = -HEIGHT / 2 - ROOM.foot;
 const DEF = DEFAULTS;
-const S = loadSettings(DEF, STORAGE_KEY, params);
+const S = loadSettings(DEF, STORAGE_KEY, params, SCENES);   // (an old link's ?scene= still works)
 
 // A saved or linked choice that no longer exists falls back to its default.
 for (const item of SCHEMA.flatMap((g) => g.items)) {
@@ -551,7 +551,7 @@ function skyColors() {
 
 // (The state is set up at the start time, or at 0 in the lab, by initState below.)
 
-// What a change in the panel does at once. The scene, form and layer need
+// What a change in the panel does at once. Rain, Form and Layer of light need
 // nothing here: the show reads them every frame and blends into the change.
 // Only the picture reads these: the show's state does not depend on them, so a change leaves it as it is.
 const LATTICE = ['leds', 'aspect', 'grid', 'rows', 'layout', 'jitter'];
@@ -704,8 +704,8 @@ function advance(dt, replay = false) {
 // bringing back a snapshot from before it (or setting the state up at 0) and stepping it on, without
 // drawing, in steps of REPLAY_STEP: the lab does so for ?t= and for a seek back. A snapshot is taken
 // the first time the show's time passes each SNAP_S, in play or in a replay, so a seek is short.
-// A seek is time-sliced over frames, so that a long one never freezes the page. The settings (the
-// scene, the colours' story ...) and the colour key (c) are those of now; a pointer is not replayed.
+// A seek is time-sliced over frames, so that a long one never freezes the page. The settings (rain,
+// form, the colours' story ...) and the colour key (c) are those of now; a pointer is not replayed.
 const REPLAY_STEP = 0.05;     // s of the show per step: the longest step a frame takes
 const SNAP_S = 60;            // s of the show between snapshots
 const MAX_SNAPS = 1500;       // at most this many snapshots (25 h of show; about 25 MB)
@@ -840,7 +840,7 @@ function hudSnapshot() {
     seek: { steps: replayed, ms: seekMs, snaps: snaps.size },
     scale: renderScale, adaptive: S.quality !== 'full', canvas: [W, H],
     grid: GRID, rows: ROWS, leds: count,
-    scene: S.scene, form: S.form, layer: S.layer, show: info,
+    rain: S.rain, form: S.form, layer: S.layer, show: info,
     weather: { name: weather.name, rain: look.rain, fall: look.flowRate },
     density: look.density, rainShare: rainShareNow,
     flow: { down: w0, across: w1, mix: direction.mix, goal: flowOf(flowGoal) },

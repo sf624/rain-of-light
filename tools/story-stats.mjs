@@ -83,7 +83,7 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
   for (const story of ['on', 'off']) {
     const r = res[story] = { runs: [], far: 0, far2: 0, pairs: 0, many: 0, passages: 0, modes: {}, pals: {}, forms: {}, layers: {}, sets: {}, off: 0, offN: 0 };
     for (let seed = 1; seed <= SEEDS; seed++) {
-      const S = { scene: 'mix', form: 'auto', layer: 'auto', story };
+      const S = { rain: 'auto', form: 'auto', layer: 'auto', story };
       const director = createDirector(seed);
       const show = createShow(S, { feet: 0, seed });
       // Sampled each second. A new passage: another kind, or another form.
