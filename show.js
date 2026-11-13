@@ -7,7 +7,7 @@
 
 import { PALETTES, PALE, FORMS, LAYER, PASSAGES } from './config.js';
 import { hash, weighted, createMood, leaning, leanTo, hueOf, apart, KIN } from './director.js';
-import { motion } from './forms.js';
+import { motion, FADING } from './forms.js';
 import { CHANGE } from './direction.js';
 
 const ROOM_TINT = [0.35, 0.5, 1.0];          // the room's colour while no form shows
@@ -41,12 +41,27 @@ const between = (a, b, r) => a + (b - a) * r;
 // that goes while rain comes fades into it, and one that comes while
 // rain goes seems to gather out of it.
 const RAIN_IN = { at: -5, fade: 14 }, RAIN_OUT = { at: 4, fade: 16 };
-const SKY_IN = { at: -4, fade: 18 }, SKY_OUT = { at: -8, fade: 16 };
+// A form's light. Every form takes about as long to come (18 .. 24 s) and to
+// go: one with a move of its own (it unfurls, unrolls, is drawn, turns; see
+// forms.js) has its light there sooner, so that the move shows, and the move
+// runs on; one whose coming is its fade alone (FADING in forms.js) fades as
+// long as the others' moves take.
+const SKY_IN = { at: -2, fade: 12 }, SKY_OUT = { at: -5, fade: 10 };
+const SKY_IN_SLOW = { at: -4, fade: 18 }, SKY_OUT_SLOW = { at: -8, fade: 16 };
 const SKY_INTO_RAIN = { at: 2, fade: 15 };   // a form going as rain comes
+// One form at a time: where one form follows another, the first has gone
+// wholly before the next begins to come, this many seconds later, about the
+// passage's start. (The room looks dark for longer, 8 to 10 s: a form's first
+// and last light is faint.)
+const SKY_GAP = 1;
 // Among rain or under a form the layer keeps this share of the glow it has alone.
 const LAYER_UNDER = 0.6;
 const LAYER_IN = { at: -6, fade: 12 }, LAYER_OUT = { at: 2, fade: 12 };
-const EASE = 2.5;                             // s: a change of scene or form setting blends in this long
+const EASE = 2.5;                             // s: a change of scene blends the rain in about this long
+// A form's or the layer's shown weight moves at most 1 / BLEND a second: it
+// follows the timeline's fades as they are (none is as steep), and a change
+// of setting fades a form in or out over BLEND seconds, down to 0 exactly.
+const BLEND = 4;
 
 // The scenes: the whole show, or only its forms (the rain is pinned in update).
 const POOLS = {
@@ -77,10 +92,16 @@ function createTimeline(seed, pool, name, mood) {
     for (let i = 0; i < pool.length; i++) if ((x -= w[i]) <= 0 && w[i] > 0) return pool[i];
     return pool.find((p, i) => w[i] > 0);
   };
+  let lastSky = null;  // the latest sky episode
+  // How the light of a form comes, and goes.
+  const comes = (form) => (FADING.has(form.name) ? SKY_IN_SLOW : SKY_IN);
+  const goes = (form) => (FADING.has(form.name) ? SKY_OUT_SLOW : SKY_OUT);
   const episode = (form, r, start, how) => {
     const names = form.palettes;
-    // What the show opens with is there almost at once.
-    const inAt = start > 0 ? start + how.at : -how.fade * 0.8;
+    // What the show opens with is there almost at once. A form comes only
+    // once the one before has gone, and SKY_GAP after.
+    let inAt = start > 0 ? start + how.at : -how.fade * 0.8;
+    if (form !== LAYER && lastSky) inAt = Math.max(inAt, lastSky.outAt + lastSky.outFade + SKY_GAP);
     // Its palette: as the seed alone has it (pal), and with the colour story (told).
     // (A sky form's palette also tires, see TIRE; the layer's does not.)
     const x = hash(r * 53 + 2), m = leaning(true, hash(r * 53 + 4), mood, start);
@@ -98,7 +119,7 @@ function createTimeline(seed, pool, name, mood) {
       const kind = prev ? pickKind(prev.kind, hash(r * 91 + 1)) : pool[0];
       const T = next;
       // The form: a storm may keep the form that shows, and rain gathers on it.
-      let sky = null;
+      let sky = null, form = null;
       if (kind.sky) {
         if (prev?.sky && prev.kind !== kind && hash(r * 37 + 5) < 0.6) sky = prev.sky;
         else {
@@ -107,12 +128,15 @@ function createTimeline(seed, pool, name, mood) {
           // (those never seen: as if all the others had come since).
           const options = FORMS.filter((f) => !recent.slice(0, Math.min(2, FORMS.length - 1)).includes(f));
           const since = (f) => (recent.includes(f) ? recent.indexOf(f) : FORMS.length);
-          const form = weighted(options, hash(r * 41 + 6), (f) => f.weight * since(f) ** 2);
-          sky = episode(form, r, T, SKY_IN);
+          form = weighted(options, hash(r * 41 + 6), (f) => f.weight * since(f) ** 2);
           recent.unshift(form);
         }
       }
-      if (prev?.sky && prev.sky !== sky) close(prev.sky, T, kind.rain > prev.kind.rain ? SKY_INTO_RAIN : SKY_OUT);
+      // One form after another: the first goes before T, the next comes after it.
+      const old = prev?.sky && prev.sky !== sky ? prev.sky : null;
+      if (old && form) close(old, T, { at: -SKY_GAP / 2 - goes(old.form).fade, fade: goes(old.form).fade });
+      else if (old) close(old, T, kind.rain > prev.kind.rain ? SKY_INTO_RAIN : goes(old.form));
+      if (form) sky = lastSky = episode(form, r, T, old ? { at: SKY_GAP / 2, fade: comes(form).fade } : comes(form));
       const layerOn = hash(r * 23 + 7) < kind.layer;
       let layer = null;
       if (layerOn) layer = prev?.layer || episode(LAYER, r, T, LAYER_IN);
@@ -235,10 +259,10 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
     return e.form.name === 'orb' ? [p.b, p.a, room] : [p.a, p.b, room];
   };
 
-  const SLOTS = 3;                            // two sky forms (one coming, one going) and the layer
+  const SLOTS = 3;                            // two sky forms (the one that shows, and the next, waiting for it to go) and the layer
   const A = new Float32Array(SLOTS * 4), B = new Float32Array(SLOTS * 4);
   const C = new Float32Array(SLOTS * 3), D = new Float32Array(SLOTS * 3);
-  const E = new Float32Array(SLOTS * 3), F = new Float32Array(SLOTS * 4);
+  const E = new Float32Array(SLOTS * 4), F = new Float32Array(SLOTS * 4);
   const tint = [...ROOM_TINT];
 
   // Where a form is at its age, how large, how turned (see forms.js). The
@@ -252,15 +276,16 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
     let m;
     if (form === LAYER) {                     // the layer: its surface height, its thickness
       m = { centre: [0, feet + between(0.5, 1.8, hash(r * 61 + 1)), 0], size: between(0.2, 0.45, hash(r * 61 + 2)),
-        turn: 0, tilt: 0, yaw: 0, f: [between(0.55, 1, hash(r * 61 + 3)), s.alone, LAYER_UNDER], bound: 1e4 };
+        turn: 0, tilt: 0, yaw: 0, f: [between(0.55, 1, hash(r * 61 + 3)), s.alone, LAYER_UNDER], dissolve: 0, bound: 1e4 };
     } else {
-      m = motion(form.name, age, w, r, s.face ?? 0, view?.rise);
+      const go = out ? { at: e.outAt - e.inAt, fade: e.outFade } : null;   // (its age as it began to go)
+      m = motion(form.name, age, w, go, r, s.face ?? 0, view?.rise);
       if (eye) {
         const goal = Math.atan2(m.anchor[0] - eye[0], m.anchor[2] - eye[2]);
         const turn = s.face === undefined ? 1 : 1 - Math.exp(-dt / 5);
         const d = goal - (s.face ?? goal);
         s.face = (s.face ?? goal) + (d - Math.round(d / (2 * Math.PI)) * 2 * Math.PI) * turn;
-        m = motion(form.name, age, w, r, s.face, view.rise);
+        m = motion(form.name, age, w, go, r, s.face, view.rise);
       }
     }
     A.set([form.type, w, m.size, m.turn], k * 4);
@@ -272,7 +297,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
     // While rain falls, a form comes from the top down and goes from the top
     // down, as if rain gathered into it or it ran off as rain; else LED by LED
     // (also beside sideways rain, which falls from nowhere: down 0).
-    E.set([sweep * down, out ? -1 : 1, m.yaw], k * 3);
+    E.set([sweep * down, out ? -1 : 1, m.yaw, m.dissolve], k * 4);
     F.set([...m.f, m.bound], k * 4);
   }
 
@@ -286,21 +311,26 @@ export function createShow(S, { feet, seed = Math.random() * 1000 }) {
     const ids = new Set();
     const top = want.items.filter((x) => x.e.form !== LAYER).sort((a, b) => b.w - a.w)[0];
     const above = top?.e;
+    const toward = (s, w) => { s.w += Math.max(-dt / BLEND, Math.min(dt / BLEND, w - s.w)); };
+    // One form at a time: while one shows, another waits (at 0) until it has
+    // gone. (The timeline never asks for two at once; a change of setting may.)
+    const showing = [...shown.values()].find((s) => s.x.e.form !== LAYER && s.w > 0);
     for (const x of want.items) {
       ids.add(x.e.id);
       const s = shown.get(x.e.id);
       const goal = colorsOf(x.e, above);
-      if (!s) shown.set(x.e.id, { x, w: first ? x.w : 0, col: goal.map((c) => [...c]) });
+      const w = x.e.form !== LAYER && showing && showing !== s ? 0 : x.w;
+      if (!s) shown.set(x.e.id, { x, w: first ? w : 0, col: goal.map((c) => [...c]) });
       else {
         s.x = x;
-        s.w += (x.w - s.w) * k;
+        toward(s, w);
         s.col.forEach((c, i) => c.forEach((v, j) => { c[j] = v + (goal[i][j] - v) * kc; }));
       }
     }
     for (const [id, s] of shown) {
       if (ids.has(id)) continue;
-      s.w += (0 - s.w) * k;                   // asked for no more: fade out
-      if (s.w < 0.002) shown.delete(id);
+      toward(s, 0);                           // asked for no more: fade out
+      if (s.w <= 0) shown.delete(id);
     }
     // Fill the slots: two for the sky forms, one for the layer. A form keeps
     // its slot while it shows (the order its LEDs light in depends on it);

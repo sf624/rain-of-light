@@ -31,7 +31,7 @@
     { "name": "forms", "cols": 4, "base": "scene=crystal&layer=off&t=30", "pre": 100, "cells": [
       {"q": "form=orb", "label": "form=orb"},
       {"q": "form=spiral", "label": "form=spiral"},
-      {"q": "form=ring", "label": "form=ring"},
+      {"q": "form=ring&t=60", "label": "form=ring"},
       {"q": "form=veil", "label": "form=veil"},
       {"q": "form=solid", "label": "form=solid"},
       {"q": "form=knot", "label": "form=knot"},
@@ -61,12 +61,12 @@
       {"q": "rainShare=0.6", "label": "rainShare=0.6"},
       {"q": "rainShare=1", "label": "rainShare=1"}
     ] },
-    { "name": "leds", "cols": 3, "base": "scene=crystal&layer=off&form=ring&t=30", "cells": [
+    { "name": "leds", "cols": 3, "base": "scene=crystal&layer=off&form=ring&t=60", "cells": [
       {"q": "leds=250", "label": "leds=250"},
       {"q": "leds=1000", "label": "leds=1000"},
       {"q": "leds=1700", "label": "leds=1700"}
     ] },
-    { "name": "aspect", "cols": 3, "base": "scene=crystal&layer=off&form=ring&t=30", "cells": [
+    { "name": "aspect", "cols": 3, "base": "scene=crystal&layer=off&form=ring&t=60", "cells": [
       {"q": "aspect=0.5", "label": "aspect=0.5"},
       {"q": "aspect=1", "label": "aspect=1"},
       {"q": "aspect=2", "label": "aspect=2"}

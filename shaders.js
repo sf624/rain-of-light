@@ -80,8 +80,8 @@ uniform float uRainMix;   // 0: the still room's look (pale drops, the room's ti
 uniform float uStorm;     // 0 .. 1: how much rain falls through a form (the rain gives way to it)
 uniform vec4 uFormA[3];   // per form: type (see FORMS and LAYER in config.js), weight 0..1, size, turn
 uniform vec4 uFormB[3];   // centre (the layer: its height in y), tilt
-uniform vec3 uFormE[3];   // how much it comes and goes from the top down (0: LED by LED), 1 coming / -1 going,
-                          // the way the tilt leans (yaw)
+uniform vec4 uFormE[3];   // how much it comes and goes from the top down (0: LED by LED), 1 coming / -1 going,
+                          // the way the tilt leans (yaw), how far it has risen away as points (0 .. 1)
 uniform vec4 uFormF[3];   // the form's own measures (see forms.js), and how far from its centre its light reaches
 uniform vec3 uFormC[3];   // the form's colour
 uniform vec3 uFormD[3];   // its second colour
@@ -305,15 +305,15 @@ vec3 orbLight(vec3 p, vec4 a, vec4 b) {
 }
 
 // A spiral disc: tilted, two arms, a bright bulge at the centre, slowly
-// turning.
-vec3 spiralLight(vec3 p, vec4 a, vec4 b, float yaw) {
+// turning. f.x: how far it has unfurled; furled, its arms wind tight.
+vec3 spiralLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
   vec3 q = turned(p - b.xyz, yaw, b.w);
-  float R = a.z;
+  float R = a.z * f.x;
   float r = length(q.xz) / R;
   float th = atan(q.z, q.x);
   float thick = a.z * (0.06 + 0.12 * exp(-r * r * 8.0));
   float disc = exp(-q.y * q.y / (thick * thick)) * (1.0 - smoothstep(0.75, 1.0, r));
-  float arm = pow(0.5 + 0.5 * cos(2.0 * (th - a.w) + 4.0 * log(r + 0.03)), 4.0);
+  float arm = pow(0.5 + 0.5 * cos(2.0 * (th - a.w) + mix(9.0, 4.0, f.x) * log(r + 0.03)), 4.0);
   float dust = 0.7 + 0.6 * noise3(p * 0.7);
   float bulge = exp(-dot(q, q) / (a.z * a.z * 0.015));
   return vec3(disc * (0.15 + 22.0 * arm * dust) * exp(-r * 0.6) + bulge * 40.0, bulge, smoothstep(0.1, 0.8, r));
@@ -339,50 +339,45 @@ vec3 layerLight(vec3 p, vec4 a, vec4 b, vec4 f) {
 }
 
 // A ring: a hoop of light, a bright thread in a soft sheath, its face tilted,
-// two brighter arcs slowly running round it. It may part into two hoops that
-// lean apart (f.x radians) and cross.
+// two brighter arcs slowly running round it.
 vec3 ringLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
-  float apart = min(1.0, f.x * 4.0);
   float fine = fineness();
-  float light = 0.0, along = 0.0, hot = 0.0;
-  for (int i = 0; i < 2; i++) {
-    if (i == 1 && f.x == 0.0) break;                 // one hoop while together
-    float tilt = b.w + (i == 0 ? f.x : -f.x);
-    vec3 q = turned(p - b.xyz, yaw, tilt);
-    float rho = length(q.xz) - a.z;
-    float d2 = (rho * rho + q.y * q.y) * fine;
-    float th = atan(q.z, q.x);
-    float arc = pow(0.5 + 0.5 * cos(th * 2.0 - a.w), 2.0);
-    // Where the hoop runs level it crosses each strand at a few LEDs only,
-    // where it runs upright it lies along one: the level parts glow more,
-    // so the hoop is as bright all the way round.
-    float level = 1.0 - abs(sin(tilt) * cos(th));
-    float core = exp(-d2 * 9.0);
-    float g = (core + 0.3 * exp(-d2 * 2.2)) * (0.42 + 0.58 * arc) * (0.75 + 1.5 * level * level);
-    light += g;
-    hot += core * core * arc;
-    along += g * (0.5 + 0.5 * sin(th + a.w * 0.5));
-  }
-  float k = f.x == 0.0 ? 1.0 : 0.5 * (1.0 + apart);
-  light *= k;
-  return vec3(light * 21.0, hot * 0.45 * k, along / max(light, 1e-4) * k);
+  vec3 q = turned(p - b.xyz, yaw, b.w);
+  float rho = length(q.xz) - a.z;
+  float d2 = (rho * rho + q.y * q.y) * fine;
+  float th = atan(q.z, q.x);
+  float arc = pow(0.5 + 0.5 * cos(th * 2.0 - a.w), 2.0);
+  // Where the hoop runs level it crosses each strand at a few LEDs only,
+  // where it runs upright it lies along one: the level parts glow more,
+  // so the hoop is as bright all the way round.
+  float level = 1.0 - abs(sin(b.w) * cos(th));
+  float core = exp(-d2 * 9.0);
+  float g = (core + 0.3 * exp(-d2 * 2.2)) * (0.42 + 0.58 * arc) * (0.75 + 1.5 * level * level);
+  float hot = core * core * arc;
+  float along = 0.5 + 0.5 * sin(th + a.w * 0.5);
+  // Edge-on (f.x: how far its face is turned to the eye, 0 .. 1) the hoop lies along the line of
+  // sight, its light piled up in one line: it gives less, so the line is no brighter than the hoop.
+  float k = mix(0.5, 1.0, sqrt(f.x));
+  return vec3(g * 21.0 * k, hot * 0.45 * k, along);
 }
 
 // A veil, like an aurora: a curtain hanging in folds that travel slowly along
 // it. Its lower hem is a bright line that rises and falls along the room;
 // from it rays of many heights rise and fade. Where a fold turns along the
 // line of sight, more of the curtain lies behind itself, and it shows brighter.
-// f.x: half its length.
+// f.x: how much of its length has unrolled; f.y: how far it has lifted;
+// f.z: half its length.
 vec3 veilLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
   vec3 q = turned(p - b.xyz, yaw, 0.0);
-  float L = f.x, x = q.x;
+  float L = f.z, x = q.x;
   float p1 = x * 0.5 + a.w, p2 = x * 1.25 - a.w * 1.6 + 1.3;
   float fold = 1.7 * sin(p1) + 0.55 * sin(p2);
   float slope = 0.85 * cos(p1) + 0.69 * cos(p2);
   float dz = (q.z - fold) / sqrt(1.0 + slope * slope);   // the distance to the curtain, not along z
   float across = exp(-dz * dz * 5.0 * fineness());
-  float ends = smoothstep(-L, -L + 3.5, x) * (1.0 - smoothstep(L - 3.5, L, x));
-  float y = q.y - 0.75 * sin(x * 0.45 + a.w * 1.3) - 0.3 * sin(x * 1.3 - a.w * 0.9);
+  float reach = -L + 2.0 * L * f.x;
+  float ends = smoothstep(-L, -L + 3.5, x) * (1.0 - smoothstep(reach - 3.5, reach, x));
+  float y = q.y - f.y - 0.75 * sin(x * 0.45 + a.w * 1.3) - 0.3 * sin(x * 1.3 - a.w * 0.9);
   float tall = a.z * (0.4 + 0.6 * pow(0.5 + 0.5 * sin(x * 0.8 + a.w * 0.7 + 2.0 * sin(x * 0.21 - a.w * 0.4)), 1.5));
   float up = y > 0.0 ? pow(max(1.0 - y / tall, 0.0), 1.3) : 0.0;
   float hem = exp(-y * y * (y > 0.0 ? 9.0 : 30.0));
@@ -405,7 +400,8 @@ float runner(float back, float trail) { return exp(-back / trail) + exp(-(1.0 - 
 // each corner: a tetrahedron or an octahedron (f.x: which, see SOLID), their
 // corners a.z from the centre. It stands on a corner's axis (the solid's y),
 // leaning a little (tilt, towards yaw) and turning about that axis (a.w), so
-// its edges run aslant or level, never along a strand.
+// its edges run aslant or level, never along a strand. The edges are drawn
+// out from the corners (f.y: how far, 0 .. 1).
 const vec3 CORNER[10] = vec3[10](
   vec3(0.0, 1.0, 0.0), vec3(0.94281, -0.33333, 0.0), vec3(-0.47140, -0.33333, 0.81650), vec3(-0.47140, -0.33333, -0.81650),
   vec3(1.0, 0.0, 0.0), vec3(-1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), vec3(0.0, -1.0, 0.0), vec3(0.0, 0.0, 1.0), vec3(0.0, 0.0, -1.0));
@@ -430,9 +426,10 @@ vec3 solidLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
     float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
     vec3 off = pa - ba * h;
     float m = min(h, 1.0 - h);                       // 0 at a corner .. 0.5 at the middle of the edge
+    float drawn = 1.0 - smoothstep(f.y * 0.56 - 0.06, f.y * 0.56, m);
     // (An edge that runs level crosses each strand at a few LEDs only: it glows more, like the ring.)
     float level = 1.0 - abs(dot(normalize(ba), up));
-    float g = rod(dot(off, off) * fine) * (0.75 + 0.6 * level * level);
+    float g = rod(dot(off, off) * fine) * drawn * (0.75 + 0.6 * level * level);
     light += g;
     along += g * m * 2.0;
   }
@@ -449,13 +446,13 @@ vec3 solidLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
 // close a little as its phase sways. It swings twice across while it goes
 // once up and down (a figure of eight, woven in depth), so it runs mostly
 // aslant or level, hardly ever along a strand, and its loops are few and wide.
-// Two lights run round it.
+// Two lights run round it. f.x .. f.y: the part of the curve that shows (0 .. 1 of the way round).
 // The curve passes the LED's height at 2 v places: the nearest place on it
 // is sought from each (one step along the curve), so the cost does not grow
 // with the curve's length.
 const vec3 KNOT = vec3(2.0, 1.0, 3.0);               // u, v, w: how often it swings across, up and down, and in depth
 const vec3 KNOT_BOX = vec3(1.0, 0.9, 0.4);          // its half width, height and depth, in units of its size: its broad side shows the figure
-vec3 knotLight(vec3 p, vec4 a, vec4 b, float yaw) {
+vec3 knotLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
   const float TAU = 6.2831853;
   vec3 w = KNOT;
   vec3 amp = a.z * KNOT_BOX;
@@ -474,13 +471,16 @@ vec3 knotLight(vec3 p, vec4 a, vec4 b, float yaw) {
     if (d2 < best) { best = d2; at = t; level = 1.0 - abs(T.y) / max(length(T), 1e-4); }
   }
   float s = fract(at / TAU);
+  float shown = smoothstep(f.x, f.x + 0.04, s) * (1.0 - smoothstep(f.y - 0.04, f.y, s));
   float run = runner(fract((uTime * 0.021 - s) * 2.0), 0.3);
-  float g = rod(best * fineness()) * (0.75 + 0.6 * level * level);
+  float g = rod(best * fineness()) * shown * (0.75 + 0.6 * level * level);
   return vec3(g * (7.0 + 9.0 * run), g * run * run * 0.3, clamp(run * 1.3, 0.0, 1.0));
 }
 
 // The light of the forms at p (v: 0 at the top .. 1 at the floor). Each comes
 // and goes LED by LED in a random order, or, while rain falls, from the top down.
+// A form that rises away as points (e.w) is seen by each LED a random way
+// below it: its light lifts off as points, the high ones rising fastest.
 // thread: the share of that light the strand's wire shows; around: how near
 // p is to a sky form (1 within its reach, 0 well away): rain gives way there.
 const vec2 LAYER_NEAR = vec2(4.5, 11.0);   // the layer is dark nearer the eye than x, full from y on
@@ -493,32 +493,40 @@ vec3 formsAt(vec3 p, float id, float v, out vec3 thread, out float around) {
     vec4 a = uFormA[k];
     if (a.y < 0.001) continue;
     vec4 b = uFormB[k];
-    vec3 e = uFormE[k];
+    vec4 e = uFormE[k];
     vec4 ff = uFormF[k];
-    float far = length(p - b.xyz);
+    vec3 q = p;
+    float keep = 1.0;
+    if (e.w > 0.001) {
+      float h = hash(id + float(k) * 3.1 + 0.5);
+      q.y -= e.w * (0.5 + 6.5 * h * h);
+      // (each LED fades out as its turn comes, over a second or so, never at once)
+      keep = (1.0 - e.w * 0.7) * clamp((hash(id + float(k) * 5.3 + 0.9) - e.w * 0.6) / 0.08 + 1.0, 0.0, 1.0);
+    }
+    float far = length(q - b.xyz);
     if (k < 2) around = max(around, a.y * (1.0 - smoothstep(ff.w * 0.8, ff.w * 2.2, far)));
     if (far > ff.w) continue;                        // too far from it for any of its light
     int type = int(a.x + 0.5);
     vec3 f;
-    if (type == 0) f = orbLight(p, a, b);
-    else if (type == 1) f = spiralLight(p, a, b, e.z);
+    if (type == 0) f = orbLight(q, a, b);
+    else if (type == 1) f = spiralLight(q, a, b, e.z, ff);
     else if (type == 2) {
       // Where a sky form already lights this LED the layer gives way, so the
       // two never add up to a white flare where a form meets the layer.
-      f = layerLight(p, a, b, ff);
+      f = layerLight(q, a, b, ff);
       f.x *= 1.0 - min(0.9, max(c.r, max(c.g, c.b)) * 1.5);
       // Not close to the eye: there the layer would be loose big points across the floor.
       vec3 eye = -(transpose(mat3(uView)) * uView[3].xyz);
-      f.x *= smoothstep(LAYER_NEAR.x, LAYER_NEAR.y, length(p.xz - eye.xz));
+      f.x *= smoothstep(LAYER_NEAR.x, LAYER_NEAR.y, length(q.xz - eye.xz));
     }
-    else if (type == 3) f = ringLight(p, a, b, e.z, ff);
-    else if (type == 4) f = veilLight(p, a, b, e.z, ff);
-    else if (type == 5) f = solidLight(p, a, b, e.z, ff);
-    else f = knotLight(p, a, b, e.z);
+    else if (type == 3) f = ringLight(q, a, b, e.z, ff);
+    else if (type == 4) f = veilLight(q, a, b, e.z, ff);
+    else if (type == 5) f = solidLight(q, a, b, e.z, ff);
+    else f = knotLight(q, a, b, e.z, ff);
     if (type != 2) f.x *= FORM_BODY;
     float order = mix(hash(id + float(k) * 7.7), e.y > 0.0 ? v : 1.0 - v, e.x * 0.8);
     float on = clamp((a.y * 1.25 - order) / 0.25, 0.0, 1.0) * smoothstep(0.0, 0.4, a.y);
-    vec3 light = mix(mix(uFormC[k], uFormD[k], f.z), WHITE_HOT, clamp(f.y, 0.0, 1.0)) * f.x * on;
+    vec3 light = mix(mix(uFormC[k], uFormD[k], f.z), WHITE_HOT, clamp(f.y, 0.0, 1.0)) * f.x * on * keep;
     c += light;
     thread += light * (type == 2 || type == 3 || type >= 5 ? 0.5 : 1.0);   // a hoop or a line is not its strands
   }

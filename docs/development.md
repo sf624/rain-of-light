@@ -367,8 +367,10 @@ node tools/story-stats.mjs [seeds=50] [hours=1]
 measures the colour story without rendering, in Node. Over many seeds it
 counts how often neighbouring passages differ in hue, how often each colour
 mode and palette comes, how far the mood wanders, how long the picture
-stays in one colour family, how much of the rain flows sideways, and how
-often each form comes. With and without the story.
+stays in one colour family, how much of the rain flows sideways, how
+often each form comes, how much of the time a form's light shows (and
+wholly), and how much of it two forms show at once (0: one form at a time).
+With and without the story.
 
 ## The service worker
 

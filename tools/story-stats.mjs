@@ -2,7 +2,8 @@
 // seeds, how often neighbouring passages differ in hue, how often each colour
 // mode and palette comes, and how far the mood wanders. With and without the story.
 // It also measures how long the picture stays in one colour family, and how
-// much of the rain flows sideways (see show.js, drift).
+// much of the rain flows sideways (see show.js, drift), and how much of the
+// time a form shows, and two at once (0: one form at a time, see show.js).
 //   node tools/story-stats.mjs [seeds=50] [hours=1]
 globalThis.innerWidth = globalThis.innerHeight = 1000;
 const { COLOR_MODES, PALETTES, SETS, FORMS } = await import('../config.js');
@@ -163,6 +164,7 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
   // flows sideways, and that falls down, as main.js runs them (direction.js), each tenth of
   // a second; and the sideways passages (drift): how many, how long, and what comes next to them.
   let side = 0, down = 0, all = 0, steps = 0, drifts = 0, lengths = [], next = 0;
+  let lit = 0, full = 0, two = 0;     // steps with a form's light (shown weight above 0), with one wholly there, with two at once
   const came = {}, stayed = {};       // per form: how many times it came, and for how many seconds it showed
   for (let seed = 1; seed <= SEEDS; seed++) {
     const show = createShow({ ...DEFAULTS }, { feet: 0, seed });
@@ -171,6 +173,10 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
       const now = show.update(t, 0.1);
       dir.update(0.1, now.flow.toward, t);
       side += dir.weights[1] * now.rain; down += dir.weights[0] * now.rain; all += now.rain; steps++;
+      const ws = show.info(t).items.filter((i) => i.form !== 'layer' && i.w > 0).map((i) => i.w);
+      if (ws.length) lit++;
+      if (ws.some((w) => w > 0.999)) full++;
+      if (ws.length > 1) two++;
     }
     let from = null, kind = null;
     let form = null;
@@ -194,6 +200,7 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
   const hours = SEEDS * SPAN / 3600;
   out.push('', `Rain: ${pct(all, steps)} of the full rain, over the whole show`,
     '', 'Forms (times each comes in an hour; share of the show it is there)');
+  out.push(`  (a form's light shows ${pct(lit, steps)} of the time, wholly ${pct(full, steps)}; two forms at once ${pct(two, steps)})`);
   for (const f of FORMS) out.push(`  ${f.name.padEnd(10)} ${((came[f.name] || 0) / hours).toFixed(1).padStart(5)}  ${pct(stayed[f.name] || 0, SEEDS * SPAN)}`);
   const sum = (k) => Object.values(k).reduce((a, b) => a + b, 0);
   out.push(`  ${'all'.padEnd(10)} ${(sum(came) / hours).toFixed(1).padStart(5)}  ${pct(sum(stayed), SEEDS * SPAN)}`);

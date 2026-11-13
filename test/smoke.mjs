@@ -449,7 +449,7 @@ await visit(cdp, base, 'lab.html?pause=1&t=Infinity&scene=rain', false);   // a 
 await visit(cdp, base, '?scene=crystal', true);
 await visit(cdp, base, '?seed=7&t=100', false);
 await visit(cdp, base, '?seed=7&t=100&story=off', false);   // without the colour story
-// The forms added later, each held part-way through its life (it has risen and turned).
+// The forms added later, each held part-way through its life (it has come and turned).
 for (const f of ['ring', 'veil', 'solid', 'knot']) await visit(cdp, base, `?scene=crystal&form=${f}&seed=2&t=40`, false);
 // LEDs spaced per strand: some LEDs are never lit, and the wires skip them.
 await visit(cdp, base, '?jitter=pitch', false);
