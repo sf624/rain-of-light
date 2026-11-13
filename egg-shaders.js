@@ -342,10 +342,10 @@ vec3 milkyLight(vec3 p, float id, vec4 a, int o) {
   float sky = smoothstep(-0.02, 0.06, d.y);           // above the horizon (the floor shows its image)
   vec3 c = vec3(0.0);
   float off = dot(d, v.xyz);                          // the sine of the angle from the band's middle
-  float along = atan(d.z, d.x);
-  float width = v.w * (0.7 + 0.6 * noise3(vec3(along * 2.5, 1.0, 3.0)));
-  float band = exp(-off * off / (width * width)) * sky * depth;
-  if (band > 0.01) {
+  if (abs(off) < v.w * 2.8 && sky > 0.0) {             // (no farther out than its widest place shows)
+    float along = atan(d.z, d.x);
+    float width = v.w * (0.7 + 0.6 * noise3(vec3(along * 2.5, 1.0, 3.0)));
+    float band = exp(-off * off / (width * width)) * sky * depth;
     float rift = 1.0 - 0.75 * exp(-pow((off - width * 0.25 * sin(along * 3.0)) / (width * 0.18), 2.0));
     float dust = 0.3 + 0.9 * noise3(d * 14.0);
     float tw = hash(id + 17.0) < 0.1 ? pow(0.5 + 0.5 * sin(uTime * (0.4 + 1.3 * hash(id + 18.0)) + hash(id + 19.0) * 6.28), 12.0) : 0.0;
