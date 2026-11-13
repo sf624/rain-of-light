@@ -14,7 +14,7 @@
 // vertical, eased in show.js): some forms turn a face to the room, and some
 // keep beyond their path as the eye sees it (see BACK).
 
-import { ROOM } from './config.js';
+import { ROOM, EGGS } from './config.js';
 
 const FLOOR = -ROOM.height / 2 - ROOM.foot;        // the mirror floor
 const TAU = Math.PI * 2;
@@ -140,18 +140,38 @@ function knot(age, w, leave, ph, face) {
   };
 }
 
-export const MOTIONS = { orb, spiral, ring, veil, solid, knot };
+// A baked form (an egg, see EGGS): it sits on the floor, its side to the
+// room, and sways slowly about the vertical, so that it shows its profile
+// and, now and then, a little of its front and its back; it never turns
+// round (its outline would read only from the side).
+// f[0]: its slab in the shader's field; f[1]: the top of its shape in its
+// box (see tools/bake-field.py), so that LEDs above it skip it.
+const BASE = 0.9;                                   // its base lies this far below its box's centre (of its size, see tools/bake-field.py)
+// Like the orb, it comes and goes by its light's fade alone (FADING), growing
+// a little as it comes (GROW), its base kept on the floor.
+function baked(egg, age, w, leave, ph, face) {
+  const size = egg.size * (GROW + (1 - GROW) * w), drift = 1.2;
+  return {
+    centre: [drift * Math.sin(0.02 * age + ph), -ROOM.height / 2 + BASE * size + 0.1, drift * Math.cos(0.017 * age + ph)],
+    size, yaw: face + 0.55 * Math.sin(0.045 * age + ph),
+    f: [egg.field, egg.top, 0],
+    bound: size * 1.75, onFloor: true,
+  };
+}
+
+export const MOTIONS = { orb, spiral, ring, veil, solid, knot,
+  ...Object.fromEntries(EGGS.map((egg) => [egg.name, (age, w, leave, ph, face) => baked(egg, age, w, leave, ph, face)])) };
 // How far beyond its own path each form keeps, as the eye sees it: the loose
 // and the wide ones read from a distance, and none flares right at the eye.
-const BACK = { orb: 2.5, spiral: 2.5, ring: 2.5, veil: 3, solid: 2.5, knot: 3.5 };
+const BACK = { orb: 2.5, spiral: 2.5, ring: 2.5, veil: 3, solid: 2.5, knot: 3.5, ...Object.fromEntries(EGGS.map((egg) => [egg.name, 3])) };
 
-// How large the orb is as it begins to come and as it has gone, of its full size.
+// How large the orb (and a baked form) is as it begins to come and as it has gone, of its full size.
 const GROW = 0.75;
 
-// The forms whose coming and going is their light's fade alone: the orb,
-// which grows with it (GROW). The others have a move of their own (see
+// The forms whose coming and going is their light's fade alone: the orb
+// and the baked forms, which grow with it (GROW). The others have a move of their own (see
 // show.js, SKY_IN).
-export const FADING = new Set(['orb']);
+export const FADING = new Set(['orb', ...EGGS.map((egg) => egg.name)]);
 
 // The form's place at its age: the defaults filled in. w (0 .. 1) is how
 // much it shows (its weight, see show.js); go: null while it stays, else
@@ -159,11 +179,12 @@ export const FADING = new Set(['orb']);
 // the forms see how far it has gone on its way out (leave, 0 .. 1). anchor is the place on its own path (the eye's way to it
 // gives `face`); centre is where it shows.
 // rise: how many times higher over the floor it floats (a tall view has the
-// room for it; see viewFit in main.js).
+// room for it; see viewFit in main.js), unless it sits on the floor (onFloor).
 export function motion(name, age, w, go, r, face, rise = 1) {
   const leave = go ? smooth((age - go.at) / go.fade) : 0;
   const m = MOTIONS[name](age, w, leave, r * TAU, face, go);
   const [x, y, z] = m.centre, back = BACK[name] || 0;
+  const lift = m.onFloor ? 1 : rise;                // (a baked form stays on the floor)
   return { turn: 0, tilt: 0, yaw: 0, f: [0, 0, 0], dissolve: 0, ...m,
-    anchor: m.centre, centre: [x + back * Math.sin(face), FLOOR + (y - FLOOR) * rise, z + back * Math.cos(face)] };
+    anchor: m.centre, centre: [x + back * Math.sin(face), FLOOR + (y - FLOOR) * lift, z + back * Math.cos(face)] };
 }

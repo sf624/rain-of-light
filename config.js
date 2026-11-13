@@ -90,6 +90,17 @@ export const FORMS = [
   { name: 'knot',      type: 6, weight: 0.4, palettes: ['aurora', 'amber', 'sakura', 'deep sea'] },
 ];
 export const LAYER = { name: 'layer', type: 2, palettes: ['deep sea', 'ice', 'aurora', 'sakura', 'amber'] };
+// The baked forms: shapes baked into fields of distance (fields/*.bin, see
+// fields.js and tools/bake-field.py), drawn as a glowing skin. They are not
+// cast like the forms above: rarely, one of them takes a form's place (see
+// EGG and the casting in show.js), and the viewer's settings never name them.
+// field: its slab in the shader's field; size: half the side of its box;
+// top: the top of its shape in that box (-1 .. 1, as tools/bake-field.py prints it).
+export const EGGS = [
+  { name: 'teapot', type: 7, field: 0, size: 5.6, top: -0.019, palettes: ['ice', 'candle'] },
+];
+// after: never before this time (s); chance: of each form that is cast after it.
+export const EGG = { after: 600, chance: 0.012 };
 
 // The room: strands of LEDs over a mirror floor, the same for the whole show.
 export const ROOM = {
@@ -144,7 +155,7 @@ export const SCHEMA = [
   { title: 'Scene', items: [
     { key: 'scene', label: 'Scene', options: SCENES, viewer: 1,
       hint: 'mix: rain and forms of light come and go, and blend / rain: only the rain / crystal: only the forms of light' },
-    { key: 'form', label: 'Form', options: ['auto', ...FORMS.map((f) => f.name), 'none'],
+    { key: 'form', label: 'Form', options: ['auto', ...FORMS.map((f) => f.name), ...EGGS.map((f) => f.name), 'none'],
       hint: 'auto: as the scene brings them / or hold one form (none: no form)' },
     { key: 'layer', label: 'Layer of light', options: ['auto', 'on', 'off'] },
     { key: 'mirror', label: 'Floor mirror (0: off)', min: 0, max: 1, step: 0.05 },

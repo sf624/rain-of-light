@@ -6,7 +6,7 @@
 // time a form shows, and two at once (0: one form at a time, see show.js).
 //   node tools/story-stats.mjs [seeds=50] [hours=1]
 globalThis.innerWidth = globalThis.innerHeight = 1000;
-const { COLOR_MODES, PALETTES, SETS, FORMS } = await import('../config.js');
+const { COLOR_MODES, PALETTES, SETS, FORMS, EGGS } = await import('../config.js');
 const { createDirector, hueOf, apart, KIN } = await import('../director.js');
 const { createShow } = await import('../show.js');
 const { createDirection } = await import('../direction.js');
@@ -166,6 +166,7 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
   let side = 0, down = 0, all = 0, steps = 0, drifts = 0, lengths = [], next = 0;
   let lit = 0, full = 0, two = 0;     // steps with a form's light (shown weight above 0), with one wholly there, with two at once
   const came = {}, stayed = {};       // per form: how many times it came, and for how many seconds it showed
+  const eggAt = [];                   // when each egg came (s into its seed's show)
   for (let seed = 1; seed <= SEEDS; seed++) {
     const show = createShow({ ...DEFAULTS }, { feet: 0, seed });
     const dir = createDirection(show.flow(0).toward);
@@ -184,7 +185,7 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
       const c = show.cast(t), k = c.kind;
       const f = c.items.find((i) => i.form !== 'layer')?.form;
       if (f) count(stayed, f);
-      if (f && f !== form) count(came, f);
+      if (f && f !== form) { count(came, f); if (EGGS.some((e) => e.name === f)) eggAt.push(t); }
       form = f;
       if (k === kind) continue;
       if (k === 'drift') { drifts++; from = t; if (['rain', 'storm'].includes(kind)) next++; }
@@ -201,8 +202,11 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
   out.push('', `Rain: ${pct(all, steps)} of the full rain, over the whole show`,
     '', 'Forms (times each comes in an hour; share of the show it is there)');
   out.push(`  (a form's light shows ${pct(lit, steps)} of the time, wholly ${pct(full, steps)}; two forms at once ${pct(two, steps)})`);
-  for (const f of FORMS) out.push(`  ${f.name.padEnd(10)} ${((came[f.name] || 0) / hours).toFixed(1).padStart(5)}  ${pct(stayed[f.name] || 0, SEEDS * SPAN)}`);
+  for (const f of [...FORMS, ...EGGS]) out.push(`  ${f.name.padEnd(10)} ${((came[f.name] || 0) / hours).toFixed(1).padStart(5)}  ${pct(stayed[f.name] || 0, SEEDS * SPAN)}`);
   const sum = (k) => Object.values(k).reduce((a, b) => a + b, 0);
   out.push(`  ${'all'.padEnd(10)} ${(sum(came) / hours).toFixed(1).padStart(5)}  ${pct(sum(stayed), SEEDS * SPAN)}`);
+  const eggs = EGGS.reduce((n, e) => n + (came[e.name] || 0), 0);
+  out.push('', `Eggs (the baked forms): ${eggs} in ${hours} h, one every ${eggs ? (hours / eggs).toFixed(1) : '-'} h;`
+    + ` the earliest at ${eggAt.length ? Math.min(...eggAt) : '-'} s`);
   console.log(out.join('\n'));
 }

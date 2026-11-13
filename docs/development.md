@@ -30,6 +30,7 @@ reload.
 | `show.js` | the show's director: the timeline of passages, how much rain falls and which way, which forms of light show, and how bright |
 | `direction.js` | a change of the rain's direction: the old drops stop coming and fade out before the new ones set out |
 | `forms.js` | how each form of light moves through its life: where it is, how large and how turned |
+| `fields.js`, `fields/` | the baked forms' fields of distance (`fields/*.bin`), fetched only when one is about to show (see Baking a form's field) |
 | `shaders.js` | the GLSL shaders: the points of light, bloom and tone mapping |
 | `lattice.js` | the strands and LEDs, and the order in which they thin out |
 | `gl.js` | WebGL helpers and vector maths |
@@ -46,7 +47,7 @@ reload.
 | `og-image.jpg` | the picture shown when the link is shared (1200x630) |
 | `sw.js` | the service worker: network first, cached files when offline (add new files to its list) |
 | `docs/` | these documents; the README's GIFs; `img/`, the pictures of the settings guide |
-| `tools/` | the capture tools for the GIFs and the docs' pictures, `story-stats.mjs` (see below), and `build-site.sh`, which assembles the Pages site (see Version) |
+| `tools/` | the capture tools for the GIFs and the docs' pictures, `story-stats.mjs` (see below), `bake-field.py` and `fields.json` (see Baking a form's field), and `build-site.sh`, which assembles the Pages site (see Version) |
 | `test/smoke.mjs` | the smoke test (see Test) |
 | `test/site.mjs` | the site test: the assembled site, with a preview (see Previews of pull requests) |
 | `test/render-audio.mjs` | renders the page's sound to a WAV file, for listening and measuring (see Test) |
@@ -372,8 +373,38 @@ counts how often neighbouring passages differ in hue, how often each colour
 mode and palette comes, how far the mood wanders, how long the picture
 stays in one colour family, how much of the rain flows sideways, how
 often each form comes, how much of the time a form's light shows (and
-wholly), and how much of it two forms show at once (0: one form at a time).
-With and without the story.
+wholly), how much of it two forms show at once (0: one form at a time),
+and how often the baked forms come (the eggs: about one every 2.3 hours,
+never in the first 10 minutes). With and without the story.
+
+### Baking a form's field
+
+The baked forms (`EGGS` in `config.js`) draw a shape from a field of
+signed distances, one file each in `fields/` (see "Baked forms" in
+[design.md](design.md)). `tools/bake-field.py` (numpy; Pillow for
+`--preview`) makes one from a closed mesh or a set of Bezier patches.
+`tools/fields.json` lists each shape: where it comes from and on what
+terms, the file to read in its archive, its format (`ply`, `obj`, or
+`patches`: a C file's tables of bicubic patches), its up axis, a turn so
+that its side faces +z and its front +x, and how many fine cells of gap
+to close. `grid` sets the fine grid, the cells of the field (40 a side)
+and the reach of its distances; `fields.js: FIELD` must say the same (the
+page refuses a file whose header differs).
+
+Download the source into an empty folder of its own and read it as data:
+the tool parses it, nothing in it is run. The meshes themselves are not
+in the repository.
+
+```sh
+python3 -I tools/bake-field.py teapot /path/to/src/teapot.c --preview /tmp/teapot.png
+```
+
+It takes about 8 s and writes `fields/<name>.bin` (64,016 bytes). The
+preview shows the solid from the side, from the front and from above, and
+a slice of its distances: check the pose there. A new shape needs an
+entry in `fields.json`, one in `EGGS` (its `field` is its slab in the
+shader's texture, the next free one), and its terms in the README's
+credits.
 
 ## The service worker
 
@@ -381,5 +412,7 @@ With and without the story.
 the network fails, it answers from that copy. It precaches a list of files
 on install, so that one visit is enough to work offline: add a new module or
 asset to that list. The docs and the GIFs are not on it; the page does not
-load them. It leaves the previews of pull requests (`pr/`) to the network
+load them. Nor are the baked forms' fields (`fields/*.bin`): each is fetched
+only when its form is about to show, and kept from then on like every file
+fetched. It leaves the previews of pull requests (`pr/`) to the network
 (see Previews of pull requests).

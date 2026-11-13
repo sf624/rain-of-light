@@ -1,6 +1,8 @@
 // The GLSL sources: a vertex and fragment pair for the points, and three
 // full-screen passes (downsample, blur, composite) that share QUAD_VS.
 
+import { FIELD } from './fields.js';
+
 // The falling time wraps at this many flow units (see drop() in POINT_VS).
 export const FLOW_WRAP = 1000;
 // A light ray is at most this many times the Ray length setting (see POINT_VS: rayK).
@@ -86,6 +88,7 @@ uniform vec4 uFormF[3];   // the form's own measures (see forms.js), and how far
 uniform vec3 uFormC[3];   // the form's colour
 uniform vec3 uFormD[3];   // its second colour
 uniform vec3 uTint;       // the colour of the room: of the forms shown now
+uniform sampler3D uFields; // the baked forms' fields, a slab each (see fields.js)
 uniform float uTwinkle;
 uniform vec3 uMirror;     // floor height, reflection gain (> 0: drawing the reflection), its fade length
 uniform vec4 uCopy[9];    // wall mirrors, per instance: x sign, x offset, z sign, z offset
@@ -477,6 +480,35 @@ vec3 knotLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
   return vec3(g * (7.0 + 9.0 * run), g * run * run * 0.3, clamp(run * 1.3, 0.0, 1.0));
 }
 
+// A baked form (an egg, see fields.js): a shape's skin as a shell of light
+// about one LED gap thick, so that any lattice draws its outline and its
+// thin parts (a handle, a spout) as brightly as its bulk; where the skin runs
+// along the line of sight more of it lies behind itself, so the outline
+// shows brighter and the shape reads round. Inside it a faint glow grows
+// towards its heart. f.x: its slab in the field. The field holds the signed
+// distance to the skin (negative inside) in the shape's box [-1, 1]^3,
+// which is a.z on each side of its centre; f.y: the top of the shape in it.
+const float FIELD_CELLS = ${FIELD.cells}.0, FIELD_SLABS = ${FIELD.slabs}.0, FIELD_REACH = ${FIELD.reach};
+float fieldAt(vec3 q, float slab) {
+  vec3 uvw = clamp(q * 0.5 + 0.5, 0.5 / FIELD_CELLS, 1.0 - 0.5 / FIELD_CELLS);
+  uvw.z = (slab + uvw.z) / FIELD_SLABS;
+  return (texture(uFields, uvw).r * 255.0 - 128.0) / 127.0 * FIELD_REACH;
+}
+vec3 bakedLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
+  vec3 q = turned(p - b.xyz, yaw, 0.0) / a.z;
+  float w = max(uLane.x, uLane.y) * 0.7;             // the skin's half thickness: about an LED gap
+  // Outside its box, or above the top of its shape (f.y) by more than its skin reaches: no light.
+  if (any(greaterThan(abs(q), vec3(1.0))) || q.y > f.y + w * 2.5 / a.z) return vec3(0.0);
+  float d = fieldAt(q, f.x) * a.z;                   // in the room's units
+  if (d > w * 2.5) return vec3(0.0);
+  float skin = exp(-d * d / (w * w));
+  float deep = clamp(-d / (a.z * 0.3), 0.0, 1.0);    // 0 at the skin .. 1 well inside
+  float body = d < 0.0 ? smoothstep(0.0, w, -d) : 0.0;
+  float shimmer = 0.75 + 0.5 * noise3(p * 1.1 + vec3(0.0, uTime * 0.25, 0.0));
+  float light = skin * 2.0 * shimmer + body * (0.12 + 0.5 * deep * deep);
+  return vec3(light * 2.4, skin * 0.12 + deep * deep * 0.2, clamp(0.3 + deep, 0.0, 1.0));
+}
+
 // The light of the forms at p (v: 0 at the top .. 1 at the floor). Each comes
 // and goes LED by LED in a random order, or, while rain falls, from the top down.
 // A form that rises away as points (e.w) is seen by each LED a random way
@@ -522,7 +554,8 @@ vec3 formsAt(vec3 p, float id, float v, out vec3 thread, out float around) {
     else if (type == 3) f = ringLight(q, a, b, e.z, ff);
     else if (type == 4) f = veilLight(q, a, b, e.z, ff);
     else if (type == 5) f = solidLight(q, a, b, e.z, ff);
-    else f = knotLight(q, a, b, e.z, ff);
+    else if (type == 6) f = knotLight(q, a, b, e.z, ff);
+    else f = bakedLight(q, a, b, e.z, ff);
     if (type != 2) f.x *= FORM_BODY;
     float order = mix(hash(id + float(k) * 7.7), e.y > 0.0 ? v : 1.0 - v, e.x * 0.8);
     float on = clamp((a.y * 1.25 - order) / 0.25, 0.0, 1.0) * smoothstep(0.0, 0.4, a.y);

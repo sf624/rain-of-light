@@ -160,7 +160,8 @@ const COUNT_RAF = `(() => { window.__frames = 0; const r = window.requestAnimati
 // software GL draws a frame in a fraction of the time. A visit passes `full` to keep the default lattice.
 const LITE = 'leds=20';
 const liteUrl = (query) => { const [q, hash] = query.split('#'); return `${q}${q.includes('?') ? '&' : '?'}${LITE}${hash === undefined ? '' : `#${hash}`}`; };
-async function visit(cdp, base, query, interact, full = false) {
+// fetches: a file the page must request (a baked form's field).
+async function visit(cdp, base, query, interact, full = false, fetches = null) {
   const lab = query.startsWith('lab.html');
   const label = query || '(default)';
   const errors = [];
@@ -412,6 +413,7 @@ async function visit(cdp, base, query, interact, full = false) {
   const f3 = await evalJs('window.__frames');
   if (f3 <= f2) fail(`[${label}] frame loop stopped (${f2} -> ${f3})`);
   if (await evalJs(`!document.getElementById('fallback').hidden`)) fail(`[${label}] #fallback became visible`);
+  if (fetches) await poll(`the page to fetch ${fetches} [${label}]`, () => [...urls.values()].some((u) => u === `${base}${fetches}`), { tick: () => check(`while waiting for ${fetches}`) });
   check('at the end');
   console.log(`ok  ${label}: ${f3} frames, ${(share * 100).toFixed(2)}% lit pixels${interact ? ', click and keys fine' : ''}`);
   await cdp.send('Target.closeTarget', { targetId });
@@ -451,6 +453,8 @@ await visit(cdp, base, '?seed=7&t=100', false);
 await visit(cdp, base, '?seed=7&t=100&story=off', false);   // without the colour story
 // The forms added later, each held part-way through its life (it has come and turned).
 for (const f of ['ring', 'veil', 'solid', 'knot']) await visit(cdp, base, `?scene=crystal&form=${f}&seed=2&t=40`, false);
+// A baked form held in the lab: its field is fetched (see fields.js); a plain visit fetches none (see test/site.mjs).
+await visit(cdp, base, 'lab.html?scene=crystal&form=teapot&seed=2&t=40', false, false, 'fields/teapot.bin');
 // LEDs spaced per strand: some LEDs are never lit, and the wires skip them.
 await visit(cdp, base, '?jitter=pitch', false);
 

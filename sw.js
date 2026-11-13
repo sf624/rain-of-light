@@ -4,11 +4,13 @@
 const CACHE = 'rain-of-light';
 
 // Precached on install, so that one visit is enough to work offline.
-// Add new modules and assets here.
+// Add new modules and assets here. (The baked forms' fields, fields/*.bin,
+// are not: each is fetched only when its form is about to show, and kept
+// then, as every file fetched is, see below.)
 const CORE = [
   './', 'index.html', 'lab.html', 'boot.js', 'style.css', 'manifest.webmanifest', 'favicon.svg',
   'main.js', 'config.js', 'shaders.js', 'lattice.js', 'gl.js', 'show.js', 'forms.js', 'director.js', 'direction.js',
-  'controls.js', 'clock.js', 'keys.js', 'hud.js', 'audio.js', 'sway.js', 'tuner.js', 'wakelock.js', 'rotate.js',
+  'fields.js', 'controls.js', 'clock.js', 'keys.js', 'hud.js', 'audio.js', 'sway.js', 'tuner.js', 'wakelock.js', 'rotate.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png',
   'icons/apple-touch-icon.png',
 ];

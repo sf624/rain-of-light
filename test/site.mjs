@@ -4,7 +4,9 @@
 // the root registers its service worker, each preview loads with no error,
 // loads only its own files, registers no service worker, and is not cached by
 // the root's. The data files in fields/ are published as build-site.sh
-// promises (a fixture commit in a clone of the repo tries the limits).
+// promises (a fixture commit in a clone of the repo tries the limits). A
+// plain load fetches no baked field (fields/*.bin); a preview pinned to one
+// fetches it from its own folder.
 // Usage: node test/site.mjs [ROOT_COMMIT [N=COMMIT ...]]   (default: HEAD 1=HEAD)
 // CHROME=/path/to/chrome chooses the browser. Node 22 built-ins only.
 import http from 'node:http';
@@ -278,6 +280,7 @@ const scopes = (ev) => ev('navigator.serviceWorker.getRegistrations().then((rs) 
 // so the previews below are opened under it.
 const main = await open('');
 if (main.errors.length) fail(`[root] ${[...new Set(main.errors)].join('\n  ')}`);
+if (main.requested.some((u) => u.includes('/fields/'))) fail(`[root] a plain load fetched a field: ${main.requested.filter((u) => u.includes('/fields/')).join(', ')}`);
 await poll('the root service worker', () => main.ev(`navigator.serviceWorker.ready.then((r) => r.active && r.scope)`));
 await poll('the root service worker to control the page', () => main.ev('!!navigator.serviceWorker.controller'));
 const v0 = await main.ev(`fetch('version.json').then((r) => r.json())`);
@@ -301,6 +304,17 @@ for (const p of previews) {
       .then((ls) => ls.flat().map((r) => r.url).filter((u) => u.includes('/pr/')))`);
     if (cached.length) fail(`[${page}] the root service worker cached preview files: ${cached.slice(0, 5).join(', ')}`);
     console.log(`ok  ${page}: loads ${t.requested.length} files of its own, ${v.sha.slice(0, 7)}, no service worker of its own, nothing cached`);
+    await t.close();
+  }
+  // A baked form held in the lab: its field comes from the preview's own folder.
+  const field = git('ls-tree', '--name-only', p.sha, 'fields/').split('\n').find((f) => f.endsWith('.bin'));
+  if (field) {
+    const name = path.posix.basename(field, '.bin'), page = `pr/${p.n}/lab.html?form=${name}&leds=20`;
+    const t = await open(page);
+    await poll(`${page} to fetch ${field}`, () => t.requested.includes(base + `pr/${p.n}/${field}`));
+    await sleep(500);
+    if (t.errors.length) fail(`[${page}] ${[...new Set(t.errors)].join('\n  ')}`);
+    console.log(`ok  ${page}: fetches ${field} from its own folder`);
     await t.close();
   }
 }

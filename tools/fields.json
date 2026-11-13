@@ -1,0 +1,19 @@
+{
+  "about": "The baked forms (see tools/bake-field.py and docs/design.md). grid: the fine grid the solid is found on, the cells of the field along each side, and the reach of its distances (in the box [-1, 1]). Per field: where its shape comes from and on what terms, the file to read, its format, its up axis, a turn about the vertical (degrees) so that its side faces +z and its front +x, and how many fine cells of gap to close (0: none).",
+  "grid": {
+    "fine": 160,
+    "cells": 40,
+    "reach": 0.3
+  },
+  "fields": {
+    "teapot": {
+      "source": "https://github.com/erich666/StandardProceduralDatabases/blob/master/src/teapot.c",
+      "file": "src/teapot.c",
+      "terms": "Martin Newell's teapot, as in Eric Haines's Standard Procedural Databases: CC0 1.0 (public domain), MIT where CC0 does not apply.",
+      "format": "patches",
+      "up": "z",
+      "turn": 0,
+      "close": 1
+    }
+  }
+}
