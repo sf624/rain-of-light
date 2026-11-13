@@ -111,6 +111,12 @@ A change shows at once, without a reload.
 - Both pages keep what you change in this browser, in one set of saved
   settings: a setting changed in the lab also holds on the viewer page,
   where the panel does not show it.
+- In the lab each row names its default, the one that applies on this
+  device (some depend on the screen's size, such as the LEDs in all; a
+  select shows the option's label). A row that is not at its default has a
+  dot before its name and a brighter value, and a click on its default
+  brings that one setting back. The viewer page's small panel does not show
+  defaults.
 - **Reset** brings back every default, also on the viewer page: there it
   also resets the settings that only the lab shows.
 - **Copy** (in the lab) copies the settings as JSON.
@@ -160,6 +166,12 @@ Its keys, which the viewer page does not have:
 | `[` `]` | slower / faster, through x0.1, x0.25, x0.5, x1, x2, x4, x12, x30 |
 | `ArrowLeft` `ArrowRight` | 5 s back / forward (`Shift`: 30 s) |
 | `h` | the readout (HUD) of the show's state |
+
+These work with the focus in the settings panel too, and do not scroll it:
+`Space` does not press a focused button, and the arrows move a slider or
+select only when the focus came to it by Tab (after a mouse or a touch has
+used a control it lets go of the focus, so the arrows seek again). The
+viewer page's keys are as above.
 
 ### URL parameters
 

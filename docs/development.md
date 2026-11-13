@@ -35,6 +35,7 @@ reload.
 | `gl.js` | WebGL helpers and vector maths |
 | `controls.js` | the sound, volume and full-screen controls |
 | `clock.js` | the lab's show clock: pause, step, speed, seek (see below) |
+| `keys.js` | which keys a focused control keeps in the lab (see the clock's keys) |
 | `hud.js` | the lab's readout of the show's state (see below) |
 | `rotate.js` | the landscape / portrait button |
 | `audio.js` | the music: pad, bells, rain, the forms' voices, reverb |
@@ -128,7 +129,10 @@ about 11 s to 3 s. It visits:
   keys and Reset), a time part-way through the show
   (with and without the colour story), four of the forms held, and
   `?jitter=pitch`, and the lab's clock (opened paused, it stands still;
-  Space runs and stops it).
+  Space runs and stops it, also with the focus in the panel; the arrows seek
+  after a mouse drag on a slider and move a slider the focus came to by Tab;
+  and part-way through a form's coming, a change of exposure, twinkle, colour
+  mode, weather or layout leaves the HUD's forms row as it was).
 
 It then renders a few seconds of sound offline and checks that a held orb
 sounds, a still room is much quieter, and nothing clips. GitHub Actions
@@ -157,10 +161,16 @@ to tune settings on one moment or to reach a late part of the show:
 - **Pause** (`Space`): the show's clock stands still, and with it the drops,
   the forms, the sway, the twinkle, the ripples, the camera, the breath and
   the sky. Every frame is still drawn, so a change in the settings panel
-  shows at once on the frozen moment: the settings that ease (weather,
-  colours, direction, forms, camera move) settle in a moment instead of over
-  seconds. The picture's render scale also stays as it is. Sound keeps
-  running, following the frozen state.
+  shows at once on the frozen moment, and it is the same moment: a setting
+  that only the picture reads (exposure, twinkle, glow, haze, the mirrors,
+  the LEDs' size, rays, the lattice and the like; `DRAW_ONLY` and `LATTICE`
+  in `main.js`) leaves the show's state as it is, and any other (scene,
+  form, weather, colour, speed, camera ...; also the `c` key and a skipped
+  episode) makes that moment again with the new setting, by a seek to it
+  (see below), so it has the forms at the weights a seek to this time with
+  the setting gives. A running show blends into a change instead. The
+  picture's render scale also stays as it is. Sound keeps running,
+  following the frozen state.
 - **Step** (`.`): the show goes on by 0.1 s (times the speed) and stays
   paused.
 - **Speed** (`[` slower, `]` faster, or the button): the button shows the
@@ -177,8 +187,14 @@ to tune settings on one moment or to reach a late part of the show:
   scrubber over the time played so far): the show goes to that time, and
   shows the same picture it had there (same forms, colours, weather,
   direction, camera), within the limits below. Paused, the frame is drawn
-  at once. The arrow keys work while a button has the focus (after a click
-  on it); they are left to a focused slider, select or text field. `Escape`
+  at once. The clock's keys (`Space`, `.`, `[`, `]`, `h`, the arrows) work wherever
+  the focus is, the settings panel too, and do not scroll it: Space pauses
+  and does not press a focused button or open a focused select (`Enter`
+  does), except in a text field. The arrows are left to a control only where
+  a keyboard user needs them: a slider or select that the focus came to by
+  Tab. A control that a pointer has used lets go of the focus (`letGo` in
+  `keys.js`), so after dragging a slider with the mouse the arrows seek
+  again. `Escape`
   closes the speed popover and gives the focus back to its button.
 - **Time**: `t 123.4 s`, the show's clock. Clicking it copies a link to the
   lab at that moment (`t=`, `seed=` and `pause=1`), to note it.
