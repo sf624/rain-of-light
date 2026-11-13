@@ -124,7 +124,7 @@
     ] },
     { "name": "exposure", "cols": 3, "base": "seed=1&t=110", "cells": [
       {"q": "exposure=0.8", "label": "exposure=0.8"},
-      {"q": "exposure=1.8", "label": "exposure=1.8"},
+      {"q": "exposure=2.2", "label": "exposure=2.2"},
       {"q": "exposure=3.5", "label": "exposure=3.5"}
     ] },
     { "name": "glow", "cols": 3, "base": "scene=crystal&form=orb&layer=off&t=30", "cells": [

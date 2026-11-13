@@ -196,10 +196,11 @@ times higher. At 16:9 and wider, nothing changes.
    LEDs, then the wires are drawn into a half-float buffer; each LED draws
    its light rays into a second buffer beside it (see "The draws"). Then the
    floor's image is drawn the same way (without rays).
-10. **Glow.** The buffer is downsampled to a quarter (only light past a knee),
-    blurred, and, for the haze, downsampled and blurred twice more.
-11. **Composite.** Glow and haze are added to the scene, then tone-mapped,
-    vignetted and dithered onto the screen.
+10. **Glow.** Only if Glow (`bloom`) or Haze is above 0 (both are 0 by
+    default): the buffer is downsampled to a quarter (only light past a
+    knee), blurred, and, for the haze, downsampled and blurred twice more.
+11. **Composite.** The rays' buffer, and the glow and haze if any, are added
+    to the scene, then tone-mapped, vignetted and dithered onto the screen.
 
 ```mermaid
 flowchart LR
@@ -250,7 +251,7 @@ use `drawElements` with `LINE_STRIP`.
   lines through it. A ray under 0.75 px (`RAY_MIN`) is not drawn, and a
   short ray is faint, so none appears at once. A longer ray is a little
   dimmer along its length, so a near head does not flare. The rays' light is
-  0.3 of the LED's (`RAY_GAIN`).
+  0.45 of the LED's (`RAY_GAIN`).
   The rays go to a second buffer of the scene (`COLOR_ATTACHMENT1`), where
   they share a budget of light: a ray of light s over the rays already
   there (d) gives `s + d · (1 − s / RAY_BUDGET)` (blend
@@ -263,9 +264,19 @@ use `drawElements` with `LINE_STRIP`.
 
 ### Glow and tone mapping
 
+By default the picture has no blur at all: Glow (`bloom`) and Haze are 0,
+and the frame is the points, their rays and the tone mapping. A glow is a
+soft patch around each bright point: at 0.4 it shows as blotches 40 to 60
+px wide around near drop heads (most of all in pale and warm palettes, where
+the glow has the most luminance). A smaller glow either shows as a halo of
+its own or adds nothing. The light rays give bright points their sparkle
+instead. With both at 0, `main.js: frame` runs none of the passes below and
+the composite reads only the scene and its rays.
+
 The render targets are made in `main.js: resize`: the scene at full size,
 the bloom at a quarter (`W >> 2`), the haze at a sixteenth, and a wide haze
-at a sixty-fourth.
+at a sixty-fourth. The haze is made from the bloom's buffer, so with Haze
+above 0 the bloom's passes run even at Glow 0.
 
 - `DOWN_FS` averages four reads. With a knee it takes the knee off the
   brightest channel and keeps the colour. `BLOOM_KNEE` is 0.5 and
@@ -276,7 +287,8 @@ at a sixty-fourth.
   The haze is read with a smooth cubic filter (`smoothRead`), because a plain
   read of so coarse a texture shows soft boxes. Glow fainter than
   `blackFloor` fades to nothing, so the space between the points is true
-  black. Light far past white loses its colour (`burn`). Then
+  black (it acts on the glow only: with Glow at 0 there is nothing for it
+  to drop). Light far past white loses its colour (`burn`). Then
   `1 − exp(−c · exposure)` tone-maps, a vignette darkens the corners, and a
   dither breaks up banding (faded out near black).
 
@@ -393,6 +405,32 @@ horizontal tubes (lanes) along the flow direction `uFlowDir`. A lane is one
 strand spacing wide and one LED spacing tall (`uLane`). Each lane carries
 drops like a strand does, with `along` (0 to 1 across the room) in place of
 `u`. Sideways trails are longer.
+
+A falling head runs down its strand from LED to LED. A sideways head
+crosses each strand at a single LED, so it glitters instead
+(`shaders.js: sparkle`):
+
+- **A flash per LED.** As the head passes, the LED flashes: a sharp rise
+  and a quick fall, over 0.05 to 0.14 units of falling time (about a tenth
+  of a second in `rain` weather). Its peak (`SPARK_PEAK`, 2) is as bright as
+  a falling head at its brightest, and the same `HEAD_MAX` caps both, so a
+  sideways head is never dimmer than a falling one. The flash is in the
+  head's light (`tip`), so it casts rays.
+- **Each LED its own.** Each LED flashes at its own strength (0.45 to 1.25
+  of the peak) and up to 0.06 units late (`SPARK_LAG`). The field
+  scintillates instead of sliding evenly, while the order of the flashes
+  still shows which way the rain goes.
+- **Rare glints.** One LED in about 16 (`SPARK_RARE`) flashes 2.5 times as
+  bright (`SPARK_RARE_K`), with its cap raised to match (`Spark`), so it
+  casts the longest rays.
+- **A glittering wake.** Behind the head, each LED's trail swells and sinks
+  at its own pace (a sine raised to the power 6, 4 to 12 radians a second),
+  as bright on the whole as a steady trail would be at 0.65 of its light.
+
+The flashes are short and spread over the whole field, so the picture's
+mean brightness holds steady from frame to frame (no pumping), at any
+speed. They are the rain's own look and have their own constants: the
+Twinkle setting is the still room's (see below).
 
 A rain never turns. See section 5 for how the direction changes.
 
@@ -574,7 +612,9 @@ image it is.
 In the still room's look, one LED in five (fewer on a lattice denser than
 72 strands a side; see section 2) blinks now and then, sharply
 (a sine raised to the power 30), each at its own pace. The setting
-`twinkle` scales it.
+`twinkle` scales it. It adds light of its own to an LED at rest; the
+glitter of sideways rain (above) only spreads the rain's light over time,
+so it does not follow this setting.
 
 ### How it all combines
 
