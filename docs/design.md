@@ -41,6 +41,14 @@ The constraints:
   (`sway.js: createSway`: the rain's swell, the gaps between automatic
   ripples, the sound's sways) and the music's notes (`audio.js`). The
   capture tools seed `Math.random` in the page to make a run repeatable.
+- **Sound first, then a smooth picture, then the look.** When the device
+  cannot do everything, this is the order. The sound must never break, on
+  any device, even when the picture struggles. Next, the picture should stay
+  smooth on ordinary PCs and phones. The look comes last: on a weak device
+  it may give way (fewer frames, a lower render scale, fewer LEDs), but on a
+  strong device it must not change. So anything that lowers the load is
+  automatic and leaves a strong device's picture as it is, and the sound's
+  work is kept small and scheduled so that a slow frame cannot touch it.
 
 ## 2. The room
 

@@ -21,6 +21,7 @@ import { createLattice, fillLattice, latticeLight } from './lattice.js';
 import { createControls } from './controls.js';
 import { createClock, rateText } from './clock.js';
 import { createHud } from './hud.js';
+import { perf } from './perf.js';
 import { keepAwake } from './wakelock.js';
 import { view, createRotation } from './rotate.js';
 import { createEggs } from './eggs.js';
@@ -180,8 +181,8 @@ const lastIdx = () => {
 };
 
 function resize() {
-  const dpr = baseRatio() * SCALES[scaleIdx];
-  renderScale = SCALES[scaleIdx];
+  renderScale = perf.scale(SCALES[scaleIdx]);   // (or a fixed ?scale=, or capped by ?guard=1)
+  const dpr = baseRatio() * renderScale;
   const w = Math.max(1, Math.round(canvas.clientWidth * dpr));
   const h = Math.max(1, Math.round(canvas.clientHeight * dpr));
   if (w === W && h === H) return;
@@ -244,7 +245,7 @@ function setStep(i) {
 }
 
 function adapt(rawDt, now) {
-  if (S.quality === 'full') {
+  if (S.quality === 'full' || perf.fixedScale) {
     if (scaleIdx !== 0) setStep(0);
     probing = judgeDown = false;
     return;
@@ -893,6 +894,7 @@ function hudSnapshot() {
     },
     camera: { moves, eye: camera ? camera.eye : [0, 0, 0], turn: pointer.sx * 180 / Math.PI },
     ripples: ripples.reduce((n, v, i) => (i % 4 === 3 && time - v >= 0 && time - v < RIPPLE_LIFE ? n + 1 : n), 0),
+    perf: perf.read(),
   };
 }
 // For tests of the lab: the whole state as text, and a seek.
@@ -904,11 +906,14 @@ if (lab) {
 const hud = createHud({ lab, params, bar: clock.bar, snapshot: hudSnapshot });
 
 function frame(now) {
+  // A frame rate cap (?fps=, ?guard=1) skips this frame.
+  if (perf.skip(now)) { frameId = requestAnimationFrame(frame); return; }
+  perf.begin(now, gl);
   const rawDt = (now - last) / 1000;
   // rAF time may precede `last`. The lab's clock may stand the show still or run it faster.
   let dt = clock.tick(Math.min(0.05, Math.max(0, rawDt)));
   last = now;
-  if (!clock.paused) adapt(rawDt, now);   // a paused picture keeps its render scale
+  if (!clock.paused) adapt(perf.adaptDt(rawDt), now);   // a paused picture keeps its render scale
   if (pendingSeek !== null) { startSeek(pendingSeek); pendingSeek = null; }
   let note = '';
   if (job) {
@@ -1189,6 +1194,7 @@ function frame(now) {
     if (err !== gl.NO_ERROR) showError(`WebGL error 0x${err.toString(16)} (float buffers: ${hasFloat})`);
   }
 
+  perf.end(gl);
   frameId = requestAnimationFrame(frame);
 }
 

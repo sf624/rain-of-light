@@ -42,6 +42,7 @@ reload.
 | `eggs.js`, `egg-kinds.js`, `egg-shaders.js` | the easter eggs: the registry and which egg shows, the eggs, their light (see Easter eggs) |
 | `rotate.js` | the landscape / portrait button |
 | `audio.js` | the music: pad, bells, rain, the forms' voices, reverb |
+| `perf.js` | the performance switches (`?latency=`, `?fps=`, `?guard=1`, ...; all off by default) and the numbers of the sound and the frames for the HUD (see Performance switches) |
 | `sway.js` | 1/f fluctuation, used by the music and the rain |
 | `wakelock.js` | keeps the screen awake while the page is showing |
 | `tuner.js` | the settings panel, and reading the settings (saved, then URL) |
@@ -310,6 +311,57 @@ lines:
   the gain a form gets among rain; `glow`: glow, haze, burn-out, rays, and
   whether float buffers are there.
 - `camera`: the move or the blend of two, the eye; `ripples`: waves alive.
+- `sound`: the AudioContext's state, sample rate, `baseLatency` and
+  `outputLatency`, and the latency hint asked for (`default`: none).
+  `voices`: the notes sounding and about how many nodes they hold.
+- `sched`: sound events begun "now" (less than 10 ms ahead of the
+  context's time, so the audio thread may already be past them; a bell
+  and a chord do this by design), in the last 10 s and in all, with the
+  least lead seen; and how often the sound's 250 ms timer came over 100 ms
+  late (the main thread was busy).
+- `render`: where the browser tells, `AudioContext.playbackStats`
+  (underruns: events and their length, and the latency) and
+  `renderCapacity` (the audio thread's load); and the clock slip: how far
+  the output's clock (`getOutputTimestamp`) fell behind the page's, in the
+  last 10 s and in all. Lost sound shows as slip. And how often the
+  context's `currentTime` stood still for over 150 ms (or 2.5 output
+  buffers) while it was running and the page was shown (the sound stopped),
+  the longest, and when.
+- `timing`: the main thread's time in a frame (mean / worst over the last
+  quarter second), the GPU's (`EXT_disjoint_timer_query_webgl2`, only
+  while the HUD shows), frames over 50 ms apart and long tasks, in the
+  last 10 s and in all; and the device's pixel ratio. `events`: the last
+  three of a log of what happened when (seconds since the page loaded):
+  the context made, its state changing (`suspended`, `interrupted`,
+  `running`), its clock standing still, new underruns, the output clock
+  slipping over 20 ms in a second, the page hidden or shown, a frame over
+  100 ms. `guard`: the level of `?guard=1` and why.
+
+`?hud=perf` shows only `time`, `frame`, `show` and these rows, also on a
+narrow screen. The `copy` button beside the HUD button copies every row as
+text, with the address, the browser, the screen and the whole event log (its last 60 lines) (where the clipboard
+is not allowed, the text opens in a box to copy by hand).
+
+### Performance switches
+
+URL switches (`perf.js`) to find out what makes the page lighter, on the
+lab and on the viewer page. Each is off by default and does one thing:
+
+| Switch | What it does |
+| --- | --- |
+| `latency=interactive\|balanced\|playback\|<s>` | the AudioContext's `latencyHint` (none by default: the browser takes `interactive`, its smallest buffer) |
+| `rate=<Hz>` | the AudioContext's sample rate (by default the device's) |
+| `ahead=<s>` | the sound's events that begin "now" (a bell, a chord, a form's voice) begin this much later; the spiral's notes too, at least this far ahead |
+| `reverb=off\|short\|<s>` | no reverb, or a shorter room (`short`: 2 s; the room is 6 s) |
+| `voices=<n>` | at most n notes at once (a chord's note counts as one, a bell as one); a note past that is not started |
+| `filters=krate` | the pad's low-pass filters follow its brightness once per 128 samples (`automationRate`), not at every sample |
+| `fps=<n>` | draw at most n frames a second (`fps=60` on a 120 Hz screen draws every other frame); adaptive quality judges a frame against that rate |
+| `scale=<x>` | a fixed render scale (0 .. 1), with no adaptive step |
+| `guard=1` | sound first: a sign that the sound is at risk (an underrun or a high load where the browser tells, the clock slipping over 30 ms, a frame over 100 ms, a late sound timer) lowers the picture's load one level: 60 fps (a 120 Hz screen draws every other frame), then 30 fps, then a render scale of at most 0.7, then 0.5. 30 s without a sign raises it one level again (a wait that doubles if trouble comes back soon) |
+| `stall=<ms>[,<s>]` | a test: the main thread is busy for ms every s seconds (5) |
+
+Settings that help too: `dpr=<n>` (the largest device pixel ratio, 2 by
+default), `leds=<n>` (thousands of LEDs), `mirror=0`, `rays=off`.
 
 On a screen narrower than 700 px only the main lines show, and with the
 settings panel open the HUD steps aside.

@@ -396,6 +396,7 @@ body.idle .full-toggle:focus-visible, body.idle .rotate-toggle:focus-visible, bo
 }
 .hud[hidden] { display: none; }
 .hud-row { display: flex; gap: 0.8em; white-space: pre-wrap; }
+.hud-row[hidden] { display: none; }
 .hud-k { flex: none; width: 7em; color: rgba(156, 200, 255, 0.85); }
 .hud-sw { display: inline-flex; gap: 2px; align-items: center; flex: none; }
 .hud-sw i { width: 10px; height: 10px; border-radius: 2px; border: 1px solid rgba(255, 255, 255, 0.35); }
@@ -404,5 +405,13 @@ body.idle .full-toggle:focus-visible, body.idle .rotate-toggle:focus-visible, bo
   .hud { width: calc(100% - 32px); max-height: 38%; font-size: 10px; }
   .hud-k { width: 4.6em; }
   .hud .more { display: none; }
+  .hud.perf-only { max-height: calc(100% - 140px); }
   body:has(.tuner:not([hidden])) .hud { display: none; }
+}
+.clock-hud-copy.copied { border-color: rgba(156, 255, 200, 0.6); }
+.clock-hud-copy[hidden] { display: none; }
+/* The readout as text, to copy by hand where the clipboard is not allowed. */
+.hud-copy {
+  position: fixed; left: 16px; right: 16px; top: 64px; height: 40%; z-index: 3;
+  background: #000; color: #fff; font: 11px/1.4 ui-monospace, Menlo, Consolas, monospace;
 }

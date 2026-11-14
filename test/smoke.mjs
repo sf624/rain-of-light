@@ -292,6 +292,13 @@ async function visit(cdp, base, query, interact, full = false, fetches = null, e
   // The lab's show clock: opened paused it stands still while frames are drawn, Space runs it, Space stops it again; the viewer page has none.
   const clockText = () => evalJs(`document.querySelector('.clock-time')?.textContent ?? ''`);
   const press = (key) => evalJs(`dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)} }))`);
+  if (lab && query.includes('hud=perf')) {
+    // The HUD's perf mode: the rows of the sound and the timing, not the show's others; and the copy button.
+    const shown = (id) => `[...document.querySelectorAll('.hud-row')].some((r) => !r.hidden && r.textContent.startsWith('${id}'))`;
+    await poll(`the perf HUD to show the sound and the timing [${label}]`, async () => await evalJs(`${shown('sound')} && ${shown('timing')} && ${shown('render')}`), { tick: () => check('while the perf HUD opens') });
+    if (await evalJs(shown('lattice'))) fail(`[${label}] the perf HUD shows the lattice row`);
+    if (await evalJs(`document.querySelector('.clock-hud-copy')?.hidden !== false`)) fail(`[${label}] no copy button beside the HUD`);
+  }
   if (lab && query.includes('pause=1')) {
     const tq = Number(new URLSearchParams(query.split('?')[1]).get('t'));
     const t0text = `t ${(Number.isFinite(tq) ? tq : 0).toFixed(1)} s`;   // (a start time that is not a number is no time)
@@ -500,6 +507,8 @@ await visit(cdp, base, '?jitter=pitch', false);
 // An easter egg pinned in the lab: its own program is built and draws it.
 await visit(cdp, base, 'lab.html?egg=penrose&t=30', false, false, null,
   { what: 'the penrose egg to draw', js: `window.__lab.eggs().drawn === 1` });
+// The performance switches (perf.js), all at once, with the HUD's perf mode: no error, the frames go on.
+await visit(cdp, base, 'lab.html?hud=perf&fps=30&scale=0.7&guard=1&latency=playback&rate=44100&ahead=0.2&reverb=short&voices=8&filters=krate&stall=40,2', true);
 
 // Links and settings saved before Rain and Form chose what plays name a scene: it is read once, at
 // load, as the settings it stands for (config.js: SCENES), filling in those still at auto; the URL's
