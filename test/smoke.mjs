@@ -152,6 +152,14 @@ function nonBlackShare(png) {
   return lit / (w * h);
 }
 
+// The keys the page reads from its address: perf.js's switches (read through num(), q.get(), q.has()), and
+// every other module's (params.get(), params.has(); the settings are config.js's DEFAULTS, read below).
+const source = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
+const keysIn = (text, re) => [...text.matchAll(re)].map((m) => m[1]);
+const PERF_KEYS = new Set(keysIn(source('perf.js'), /\b(?:num|q\.get|q\.has)\('(\w+)'\)/g));
+const PAGE_KEYS = new Set(fs.readdirSync(ROOT).filter((f) => f.endsWith('.js') && f !== 'perf.js')
+  .flatMap((f) => keysIn(source(f), /\bparams\.(?:get|has)\('(\w+)'\)/g)));
+
 // Count requestAnimationFrame callbacks that really run.
 const COUNT_RAF = `(() => { window.__frames = 0; const r = window.requestAnimationFrame.bind(window);
   window.requestAnimationFrame = (cb) => r((t) => { window.__frames++; cb(t); }); })()`;
@@ -298,6 +306,13 @@ async function visit(cdp, base, query, interact, full = false, fetches = null, e
     await poll(`the perf HUD to show the sound and the timing [${label}]`, async () => await evalJs(`${shown('sound')} && ${shown('timing')} && ${shown('render')}`), { tick: () => check('while the perf HUD opens') });
     if (await evalJs(shown('lattice'))) fail(`[${label}] the perf HUD shows the lattice row`);
     if (await evalJs(`document.querySelector('.clock-hud-copy')?.hidden !== false`)) fail(`[${label}] no copy button beside the HUD`);
+    // What ran: the clock at its own speed (a switch is no clock key), and the switches row naming each switch of the address.
+    const row = (name) => evalJs(`[...document.querySelectorAll('.hud-row')].find((r) => r.firstChild.textContent === '${name}')?.children[1].textContent ?? ''`);
+    const q = new URLSearchParams(query.split('?')[1]);
+    if (!q.has('rate') && !/ x1 /.test(await row('time'))) fail(`[${label}] the clock does not run at x1: ${await row('time')}`);
+    const named = (await row('switches')).split(/\s+/);
+    const missing = [...q.keys()].filter((k) => PERF_KEYS.has(k) && !named.includes(k));
+    if (missing.length) fail(`[${label}] the switches row does not name ${missing.join(', ')}: ${await row('switches')}`);
   }
   if (lab && query.includes('pause=1')) {
     const tq = Number(new URLSearchParams(query.split('?')[1]).get('t'));
@@ -468,12 +483,18 @@ await poll(`index.html to load before reading config.js (${base}index.html)`, as
   (await cdp.send('Runtime.evaluate', { expression: `location.href.startsWith(${JSON.stringify(base)}) && document.readyState === 'complete'`, returnByValue: true }, sessionId)).result.value === true);
 const r = await cdp.send('Runtime.evaluate', { expression: `import('./config.js').then((c) => {
   const items = c.SCHEMA.flatMap((g) => g.items);
-  return { modes: c.COLOR_MODES.map((m) => m.name), storageKey: c.STORAGE_KEY, all: items.map((i) => i.key),
+  return { modes: c.COLOR_MODES.map((m) => m.name), storageKey: c.STORAGE_KEY, defaults: Object.keys(c.DEFAULTS), all: items.map((i) => i.key),
     viewer: items.filter((i) => i.viewer).sort((a, b) => a.viewer - b.viewer).map((i) => i.key) }; })`,
   awaitPromise: true, returnByValue: true }, sessionId);
 if (r.exceptionDetails || !Array.isArray(r.result.value?.modes)) fail(`could not read config.js: ${r.exceptionDetails?.exception?.description || r.exceptionDetails?.text}`);
-const { modes, storageKey: STORAGE_KEY, ...schema } = r.result.value;
+const { modes, storageKey: STORAGE_KEY, defaults, ...schema } = r.result.value;
 await cdp.send('Target.closeTarget', { targetId });
+// A performance switch's key is read for nothing else: not a setting, nor another module's key (the lab clock's `rate`).
+const scanned = PAGE_KEYS.size;
+for (const k of defaults) PAGE_KEYS.add(k);
+if (!PERF_KEYS.size || !scanned) fail(`the scan of the address keys found too little: perf ${[...PERF_KEYS]}; page ${[...PAGE_KEYS]}`);
+const clash = [...PERF_KEYS].filter((k) => PAGE_KEYS.has(k));
+if (clash.length) fail(`perf.js's switches use keys the page reads for something else: ${clash.join(', ')}`);
 
 await visit(cdp, base, '', true, true); // the real default lattice
 for (const m of modes) await visit(cdp, base, `?color=${encodeURIComponent(m)}`, false);
@@ -508,7 +529,7 @@ await visit(cdp, base, '?jitter=pitch', false);
 await visit(cdp, base, 'lab.html?egg=penrose&t=30', false, false, null,
   { what: 'the penrose egg to draw', js: `window.__lab.eggs().drawn === 1` });
 // The performance switches (perf.js), all at once, with the HUD's perf mode: no error, the frames go on.
-await visit(cdp, base, 'lab.html?hud=perf&fps=30&scale=0.7&guard=1&latency=playback&rate=44100&ahead=0.2&reverb=short&voices=8&filters=krate&stall=40,2', true);
+await visit(cdp, base, 'lab.html?hud=perf&fps=30&scale=0.7&guard=1&latency=playback&hz=44100&ahead=0.2&reverb=short&voices=8&filters=krate&stall=40,2', true);
 
 // Links and settings saved before Rain and Form chose what plays name a scene: it is read once, at
 // load, as the settings it stands for (config.js: SCENES), filling in those still at auto; the URL's

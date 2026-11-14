@@ -53,7 +53,8 @@ const BOTH = [gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1], FIRST = [gl.COLOR_ATT
 // ---------- fixed settings (also ?dpr=1.5) ----------
 const params = new URLSearchParams(location.search);
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const MAX_DPR = Number(params.get('dpr')) || 2;
+const DPR_CAP = 2;   // the largest device pixel ratio drawn, unless ?dpr= sets another
+const MAX_DPR = Number(params.get('dpr')) || DPR_CAP;
 const SEED = params.has('seed') && Number.isFinite(Number(params.get('seed'))) ? Number(params.get('seed')) : Math.random() * 1000;
 const SPEED = reducedMotion ? 0.4 : 1.0;
 
@@ -160,6 +161,9 @@ function buildLattice() {
   light = latticeLight(GRID, ROWS, SPAN, HEIGHT);
 }
 buildLattice();
+// Are the wires drawn, and the floor's image? (Settings; ?guard=1 may also leave the floor's out, see draw.)
+const wiresDrawn = () => S.wire > 0 && wireCount > 0;
+const floorDrawn = () => S.mirror > 0;
 const pointVao = lattice.pointVao;
 const emptyVao = gl.createVertexArray();
 
@@ -872,6 +876,16 @@ let checked = false;
 // times a second); the frame keeps only the last frame's few derived values.
 let lastShown = null, lastGlow = 1, lastBreath = null, rainShareNow = 0, fallLightNow = 0;
 const RIPPLE_LIFE = 7;   // seconds a wave lives (POINT_VS)
+// The settings that change the picture's load, where they differ from the defaults (the readout's switches row, after perf.js's).
+function loadSwitches() {
+  const on = [];
+  if (MAX_DPR !== DPR_CAP) on.push(`dpr ${MAX_DPR}`);
+  if (!wiresDrawn()) on.push('wires off');
+  else if (S.wire !== DEF.wire) on.push(`wire ${S.wire}`);
+  if (!floorDrawn()) on.push('floor image off');
+  if (S.leds !== DEF.leds) on.push(`leds ${count}`);
+  return on;
+}
 function hudSnapshot() {
   const info = show.info(time);
   const lookNow = looks[sideNow < 0.5 ? 0 : 1], goalNow = goals[sideNow < 0.5 ? 0 : 1];
@@ -894,7 +908,7 @@ function hudSnapshot() {
     },
     camera: { moves, eye: camera ? camera.eye : [0, 0, 0], turn: pointer.sx * 180 / Math.PI },
     ripples: ripples.reduce((n, v, i) => (i % 4 === 3 && time - v >= 0 && time - v < RIPPLE_LIFE ? n + 1 : n), 0),
-    perf: perf.read(),
+    perf: perf.read(), loadSwitches: loadSwitches(),
   };
 }
 // For tests of the lab: the whole state as text, and a seek.
@@ -963,7 +977,7 @@ function frame(now) {
   gl.clearColor(0, 0, 0, 1);
   gl.clear(gl.COLOR_BUFFER_BIT);
   // The LEDs and their wires share one vertex shader, so both get the same uniforms.
-  const wiresOn = S.wire > 0 && wireCount > 0;
+  const wiresOn = wiresDrawn();
   // Every LED's light casts rays (see POINT_VS: rayK), drawn with the LED into
   // the second buffer. Without float buffers there are none.
   const rays = S.rays === 'off' || !hasFloat ? 0 : Number(S.rays);
@@ -1059,7 +1073,7 @@ function frame(now) {
   // its light, near or far: the strands are fine threads, and nothing near
   // the eye stands dark in front of a form.
   const images = S.walls >= 1 ? 9 : 1;
-  const passes = S.mirror > 0 && perf.mirror ? [0, S.mirror] : [0];   // (?guard=1 may leave the floor's image out)
+  const passes = floorDrawn() && perf.mirror ? [0, S.mirror] : [0];   // (?guard=1 may leave the floor's image out)
   gl.bindVertexArray(pointVao);
   gl.disable(gl.DEPTH_TEST);
   gl.enable(gl.BLEND);

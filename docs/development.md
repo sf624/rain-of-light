@@ -311,6 +311,11 @@ lines:
   the gain a form gets among rain; `glow`: glow, haze, burn-out, rays, and
   whether float buffers are there.
 - `camera`: the move or the blend of two, the eye; `ripples`: waves alive.
+- `switches`: what ran: every performance switch in effect with the value
+  it took (see Performance switches), then the settings that change the
+  picture's load where they differ from the defaults (`dpr`, `wires off`
+  or `wire`, `floor image off`, `leds` with the LEDs drawn); `none` when
+  there are none.
 - `sound`: the AudioContext's state, sample rate, `baseLatency` and
   `outputLatency`, and the latency hint asked for (`default`: none).
   `voices`: the notes sounding and about how many nodes they hold.
@@ -339,8 +344,9 @@ lines:
 
 `?hud=perf` shows only `time`, `frame`, `show` and these rows, also on a
 narrow screen. The `copy` button beside the HUD button copies every row as
-text, with the address, the browser, the screen and the whole event log (its last 60 lines) (where the clipboard
-is not allowed, the text opens in a box to copy by hand).
+text, with the address, the browser, the screen and the whole event log
+(its last 60 lines); its label reads `copied` for a moment. Where the
+clipboard is not allowed, the text opens in a box to copy by hand.
 
 ### Performance switches
 
@@ -350,7 +356,7 @@ lab and on the viewer page. Each is off by default and does one thing:
 | Switch | What it does |
 | --- | --- |
 | `latency=interactive\|balanced\|playback\|<s>` | the AudioContext's `latencyHint` (none by default: the browser takes `interactive`, its smallest buffer) |
-| `rate=<Hz>` | the AudioContext's sample rate (by default the device's) |
+| `hz=<Hz>` | the AudioContext's sample rate (by default the device's; `rate=` is the lab clock's speed) |
 | `ahead=<s>` | the sound's events that begin "now" (a bell, a chord, a form's voice) begin this much later; the spiral's notes too, at least this far ahead |
 | `reverb=off\|short\|<s>` | no reverb, or a shorter room (`short`: 2 s; the room is 6 s) |
 | `voices=<n>` | at most n notes at once (a chord's note counts as one, a bell as one); a note past that is not started |
@@ -363,6 +369,10 @@ lab and on the viewer page. Each is off by default and does one thing:
 Settings that help too: `dpr=<n>` (the largest device pixel ratio, 2 by
 default), `leds=<n>` (thousands of LEDs), `wire=0` (no wires: each wire
 pass runs the whole LED shader again), `mirror=0`, `rays=off`.
+
+The readout's `switches` row names each switch in effect by its key. A
+switch's key must not be one the page reads for anything else (a
+setting, `rate`, `t`, `seed`, ...): `node test/smoke.mjs` fails if it is.
 
 On a screen narrower than 700 px only the main lines show, and with the
 settings panel open the HUD steps aside.

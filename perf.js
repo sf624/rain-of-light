@@ -4,7 +4,7 @@
 // docs/development.md, "Performance switches"):
 //
 //   ?latency=interactive|balanced|playback|<s>  the AudioContext's latencyHint
-//   ?rate=<Hz>          the AudioContext's sample rate
+//   ?hz=<Hz>            the AudioContext's sample rate (not ?rate=: that is the lab clock's speed)
 //   ?ahead=<s>          the sound's events that begin "now" (a bell, a chord) begin this much later
 //   ?reverb=off|short|<s>  no reverb, or a shorter room (short: 2 s; the room is 6 s)
 //   ?voices=<n>         at most n notes at once: a note past that is not started
@@ -13,10 +13,14 @@
 //   ?scale=<x>          a fixed render scale (the adaptive step is not used)
 //   ?guard=1            sound first: lower the picture's load while the sound is at risk
 //   ?stall=<ms>[,<s>]   (a test) the main thread is busy for ms every s seconds (5)
+//
+// The readout's switches row names every one in effect (switchesInEffect),
+// with the key as its label.
 
 const q = new URLSearchParams(location.search);
 const num = (key) => (q.has(key) && Number.isFinite(Number(q.get(key))) ? Number(q.get(key)) : 0);
 
+const ROOM_S = 6;              // the reverb's length without ?reverb=
 const latency = q.get('latency');
 const reverb = q.get('reverb');
 const [stallMs, stallEvery] = (q.get('stall') || '').split(',').map(Number);
@@ -24,16 +28,34 @@ const [stallMs, stallEvery] = (q.get('stall') || '').split(',').map(Number);
 export const PERF = {
   // The latencyHint, or null for the browser's default ('interactive').
   latency: ['interactive', 'balanced', 'playback'].includes(latency) ? latency : num('latency') > 0 ? num('latency') : null,
-  rate: num('rate') >= 8000 ? num('rate') : 0,
+  sampleRate: num('hz') >= 8000 ? num('hz') : 0,
   ahead: Math.max(0, num('ahead')),
   // The reverb's length in seconds; 0: no reverb.
-  reverb: reverb === 'off' ? 0 : reverb === 'short' ? 2 : num('reverb') > 0 ? num('reverb') : 6,
+  reverb: reverb === 'off' ? 0 : reverb === 'short' ? 2 : num('reverb') > 0 ? num('reverb') : ROOM_S,
   voices: Math.max(0, Math.floor(num('voices'))),
   krate: q.get('filters') === 'krate',
   fps: num('fps') > 0 ? num('fps') : 0,
   scale: num('scale') > 0 ? Math.min(1, num('scale')) : 0,
   guard: q.get('guard') === '1',
 };
+
+const stall = stallMs > 0 ? { ms: stallMs, every: stallEvery > 0 ? stallEvery : 5 } : null;
+
+// The switches in effect, with the values they took (an empty list: none).
+function switchesInEffect() {
+  const on = [];
+  if (PERF.latency !== null) on.push(`latency ${typeof PERF.latency === 'number' ? `${PERF.latency}s` : PERF.latency}`);
+  if (PERF.sampleRate) on.push(`hz ${PERF.sampleRate}`);
+  if (PERF.ahead) on.push(`ahead ${PERF.ahead}s`);
+  if (PERF.reverb !== ROOM_S) on.push(`reverb ${PERF.reverb ? `${PERF.reverb}s` : 'off'}`);
+  if (PERF.voices) on.push(`voices ${PERF.voices}`);
+  if (PERF.krate) on.push('filters k-rate');
+  if (PERF.fps) on.push(`fps ${PERF.fps}`);
+  if (PERF.scale) on.push(`scale ${PERF.scale}`);
+  if (PERF.guard) on.push('guard on');
+  if (stall) on.push(`stall ${stall.ms}ms every ${stall.every}s`);
+  return on;
+}
 
 const WINDOW = 10000;          // ms: the readout's "last 10 s"
 const LONG_MS = 50;            // a frame or a task this long is long
@@ -283,6 +305,7 @@ export const perf = {
       tasks: tasksSeen ? longTasks.read(t) : null,
       voices: soundLog.voices ? soundLog.voices() : null,
       events,
+      switches: switchesInEffect(),
       dpr: devicePixelRatio,
       guard: PERF.guard ? { level, why, fps: GUARD_CAPS[level][0], scale: GUARD_CAPS[level][1], mirrorWires: GUARD_CAPS[level][2], mirror: GUARD_CAPS[level][3] } : null,
       sound: audio ? {
@@ -331,9 +354,9 @@ function gpuEnd(gl) {
 }
 
 // ---------- a test: the main thread busy on purpose ----------
-if (stallMs > 0) {
+if (stall) {
   setInterval(() => {
-    const end = now() + stallMs;
+    const end = now() + stall.ms;
     while (now() < end) { /* busy */ }
-  }, (stallEvery > 0 ? stallEvery : 5) * 1000);
+  }, stall.every * 1000);
 }

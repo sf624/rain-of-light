@@ -91,10 +91,10 @@ export function createAudio({ settings }) {
   soundLog.voices = () => (ctx ? { notes: live(), nodes: sounding.reduce((n, [, k]) => n + k, 0) } : null);
 
   function build() {
-    // The browser's default latency and rate, unless ?latency= or ?rate= ask for others.
+    // The browser's default latency and rate, unless ?latency= or ?hz= ask for others.
     const options = {};
     if (PERF.latency !== null) options.latencyHint = PERF.latency;
-    if (PERF.rate) options.sampleRate = PERF.rate;
+    if (PERF.sampleRate) options.sampleRate = PERF.sampleRate;
     ctx = new (window.AudioContext || window.webkitAudioContext)(options);
     soundLog.context(ctx);
     // A context that the system suspended or interrupted (a call, another

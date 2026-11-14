@@ -53,6 +53,8 @@ const ROWS = [
   ['camera', 'camera', false, (s) => `${s.camera.moves}  eye ${s.camera.eye.map((v) => v.toFixed(1)).join(' ')}${Math.abs(s.camera.turn) >= 0.5 ? `  turn ${Math.round(s.camera.turn)}°` : ''}`],
   ['ripples', 'ripples', false, (s) => `${s.ripples} alive`],
   // The sound and the timing (perf.js): with ?hud=perf the only rows beside time, frame and show.
+  // switches: what ran, every switch in effect (perf.js), then the settings that change the picture's load (main.js).
+  ['switches', 'switches', 'perf', (s) => [...s.perf.switches, ...s.loadSwitches].join('  ') || 'none'],
   ['sound', 'sound', 'perf', (s) => {
     const a = s.perf.sound;
     return a ? `${a.state}  ${a.rate} Hz  base ${msOf(a.base)}  out ${msOf(a.out)}  hint ${a.hint}` : 'not started (a tap or a key starts it)';
@@ -133,6 +135,7 @@ export function createHud({ lab, params, bar, snapshot }) {
   });
   document.body.append(root);
   let last = null;   // the last snapshot shown
+  let copiedTimer = 0;
   copy.addEventListener('click', () => {
     if (!last) return;
     const lines = [`${new Date().toISOString()}  ${location.href}`, navigator.userAgent,
@@ -140,7 +143,13 @@ export function createHud({ lab, params, bar, snapshot }) {
       ...rows.map((r) => `${r.label}: ${r.text(last)}`),
       'event log:', ...last.perf.events];
     const text = lines.join('\n');
-    const done = () => { copy.classList.add('copied'); setTimeout(() => copy.classList.remove('copied'), 1200); };
+    // The label says so for a moment (a class alone is hard to see on a phone).
+    const done = () => {
+      copy.classList.add('copied');
+      copy.textContent = 'copied';
+      clearTimeout(copiedTimer);
+      copiedTimer = setTimeout(() => { copy.classList.remove('copied'); copy.textContent = 'copy'; }, 1200);
+    };
     // The clipboard (a secure page), else a text area to copy by hand.
     navigator.clipboard?.writeText(text).then(done, () => byHand(text)) ?? byHand(text);
   });
