@@ -1,7 +1,8 @@
-// The figures of the forms of mathematics, each time one for its whole life
-// (see show.js, variantOf): the solids (wireframes) and the knots (closed
-// curves, a link of two rings, a Moebius band). Their names are the
-// settings' options (config.js), their geometry the shader's tables
+// The figures of the forms of mathematics, the shapes of the families solid
+// and knot (config.js: FORMS, members), each time one for its whole life
+// (see show.js, shapeIn): the solids (wireframes) and the knots (closed
+// curves, a link of two rings, a Moebius band). Their names (and labels, as
+// shown) are the Form setting's options (config.js), their geometry the shader's tables
 // (shaders.js: SOLID, KNOT) and the motions' (forms.js: where each rests on
 // the layer of light), their size the motions' too.
 // The order is the shader's numbering.
@@ -114,11 +115,11 @@ const bandEdge = ({ R, r }) => Array.from({ length: 96 }, (_, i) => {
 
 export const KNOTS = [
   // A Lissajous curve: twice across while once up and down (a figure of eight), three times in depth.
-  { name: 'lissajous', curve: 'lissajous', w: [2, 1, 3], box: [1, 0.9, 0.4], widest: 0, sway: 0.55, size: 4.05 },
+  { name: 'lissajous', label: 'Lissajous curve', curve: 'lissajous', w: [2, 1, 3], box: [1, 0.9, 0.4], widest: 0, sway: 0.55, size: 4.05 },
   // Two rings, each through the other's centre, both aslant to the room.
-  { name: 'hopf', curve: 'rings', rings: [{ centre: [-0.5, 0, 0], u: [1, 0, 0], v: [0, 1, 0] }, { centre: [0.5, 0, 0], u: [1, 0, 0], v: [0, 0, 1] }],
+  { name: 'hopf', label: 'Hopf link', curve: 'rings', rings: [{ centre: [-0.5, 0, 0], u: [1, 0, 0], v: [0, 1, 0] }, { centre: [0.5, 0, 0], u: [1, 0, 0], v: [0, 0, 1] }],
     view: [0, Math.PI / 4], size: 3.6 },
   // A Moebius band: R out from its axis, r wide each way.
-  { name: 'mobius', curve: 'band', R: 0.66, r: 0.34, lean: 0.9, size: 4.4 },
+  { name: 'mobius', label: 'Möbius band', curve: 'band', R: 0.66, r: 0.34, lean: 0.9, size: 4.4 },
 ].map((k) => (k.curve === 'rings' ? ringsOf(k) : k.curve === 'band' ? { ...k, reach: [k.R + k.r, k.R + k.r, k.r], points: bandEdge(k) }
   : { ...k, reach: k.box }));

@@ -5,7 +5,7 @@
 // another (the rain, the form, the layer), so there is never a cut. The
 // timeline is made from hashes of one seed: a time (?t=) gives its picture.
 
-import { PALETTES, PALE, FORMS, LAYER, PASSAGES, BAKED, BODIES } from './config.js';
+import { PALETTES, PALE, FORMS, LAYER, PASSAGES, BAKED, BODIES, CHOICES } from './config.js';
 import { RARE, rareEggs } from './eggs.js';
 import './egg-kinds.js';                   // (the eggs: those of the rare slot are cast here)
 import { hash, weighted, createMood, leaning, leanTo, hueOf, apart, KIN } from './director.js';
@@ -115,12 +115,13 @@ function createTimeline(seed, pool, name, mood, baked) {
   // Sideways rain (drift) comes only between two form passages: a form lasts
   // long enough that the rain before has gone, and the direction changed,
   // before the sideways rain comes, and the same after it (see flowAt).
-  // A form with figures (the solid, the knot) is each time another of them:
-  // they come in rounds, each round every figure once in a shuffled order,
-  // never the one of the time before (so all come as often, none twice in a row).
-  const rounds = new Map();   // form -> { left: the figures still to come in this round, last: the latest }
-  const figureOf = (form, r) => {
-    const n = form.variants?.length || 0;
+  // Each time a family comes it is another of its shapes (config.js: FORMS,
+  // members): they come in rounds, each round every shape once in a shuffled
+  // order, never the one of the time before (so all come as often, none
+  // twice in a row; a family of one is its shape every time).
+  const rounds = new Map();   // form -> { left: the shapes still to come in this round, last: the latest }
+  const shapeIn = (form, r) => {
+    const n = form.members.length;
     if (n < 2) return 0;
     const b = rounds.get(form) || { left: [], last: -1 };
     if (!b.left.length) {
@@ -205,7 +206,7 @@ function createTimeline(seed, pool, name, mood, baked) {
       const as = egg || form;
       if (form) sky = lastSky = episode(form, r, T, old ? { at: SKY_GAP / 2, fade: comes(as).fade } : comes(as));
       if (egg) sky.form = egg;
-      else if (form) sky.v = figureOf(form, r);   // (an egg uses none of the figures it replaces)
+      else if (form) sky.v = shapeIn(form, r);   // (an egg uses none of the shapes it replaces)
       const layerOn = hash(r * 23 + 7) < kind.layer;
       let layer = null;
       if (layerOn) layer = prev?.layer || episode(LAYER, r, T, LAYER_IN);
@@ -282,24 +283,28 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
   const mood = createMood(seed);              // the colour story's mood at a time (see director.js)
   const timelines = {};
   const timeline = (name) => (timelines[name] ||= createTimeline(seed, POOLS[name], name, mood, baked));
-  const held = new Map();                     // form name -> a held episode
-  const holdOf = (form) => {
-    if (!held.has(form.name)) {
-      held.set(form.name, { id: `held-${form.name}`, form, r: hash(seed), start: 0, pal: 0, told: 0,
-        v: Math.floor(hash(seed * 3 + 1) * (form.variants?.length || 1)),
+  const held = new Map();                     // the name held (a form, a family or one of its shapes) -> its episode
+  // shape: which of the form's shapes (undefined: one from the seed).
+  const holdOf = (form, shape, name = form.name) => {
+    if (!held.has(name)) {
+      held.set(name, { id: `held-${name}`, form, r: hash(seed), start: 0, pal: 0, told: 0,
+        v: shape ?? Math.floor(hash(seed * 3 + 1) * (form.members?.length ?? 1)),
         inAt: 0, inFade: 1, outAt: Infinity, outFade: 1 });
     }
-    return held.get(form.name);
+    return held.get(name);
+  };
+  // The episode the Form setting holds (none: the show casts, or no form).
+  const heldForm = () => {
+    const c = CHOICES.get(S.form);
+    return c ? holdOf(c.form, c.shape, S.form) : null;
   };
 
-  // Which of its figures an episode shows: as the setting of its form pins
-  // it (lab: solid=, knot=), else its own (a held form: one from the seed).
-  const variantOf = (e) => {
-    const pin = e.form.variants?.indexOf(S[e.form.name]) ?? -1;
-    return pin >= 0 ? pin : e.v || 0;
-  };
+  // Which of its form's shapes an episode shows (its members, see config.js: FORMS).
+  const shapeOf = (e) => e.v || 0;
+  // Its shape's name (the layer's, an egg's: its own).
+  const shapeName = (e) => e.form.members?.[shapeOf(e)].name ?? e.form.name;
   // A celestial body (its own colours, see config.js: BODIES), else undefined.
-  const bodyOf = (e) => (e.form === CELESTIAL ? BODIES[variantOf(e)] : undefined);
+  const bodyOf = (e) => (e.form === CELESTIAL ? BODIES[shapeOf(e)] : undefined);
 
   // What the settings ask for at t: the rain, and the episodes with their weights.
   // egg: an easter egg in the form slot (see eggs.js): { w, age, form, rain, layer }; rare: how
@@ -315,8 +320,8 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
     let items = rare < 1 ? now.items.map((x) => (isRare(x.e.form) ? { ...x, w: x.w * rare } : x)) : now.items;
     if (S.form !== 'auto') {
       items = items.filter((x) => x.e.form === LAYER);
-      const form = FORMS.find((f) => f.name === S.form);
-      if (form) items.push({ e: holdOf(form), w: 1, age: t, out: false });
+      const e = heldForm();
+      if (e) items.push({ e, w: 1, age: t, out: false });
     }
     if (S.layer !== 'auto') {
       items = items.filter((x) => x.e.form !== LAYER);
@@ -415,7 +420,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
         turn: 0, tilt: 0, yaw: 0, f: [between(0.55, 1, hash(r * 61 + 3)), s.alone, LAYER_UNDER], dissolve: 0, bound: 1e4 };
     } else {
       const go = out ? { at: e.outAt - e.inAt, fade: e.outFade } : null;   // (its age as it began to go)
-      m = motion(form.name, age, w, go, r, s.face ?? 0, ground, variantOf(e));
+      m = motion(form.name, age, w, go, r, s.face ?? 0, ground, shapeOf(e));
       if (eye) {
         const goal = Math.atan2(m.anchor[0] - eye[0], m.anchor[2] - eye[2]);
         const turn = s.face === undefined ? 1 : 1 - Math.exp(-dt / 5);
@@ -424,7 +429,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
         // (and how the show's own camera sees it, at once, whatever a drag does: a black hole stands its disc for it)
         const [cx, cy, cz] = m.centre, [px, py, pz] = view.path ?? eye;
         const sight = { rise: Math.atan2(cy - py, Math.hypot(cx - px, cz - pz)), az: Math.atan2(cx - px, cz - pz) };
-        m = motion(form.name, age, w, go, r, s.face, ground, variantOf(e), eye, sight);
+        m = motion(form.name, age, w, go, r, s.face, ground, shapeOf(e), eye, sight);
       }
       const b = bodyOf(e);
       if (b && w >= 0.001 && (!body || w > bodyW)) { body = b; bodyW = w; }
@@ -546,7 +551,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
   function cast(t) {
     const tl = timeline('all'), es = tl.at(t).items.filter((x) => x.w > 0.5).map((x) => x.e);
     const top = es.find((e) => e.form !== LAYER);
-    return { kind: tl.passage(t).kind.name, items: es.map((e) => ({ form: e.form.name, figure: e.form.variants?.[variantOf(e)], palette: shownIn(e, top) })) };
+    return { kind: tl.passage(t).kind.name, items: es.map((e) => ({ form: e.form.name, shape: shapeName(e), palette: shownIn(e, top) })) };
   }
 
   // The state that carries from frame to frame (the eased weights and colours, the slots), to be
@@ -565,13 +570,13 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
   // begins; playing: what shows now, by the kinds of passage (rain, form, storm, still; the
   // settings may pin the rain and the form: rain through a held form plays a storm whatever the passage);
   // rain, storm, gain: the eased rain, the rain through a form, and how much more a form glows among rain;
-  // items: each episode that shows, with its form's name and its label (as shown), its weight, age, whether it goes, its figure (if its form has them),
+  // items: each episode that shows, with its form's name and its label (as shown), its shape's name, its weight, age, whether it goes,
   // its palette and its colours.
   function info(t) {
     const tl = timeline(timelineFor(S.rain));
     const top = [...shown.values()].filter((s) => s.x.e.form !== LAYER).sort((a, b) => b.w - a.w)[0]?.x.e;
     const items = [...shown.values()].sort((a, b) => b.w - a.w).map((s) => ({
-      form: s.x.e.form.name, label: s.x.e.form.label ?? s.x.e.form.name, figure: s.x.e.form.variants?.[variantOf(s.x.e)], w: s.w, age: s.x.age, out: s.x.out, held: s.x.e.id.startsWith('held-'),
+      form: s.x.e.form.name, label: s.x.e.form.label ?? s.x.e.form.name, shape: shapeName(s.x.e), w: s.w, age: s.x.age, out: s.x.out, held: s.x.e.id.startsWith('held-'),
       palette: shownIn(s.x.e, top), colors: bodyOf(s.x.e) ? [s.col[0], s.col[1], s.col[3], s.col[4]] : [s.col[0], s.col[1]],
     }));
     const rain = rainNow ?? 0, sky = items.some((i) => i.form !== LAYER.name && i.w > 0.5);
@@ -594,7 +599,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
   // one held, or the timeline's (their programs are built first, see main.js: bodyProgs).
   function bodiesNear(t, ahead = BODY_AHEAD) {
     const tl = castBy();
-    const es = tl ? tl.spans(t, t + ahead, (e) => e.form === CELESTIAL).map((x) => x.e) : S.form === CELESTIAL.name ? [holdOf(CELESTIAL)] : [];
+    const es = tl ? tl.spans(t, t + ahead, (e) => e.form === CELESTIAL).map((x) => x.e) : [heldForm()].filter((e) => e?.form === CELESTIAL);
     return [...new Set(es.map((e) => bodyOf(e).kind))];
   }
   // The eggs of the rare slot the timeline has between t0 and t1 (see eggs.js): { egg, from, to }.

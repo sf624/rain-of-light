@@ -31,7 +31,7 @@ reload.
 | `direction.js` | a change of the rain's direction: the old drops stop coming and fade out before the new ones set out |
 | `forms.js` | how each form of light moves through its life: where it is, how large and how turned |
 | `fields.js`, `fields/` | the baked forms' fields of distance (`fields/*.bin`), fetched only when one is about to show (see Baking a form's field) |
-| `figures.js` | the figures of the solid and the knot: their names, corners and edges, curves, sizes |
+| `figures.js` | the shapes of the solid and the knot: their names and labels, corners and edges, curves, sizes |
 | `celestial.js` | the celestial bodies: their programs |
 | `planets.js` | the ringed planets: their rings, their lowest light and their shader |
 | `shaders.js` | the GLSL shaders: the points of light, bloom and tone mapping |
@@ -137,9 +137,9 @@ about 11 s to 3 s. It visits:
 - rain alone (`rain=on&form=none&layer=off`, in the lab) and no rain
   (`rain=off`), both with the click, keys and Reset; rain that never ends
   with a form through it (`rain=on&seed=1&t=60`); a time part-way through the show
-  (with and without the colour story), four of the forms held, a celestial body held (Saturn and the black hole
-  in the lab, each drawn by its kind's own programs, and a body name it
-  does not have, which falls back to auto),
+  (with and without the colour story), four of the forms held, two knots and two celestial bodies
+  held by their own names (Saturn and the black hole in the lab, each drawn by its kind's own
+  programs), an old link's body or solid that no longer exists (which falls back to any of its family),
   `?jitter=pitch`, two easter eggs pinned (penrose, and the teapot with its
   field; `form=teapot` falls back to `auto`), and the lab's clock (opened paused, it stands still;
   Space runs and stops it, also with the focus in the panel; the arrows seek
@@ -147,7 +147,13 @@ about 11 s to 3 s. It visits:
   and part-way through a form's coming, a change of exposure, twinkle, colour
   mode, weather or layout leaves the HUD's forms row as it was);
 - a `scene=` in a link or in saved settings: each is read as the settings
-  it stands for (`config.js: SCENES`), and a saved one is no more kept.
+  it stands for (`config.js: SCENES`), and a saved one is no more kept;
+- a shape chosen by its family's own key (`solid=`, `knot=`,
+  `celestial=`, `planet=`) in a link or in saved settings: Form's shape
+  where Form named that family, else dropped; a saved one is rewritten
+  once (`config.js: RENAMED`);
+- Form's names, one per thing (`config.js: formNames` refuses a clash),
+  and its list in the viewer's panel, each family under its heading.
 
 It then renders a few seconds of sound offline and checks that a held orb
 sounds, a still room is much quieter, and nothing clips. GitHub Actions
@@ -303,7 +309,8 @@ lines:
   with the timeline's passage after it where that differs (rain, form,
   storm, still, drift), and the time to the next passage.
 - `rain`: how much rain the show has now (0 .. 1), and `storm`, the rain
-  through a form. `forms`: each form with its weight (0 .. 1), its palette,
+  through a form. `forms`: each form (its family, and its shape in
+  brackets where the family has more than one) with its weight (0 .. 1), its palette,
   its age and whether it comes or goes, with swatches of its colours;
   `layer`: the layer of light.
 - `weather`: the weather's name and the eased rain and fall values, the
@@ -318,6 +325,22 @@ lines:
 
 On a screen narrower than 700 px only the main lines show, and with the
 settings panel open the HUD steps aside.
+
+## Forms and their shapes
+
+Each form of light is a family of shapes (`config.js: FORMS`); the show
+casts families (each by its `weight`), and each time a family comes it is
+one of its shapes, in rounds (`show.js: shapeIn`). A family's `members`
+are its shapes, each with its `name` and, if it reads otherwise, its
+`label`: the solids and the knots (`figures.js`), the celestial bodies
+(`config.js: BODIES`); a family without members (the orb, the spiral, the
+ring, the veil) is a family of one. The Form setting's options, its
+grouped list, the reading of old links and the stats are made from these
+lists. A new shape of a family is one entry in its list, with its light
+(the shader's code, and its motion in `forms.js` where its family's needs
+it); a new family is one entry in `FORMS`, with its type in the shader.
+Every name is one thing: a family's, a shape's, a palette's, `auto` or
+`none` (`config.js: formNames` refuses a clash as the page loads).
 
 ## Easter eggs
 
@@ -484,7 +507,7 @@ measures the colour story without rendering, in Node. Over many seeds it
 counts how often neighbouring passages differ in hue, how often each colour
 mode and palette comes, how far the mood wanders, how long the picture
 stays in one colour family, how much of the rain flows sideways, how
-often each form comes, how much of the time a form's light shows (and
+often each family comes and each shape of a family of more than one, how much of the time a form's light shows (and
 wholly), how much of it two forms show at once (0: one form at a time),
 and how often each easter egg of the rare slot comes (never in the first
 10 minutes; the first seed and time of each, to watch in the lab). With

@@ -77,8 +77,8 @@ export const CAMERAS = [
   { name: 'rise',  hold: [25, 40], weight: 1.5 },
 ];
 
-// The celestial bodies (the form celestial's variants, see celestial.js):
-// one of them each time it comes. Each has a kind (the bodies of a kind
+// The celestial bodies (the shapes of the family celestial, see FORMS and
+// celestial.js): one of them each time it comes. Each has a kind (the bodies of a kind
 // share their code, see celestial.js), colours of its own (four: see each
 // kind), room (the room's tint while it shows), under (the layer's palettes
 // under it) and voice (whose voice it sings with, see audio.js); label:
@@ -101,13 +101,13 @@ const TAU = Math.PI * 2;
 export const BODIES = [
   // Saturn: C ring faint and dusky, B ring bright cream (brightest outward),
   // the dark Cassini division, A ring greyer with the Encke gap, and the thin F ring.
-  { name: 'saturn', kind: 'planet', voice: 'orb', size: 2.3, upright: true, open: [0.3, 0.44], roll: 0.16, spin: TAU / 45, phase: 0.65,
+  { name: 'saturn', label: 'Saturn', kind: 'planet', voice: 'orb', size: 2.3, upright: true, open: [0.3, 0.44], roll: 0.16, spin: TAU / 45, phase: 0.65,
     rings: [[1.24, 1.43, 0.14, 3.0], [1.43, 1.53, 0.24, 2.9], [1.53, 1.72, 0.7, 2.1], [1.72, 1.95, 1.0, 1.9],
       [2.06, 2.19, 0.5, 2.7], [2.225, 2.27, 0.42, 2.75], [2.32, 2.34, 0.4, 2.4]], stretch: 1.45,
     colors: [[1.0, 0.85, 0.56], [0.78, 0.55, 0.3], [1.0, 0.92, 0.74], [0.6, 0.56, 0.52]], room: [0.95, 0.75, 0.42],
     under: ['deep sea', 'sakura'] },
   // Uranus: lying on its side, a few thin rings standing round it, the outer (epsilon) the brightest.
-  { name: 'uranus', kind: 'planet', voice: 'orb', size: 1.6, upright: false, open: [0.62, 0.85], roll: 0.14, spin: TAU / 50, phase: 0.55,
+  { name: 'uranus', label: 'Uranus', kind: 'planet', voice: 'orb', size: 1.6, upright: false, open: [0.62, 0.85], roll: 0.14, spin: TAU / 50, phase: 0.55,
     rings: [[1.64, 1.66, 0.55, 2.6], [1.75, 1.79, 0.65, 2.5], [1.86, 1.9, 0.7, 2.4], [1.99, 2.02, 1.0, 2.0]], stretch: 1.5,
     colors: [[0.5, 0.92, 0.96], [0.3, 0.72, 0.9], [0.92, 0.98, 1.0], [0.55, 0.68, 0.8]], room: [0.35, 0.75, 0.95],
     under: ['sakura', 'amber'] },
@@ -118,25 +118,44 @@ export const BODIES = [
 
 // Forms of light. Sky forms come one at a time (two while one turns into the
 // next); the layer (a sea of light near the floor) comes and goes beside
-// them. Each form picks its colours from a few of the palettes. type is the
-// form's number in the shader (see formsAt in shaders.js); weight is how
-// often it comes (see the casting in show.js): the forms of nature come more
-// often than the forms of mathematics. variants: the figures a form may be,
-// one for each of its lives (see figures.js, BODIES, and show.js: variantOf);
+// them. Each form is a family of shapes, and the show casts families: weight
+// is how often a family comes (see the casting in show.js; the forms of
+// nature come more often than the forms of mathematics), and each time it
+// comes it is one of its shapes, in turns (see show.js: shapeIn). members:
+// its shapes, each with a name and a label (its name as shown, if not its
+// name), their own data beside (figures.js, BODIES); a family with none is a
+// family of one, its one shape itself. A new shape is one entry in its
+// family's list. Each form picks its colours from a few of the palettes.
+// type is the form's number in the shader (see formsAt in shaders.js);
 // label: its name as shown, if not its key.
 export const FORMS = [
   { name: 'orb',       type: 0, weight: 1,   palettes: ['amber', 'candle', 'sakura', 'deep sea'] },
   { name: 'spiral',    type: 1, weight: 1,   palettes: ['deep sea', 'sakura', 'ice', 'aurora'] },
   { name: 'ring',      type: 3, weight: 1,   palettes: ['amber', 'aurora', 'sakura', 'deep sea'] },
   { name: 'veil',      type: 4, weight: 1,   palettes: ['aurora', 'sakura', 'deep sea', 'amber'] },
-  { name: 'solid',     type: 5, weight: 0.4, palettes: ['ice', 'amber', 'aurora', 'sakura'], variants: SOLIDS.map((x) => x.name) },
-  { name: 'knot',      type: 6, weight: 0.4, palettes: ['aurora', 'amber', 'sakura', 'deep sea'], variants: KNOTS.map((x) => x.name) },
+  { name: 'solid',     type: 5, weight: 0.4, palettes: ['ice', 'amber', 'aurora', 'sakura'], members: SOLIDS },
+  { name: 'knot',      type: 6, weight: 0.4, palettes: ['aurora', 'amber', 'sakura', 'deep sea'], members: KNOTS },
   // A celestial body: each of its bodies (BODIES) has colours of its own, so it has no palettes.
   // (Its weight is for all its bodies: each comes about as often as its share of it.)
-  { name: 'celestial', type: 8, weight: 0.8, label: 'celestial body', palettes: [],
-    variants: BODIES.map((x) => x.name), variantLabels: BODIES.map((x) => x.label ?? x.name),
-    whichHint: 'auto: each time a celestial body comes, another of them / or always this one' },
+  { name: 'celestial', type: 8, weight: 0.8, label: 'celestial body', palettes: [], members: BODIES },
 ];
+for (const f of FORMS) f.members ??= [{ name: f.name, label: f.label }];
+
+// The names the Form setting takes, each for one thing: a family (any of its
+// shapes) or one shape; a family of one is its shape. Two things of one name
+// would be one option for both, so the page refuses to load (taken: names
+// already used, the setting's own auto and none, and the other forms the
+// show's items are named by: the layer, the baked forms; palettes too, as the
+// tools read a form's palette, or a body's own, by its name).
+export function formNames(forms, taken = []) {
+  const names = forms.flatMap((f) => [f.name, ...f.members.filter((m) => m.name !== f.name || f.members.length > 1).map((m) => m.name)]);
+  const seen = new Set(taken);
+  for (const n of names) {
+    if (seen.has(n)) throw new Error(`config.js: the name ${n} is taken twice (a form, a shape, a palette or an option)`);
+    seen.add(n);
+  }
+  return names;
+}
 // The layer's surface lies height over the strands' feet, its bright band
 // thick around it (each a range: each time the layer has its own). The forms
 // rest on the top of its band (see ground in show.js).
@@ -151,6 +170,16 @@ export const LAYER = { name: 'layer', type: 2, palettes: ['deep sea', 'ice', 'au
 export const BAKED = [
   { name: 'teapot', type: 7, field: 0, size: 5.6, top: -0.019, palettes: ['ice', 'candle'] },
 ];
+
+// What each value of the Form setting holds (see formNames; auto and none
+// aside): its form, and which of its shapes (undefined: any of them; held, the
+// seed picks one, see holdOf in show.js).
+export const CHOICES = new Map();
+for (const n of formNames(FORMS, ['auto', 'none', LAYER.name, ...BAKED.map((b) => b.name), ...PALETTES.map((p) => p.name)])) {
+  const form = FORMS.find((f) => f.name === n);
+  if (form) CHOICES.set(n, { form });
+  else for (const f of FORMS) { const i = f.members.findIndex((m) => m.name === n); if (i >= 0) CHOICES.set(n, { form: f, shape: i }); }
+}
 
 // The room: strands of LEDs over a mirror floor, the same for the whole show.
 export const ROOM = {
@@ -180,12 +209,28 @@ export const PASSAGES = [
 export const SCENES = { rain: { rain: 'on', form: 'none', layer: 'off' }, crystal: { rain: 'off' } };
 // Settings renamed since links and saved settings named them (see
 // loadSettings in tuner.js): keys, an old key for its new one; values, per
-// key an old value for its new one. The planet became the celestial body.
-export const RENAMED = { keys: { planet: 'celestial' }, values: { form: { planet: 'celestial' } } };
+// key an old value for its new one; into, per key the old keys that chose
+// one of the shapes of the family it named, and their shapes (the key takes
+// the shape where it named that family; the old key goes in any case). The
+// planet became the celestial body; solid=, knot= and celestial= chose a
+// shape of their family, which Form now names itself.
+export const RENAMED = { keys: { planet: 'celestial' }, values: { form: { planet: 'celestial' } },
+  into: { form: Object.fromEntries(['solid', 'knot', 'celestial'].map((k) => [k, FORMS.find((f) => f.name === k).members.map((m) => m.name)])) } };
+
+// The Form setting's list: auto and none, the families of one (their shapes),
+// then each family of more, under its name as a heading (heads: the option
+// each heading comes before): any of it, then its shapes.
+const nameOf = (x) => x.label ?? x.name;
+const FORM_LIST = (() => {
+  const many = FORMS.filter((f) => f.members.length > 1);
+  const rows = [['auto', 'auto'], ['none', 'none'], ...FORMS.filter((f) => f.members.length === 1).map((f) => [f.name, nameOf(f)]),
+    ...many.flatMap((f) => [[f.name, `any ${nameOf(f)}`], ...f.members.map((m) => [m.name, nameOf(m)])])];
+  return { options: rows.map((r) => r[0]), labels: rows.map((r) => r[1]), heads: Object.fromEntries(many.map((f) => [f.name, nameOf(f)])) };
+})();
 
 // ---------- tunable settings (panel: p key or the gear button; also ?key=value) ----------
 export const DEFAULTS = {
-  rain: 'auto', form: 'auto', solid: 'auto', knot: 'auto', celestial: 'auto', layer: 'auto', mirror: 0.6, walls: 0, haze: 0, burn: 0.7, twinkle: 0.4, paleDrops: 1, rainShare: 1,
+  rain: 'auto', form: 'auto', layer: 'auto', mirror: 0.6, walls: 0, haze: 0, burn: 0.7, twinkle: 0.4, paleDrops: 1, rainShare: 1,
   leds: small ? 210 : 1000, aspect: 1, grid: 0, rows: 0,
   layout: 'strands', jitter: 'off', density: 'auto', strandShare: 1.0, rowShare: 1.0, strandMin: 0.66, rowMin: 0.68,
   size: 0.018, maxPx: 4.5, rest: 0.03, wire: 0.2,
@@ -212,12 +257,8 @@ export const SCHEMA = [
   { title: 'Scene', viewerTitle: '', items: [
     { key: 'rain', label: 'Rain', options: ['auto', 'on', 'off'], viewer: 1,
       hint: 'auto: rain comes and goes with the show / on: rain always falls, and the forms come and go through it / off: no rain, the forms of light have the room' },
-    { key: 'form', label: 'Form', options: ['auto', ...FORMS.map((f) => f.name), 'none'], viewer: 2,
-      labels: ['auto', ...FORMS.map((f) => f.label ?? f.name), 'none'],
-      hint: 'auto: forms of light come and go with the show / or hold one form (none: no form)' },
-    ...FORMS.filter((f) => f.variants).map((f) => ({ key: f.name, label: `Which ${f.label ?? f.name}`, options: ['auto', ...f.variants],
-      labels: f.variantLabels && ['auto', ...f.variantLabels],
-      hint: f.whichHint ?? `auto: each time the ${f.name} comes, another of its figures / or always this one` })),
+    { key: 'form', label: 'Form', viewer: 2, ...FORM_LIST,
+      hint: 'auto: forms of light come and go with the show / or hold one shape, or any of a family (one of its shapes) / none: no form' },
     { key: 'layer', label: 'Layer of light', options: ['auto', 'on', 'off'] },
     { key: 'mirror', label: 'Floor mirror (0: off)', min: 0, max: 1, step: 0.05 },
     { key: 'walls', label: 'Wall mirrors (copies per side)', min: 0, max: 1, step: 1,

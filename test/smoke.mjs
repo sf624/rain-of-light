@@ -459,13 +459,30 @@ const { targetId } = await cdp.send('Target.createTarget', { url: `${base}index.
 const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
 await poll(`index.html to load before reading config.js (${base}index.html)`, async () =>
   (await cdp.send('Runtime.evaluate', { expression: `location.href.startsWith(${JSON.stringify(base)}) && document.readyState === 'complete'`, returnByValue: true }, sessionId)).result.value === true);
+// Also: the names Form takes are one per thing (a clash of a shape's name with a family's, another
+// shape's or a palette's is refused), and the viewer's Form list groups each family of more than one
+// shape under its heading: any of it, then its shapes.
 const r = await cdp.send('Runtime.evaluate', { expression: `import('./config.js').then((c) => {
   const items = c.SCHEMA.flatMap((g) => g.items);
+  const refused = (forms, taken) => { try { c.formNames(forms, taken); return ''; } catch (e) { return e.message; } };
+  const list = [...document.querySelector('.tuner-row[data-key="form"] select').children]
+    .map((x) => (x.tagName === 'OPTGROUP' ? x.label + ': ' + [...x.children].map((o) => o.value).join(' ') : x.value));
   return { modes: c.COLOR_MODES.map((m) => m.name), storageKey: c.STORAGE_KEY, all: items.map((i) => i.key),
-    viewer: items.filter((i) => i.viewer).sort((a, b) => a.viewer - b.viewer).map((i) => i.key) }; })`,
+    viewer: items.filter((i) => i.viewer).sort((a, b) => a.viewer - b.viewer).map((i) => i.key),
+    clashes: [refused([{ name: 'knot', members: [{ name: 'hopf' }, { name: 'knot' }] }]),
+      refused([{ name: 'knot', members: [{ name: 'hopf' }, { name: 'mobius' }] }, { name: 'hopf', members: [{ name: 'hopf' }] }]),
+      refused([{ name: 'celestial', members: [{ name: 'saturn' }, { name: 'ice' }] }], ['ice']),
+      refused([{ name: 'orb', members: [{ name: 'orb' }] }, { name: 'knot', members: [{ name: 'hopf' }, { name: 'mobius' }] }], ['auto'])],
+    list, choices: [...c.CHOICES].map(([n, x]) => n + '=' + x.form.name + (x.shape === undefined ? '' : '/' + x.form.members[x.shape].name)) }; })`,
   awaitPromise: true, returnByValue: true }, sessionId);
 if (r.exceptionDetails || !Array.isArray(r.result.value?.modes)) fail(`could not read config.js: ${r.exceptionDetails?.exception?.description || r.exceptionDetails?.text}`);
-const { modes, storageKey: STORAGE_KEY, ...schema } = r.result.value;
+const { modes, storageKey: STORAGE_KEY, clashes, list: formList, choices, ...schema } = r.result.value;
+if (!clashes.slice(0, 3).every((m) => /taken twice/.test(m)) || clashes[3]) fail(`names Form takes: clashes read as ${JSON.stringify(clashes)}`);
+const LIST = ['auto', 'none', 'orb', 'spiral', 'ring', 'veil', 'solid: solid tetrahedron cube', 'knot: knot lissajous hopf mobius',
+  'celestial body: celestial saturn uranus blackhole'];
+if (formList.join() !== LIST.join()) fail(`the Form list reads ${JSON.stringify(formList)}, not ${JSON.stringify(LIST)}`);
+if (!choices.includes('hopf=knot/hopf') || !choices.includes('knot=knot') || !choices.includes('orb=orb') || choices.length !== 15) fail(`Form's choices: ${choices}`);
+console.log('ok  Form: one name per thing (clashes refused), its list grouped by family');
 await cdp.send('Target.closeTarget', { targetId });
 
 await visit(cdp, base, '', true, true); // the real default lattice
@@ -485,9 +502,10 @@ await visit(cdp, base, '?seed=7&t=100', false);
 await visit(cdp, base, '?seed=7&t=100&story=off', false);   // without the colour story
 // The forms added later, each held part-way through its life (it has come and turned).
 for (const f of ['ring', 'veil', 'solid', 'knot']) await visit(cdp, base, `?rain=off&form=${f}&seed=2&t=40`, false);
-// The other kinds of knot the shader draws (seed 2 holds the Moebius band): the Lissajous curve and a link of rings.
-for (const k of ['lissajous', 'hopf']) await visit(cdp, base, `?rain=off&form=knot&knot=${k}&seed=2&t=40`, false);
-// Names that are no option (a form, a figure) fall back to the defaults.
+// The other kinds of knot the shader draws (seed 2 holds the Moebius band), each by its own name:
+// the Lissajous curve and a link of rings.
+for (const k of ['lissajous', 'hopf']) await visit(cdp, base, `?rain=off&form=${k}&seed=2&t=40`, false);
+// Names that are no option (a form; old settings that chose a figure) fall back to the defaults.
 await visit(cdp, base, '?rain=off&form=cone&solid=sphere&knot=granny&seed=2&t=40', false);
 // The teapot, an easter egg pinned in the lab: its field is fetched (see fields.js); a plain visit fetches
 // none (see test/site.mjs). It is no Form: form=teapot (a link or a saved setting) falls back to auto.
@@ -496,17 +514,17 @@ await visit(cdp, base, 'lab.html?rain=off&egg=teapot&seed=2&t=40', false, false,
 await visit(cdp, base, 'lab.html?rain=off&form=teapot&seed=2&t=40', false, false, null,
   { what: 'form=teapot to fall back to auto', js: `window.__lab.setting('form') === 'auto'` });
 // A celestial body held in the lab, drawn by its kind's own programs (celestial.js: Saturn by the
-// planets', the black hole by its own, and only those built), and by a body name it does not have
-// (which falls back to auto).
-await visit(cdp, base, 'lab.html?rain=off&form=celestial&celestial=saturn&seed=2&t=40', false, false, null,
+// planets', the black hole by its own, and only those built); an old link's body it does not have
+// (which falls back to any celestial body).
+await visit(cdp, base, 'lab.html?rain=off&form=saturn&seed=2&t=40', false, false, null,
   { what: 'Saturn to draw with the planets\' programs', js: `window.__lab.bodies().drawn === 'planet'` });
-await visit(cdp, base, 'lab.html?rain=off&form=celestial&celestial=blackhole&seed=2&t=40', false, false, null,
+await visit(cdp, base, 'lab.html?rain=off&form=blackhole&seed=2&t=40', false, false, null,
   { what: 'the black hole to draw with its own programs', js: `window.__lab.bodies().drawn === 'hole' && window.__lab.bodies().built.join() === 'hole'` });
 await visit(cdp, base, 'lab.html?rain=off&form=celestial&celestial=earth&seed=3&t=40', false, false, null,
-  { what: 'celestial=earth to fall back to auto', js: `window.__lab.setting('celestial') === 'auto'` });
-// A solid by a name it no longer has (the star): back to auto, and a solid shows.
+  { what: 'celestial=earth to fall back to any celestial body', js: `window.__lab.setting('form') === 'celestial' && !!window.__lab.bodies().drawn` });
+// An old link's solid by a name it no longer has (the star): any solid, and a solid shows.
 await visit(cdp, base, 'lab.html?rain=off&form=solid&solid=star&seed=2&t=40', false, false, null,
-  { what: 'solid=star to fall back to auto', js: `window.__lab.setting('solid') === 'auto'` });
+  { what: 'solid=star to fall back to any solid', js: `window.__lab.setting('form') === 'solid' && window.__lab.setting('solid') === undefined` });
 // LEDs spaced per strand: some LEDs are never lit, and the wires skip them.
 await visit(cdp, base, '?jitter=pitch', false);
 // An easter egg pinned in the lab: its own program is built and draws it.
@@ -552,15 +570,29 @@ await visit(cdp, base, 'lab.html?egg=penrose&t=30', false, false, null,
   }
   console.log('ok  old scene= links and saved scenes read as Rain, Form and Layer');
   // Renamed settings (config.js: RENAMED): an old link's or a saved setting's planet is the
-  // celestial body, and the saved one is rewritten under the new names.
+  // celestial body; a shape chosen by its family's own setting (solid=, knot=, celestial=, planet=)
+  // is Form's where Form named that family, else it is dropped; a saved one is rewritten under the new names.
   for (const [q, saved, want, kept] of [
-    ['form=planet&planet=uranus', undefined, 'celestial,uranus'],
-    ['form=planet', undefined, 'celestial,auto'],
-    ['', { form: 'planet', planet: 'saturn' }, 'celestial,saturn', { form: 'celestial', celestial: 'saturn' }],
-    ['planet=uranus', { celestial: 'saturn' }, 'auto,uranus', { celestial: 'saturn' }],
+    ['form=planet&planet=uranus', undefined, 'uranus'],
+    ['form=planet', undefined, 'celestial'],
+    ['form=planet&planet=earth', undefined, 'celestial'],
+    ['form=solid&solid=cube', undefined, 'cube'],
+    ['form=knot&knot=hopf', undefined, 'hopf'],
+    ['form=celestial&celestial=blackhole', undefined, 'blackhole'],
+    ['form=solid&solid=star', undefined, 'solid'],
+    ['form=knot&knot=auto', undefined, 'knot'],
+    ['form=auto&knot=hopf', undefined, 'auto'],
+    ['form=orb&solid=cube', undefined, 'orb'],
+    ['knot=hopf', undefined, 'auto'],
+    ['', { form: 'planet', planet: 'saturn' }, 'saturn', { form: 'saturn' }],
+    ['', { form: 'knot', knot: 'mobius', rain: 'off' }, 'mobius', { form: 'mobius', rain: 'off' }],
+    ['', { form: 'orb', solid: 'cube' }, 'orb', { form: 'orb' }],
+    ['', { solid: 'cube' }, 'auto', {}],
+    ['planet=uranus', { celestial: 'saturn' }, 'auto', {}],
+    ['knot=hopf', { form: 'knot' }, 'hopf', { form: 'knot' }],
   ]) {
-    const got = await read(q, saved, ['form', 'celestial']);
-    if (got !== want) fail(`?${q} with ${JSON.stringify(saved ?? {})} saved reads form, celestial as ${got}, not ${want}`);
+    const got = await read(q, saved, ['form']);
+    if (got !== want) fail(`?${q} with ${JSON.stringify(saved ?? {})} saved reads form as ${got}, not ${want}`);
     if (kept) {
       const now = await ev(`localStorage.getItem(${JSON.stringify(STORAGE_KEY)})`);
       if (now !== JSON.stringify(kept)) fail(`saved ${JSON.stringify(saved)} was kept as ${now}, not ${JSON.stringify(kept)}`);
@@ -568,7 +600,7 @@ await visit(cdp, base, 'lab.html?egg=penrose&t=30', false, false, null,
     await ev(`localStorage.removeItem(${JSON.stringify(STORAGE_KEY)})`);
   }
   await cdp.send('Target.closeTarget', { targetId });
-  console.log('ok  old form=planet, planet= links and saved settings read as the celestial body');
+  console.log('ok  old form=planet, planet=, solid=, knot=, celestial= links and saved settings read as Form\'s shapes and families');
 }
 
 // The sound follows the show: rendered offline on the page's own clock (see

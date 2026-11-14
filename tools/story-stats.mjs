@@ -4,7 +4,7 @@
 // It also measures how long the picture stays in one colour family, and how
 // much of the rain flows sideways (see show.js, drift), and how much of the
 // time a form shows, and two at once (0: one form at a time, see show.js),
-// and how often each figure of the solid and the knot comes.
+// and how often each shape of the families of more than one comes.
 //   node tools/story-stats.mjs [seeds=50] [hours=1]
 globalThis.innerWidth = globalThis.innerHeight = 1000;
 const { COLOR_MODES, PALETTES, SETS, FORMS, BODIES } = await import('../config.js');
@@ -24,6 +24,8 @@ const hueOfAll = (cs) => {
 // (A celestial body's palette is its name: its first colour.)
 const pal = (n) => PALETTES.find((p) => p.name === n) || { a: BODIES.find((p) => p.name === n)?.colors[0] };
 const ONE_PALETTE = ['mono', 'comet', 'accent'];
+// The families of more than one shape (config.js: FORMS): how often each of their shapes comes.
+const MANY = new Set(FORMS.filter((f) => f.members.length > 1).map((f) => f.name));
 // The passages of rain alone: falling, and sideways.
 const RAIN_ALONE = ['rain', 'drift'];
 // The rain's main hue in a colour episode (undefined: many colours at once).
@@ -170,8 +172,8 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
   let side = 0, down = 0, all = 0, steps = 0, drifts = 0, lengths = [], next = 0;
   let lit = 0, full = 0, two = 0;     // steps with a form's light (shown weight above 0), with one wholly there, with two at once
   const came = {}, stayed = {};       // per form: how many times it came, and for how many seconds it showed
-  const figures = {}, lastFigure = {};   // per form with figures: how many times each came; and per seed, the latest
-  let twice = 0;                      // a figure that came again the next time its form did
+  const figures = {}, lastFigure = {};   // per family of more than one shape: how many times each came; and per seed, the latest
+  let twice = 0;                      // a shape that came again the next time its family did
   const eggAt = [];                   // when each egg came (s into its seed's show)
   const firstOf = {};                 // per egg: the first seed and time it came
   for (let seed = 1; seed <= SEEDS; seed++) {
@@ -196,10 +198,10 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
       if (f && f !== form) {
         count(came, f);
         if (EGG_NAMES.includes(f)) { eggAt.push(t); firstOf[f] ||= `seed=${seed}&t=${t}`; }
-        if (sky.figure) {
-          count(figures[f] ||= {}, sky.figure);
-          if (lastFigure[f] === sky.figure) twice++;
-          lastFigure[f] = sky.figure;
+        if (MANY.has(f)) {
+          count(figures[f] ||= {}, sky.shape);
+          if (lastFigure[f] === sky.shape) twice++;
+          lastFigure[f] = sky.shape;
         }
       }
       form = f;
@@ -221,11 +223,11 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
   for (const f of [...FORMS, ...rareEggs()]) out.push(`  ${f.name.padEnd(10)} ${((came[f.name] || 0) / hours).toFixed(1).padStart(5)}  ${pct(stayed[f.name] || 0, SEEDS * SPAN)}`);
   const sum = (k) => Object.values(k).reduce((a, b) => a + b, 0);
   out.push(`  ${'all'.padEnd(10)} ${(sum(came) / hours).toFixed(1).padStart(5)}  ${pct(sum(stayed), SEEDS * SPAN)}`);
-  out.push('', 'Figures (times each comes in an hour)');
-  for (const f of FORMS.filter((x) => x.variants)) {
-    out.push(`  ${f.name.padEnd(10)} ${f.variants.map((v) => `${v} ${((figures[f.name]?.[v] || 0) / hours).toFixed(1)}`).join(', ')}`);
+  out.push('', 'Shapes of the families of more than one (times each comes in an hour)');
+  for (const f of FORMS.filter((x) => MANY.has(x.name))) {
+    out.push(`  ${f.name.padEnd(10)} ${f.members.map(({ name: v }) => `${v} ${((figures[f.name]?.[v] || 0) / hours).toFixed(1)}`).join(', ')}`);
   }
-  out.push(`  the same figure as its form's time before: ${twice}`);
+  out.push(`  the same shape as its family's time before: ${twice}`);
   const eggs = EGG_NAMES.reduce((n, e) => n + (came[e] || 0), 0);
   const regular = FORMS.reduce((n, f) => n + (came[f.name] || 0), 0);
   out.push('', `Eggs (the rare slot's): ${eggs} in ${hours} h, ${(eggs / hours).toFixed(2)} an hour, one every ${eggs ? (hours / eggs).toFixed(1) : '-'} h;`
