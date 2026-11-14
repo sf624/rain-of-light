@@ -43,7 +43,7 @@ const ROWS = [
   ['bright', 'bright', true, (s) => `exposure ${f2(s.light.exposure)} x breath ${s.light.breath === null ? 'off' : f2(s.light.glow)} = ${f2(s.light.applied)}`],
   ['light', 'light', false, (s) => `room ${f2(s.light.room)}  wire ${f2(s.light.wire)}  twinkle ${f2(s.light.twinkle)}  fall light ${f2(s.light.fall)}  form gain x${f2(s.light.stormGain)}`],
   ['glow', 'glow', false, (s) => `${s.light.bloom > 0 ? `glow ${f2(s.light.bloom)}` : 'glow off'}  haze ${s.light.haze > 0 ? f2(s.light.haze) : 'off'}  burn ${s.light.burn > 0 ? f2(s.light.burn) : 'off'}  rays ${s.light.rays}  float buffers ${s.light.float ? 'yes' : 'no'}`],
-  ['camera', 'camera', false, (s) => `${s.camera.moves}  eye ${s.camera.eye.map((v) => v.toFixed(1)).join(' ')}`],
+  ['camera', 'camera', false, (s) => `${s.camera.moves}  eye ${s.camera.eye.map((v) => v.toFixed(1)).join(' ')}${Math.abs(s.camera.turn) >= 0.5 ? `  turn ${Math.round(s.camera.turn)}°` : ''}`],
   ['ripples', 'ripples', false, (s) => `${s.ripples} alive`],
 ];
 

@@ -266,7 +266,7 @@ Limits: a seek uses the settings as they are now (change the scene, the
 colour story or a form, and a seek back shows the show with the new
 setting from the start), and the colour key counts as a setting: all of
 the show, past and future, has its colours after a key press. The pointer
-is not replayed: a seek steps with a neutral pointer (and with the canvas
+(its turn too: `__lab.turn()` reads it, in radians) is not replayed: a seek steps with a neutral pointer (and with the canvas
 as it is now, whose shape sets the camera's distance), so a view dragged
 with the mouse is only seen again as the live frames apply it. A skipped
 episode stays skipped. Clicks make waves that a seek back does not bring
