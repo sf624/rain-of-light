@@ -341,7 +341,9 @@ or
   Over the heart the disc's far side shows lifted into an arch that hugs
   it, and a thinner arch under it, as gravity bends its light; a thin
   bright ring hugs the dark heart. Two pale blue-white jets blow out along
-  the disc's axis, matter running out along them: one comes
+  the disc's axis, clumps of matter running out along them, each its
+  own size and brightness, in no fixed rhythm: busy stretches, quiet
+  ones, and now and then a stronger outflow. One comes
   towards you on one diagonal, passing in front of the heart, its points
   growing as they come; the other goes away on the opposite
   diagonal, dimmer and finer, from behind the heart and behind the disc,

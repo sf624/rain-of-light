@@ -53,6 +53,23 @@ const vec3 HOLE_ARC = vec3(1.1, 1.06, 1.7);    // of the shadow's radius: the ar
 const vec2 HOLE_UNDER = vec2(1.03, ${f(BH.under)});      // the arch under the heart: the inner rim's height, the outer edge's (BH.under)
 const vec4 HOLE_JET = vec4(7.0, 2.6, 5.0, 2.6);   // the jets: the upper one's reach past the heart and fade length, the lower one's (forms.js: BH.down)
 const vec3 HOLE_CONE = vec3(0.25, 0.06, 0.5);  // a jet's half width at its base, its widening per unit; the light of one that goes away from the eye
+const vec2 HOLE_FLOW = vec2(2.2, 0.05);        // the jets' matter: its speed (units/s), and how far it sways from the axis per unit out
+// A smooth noise of one number (0 .. 1): a new value at each whole number, eased between.
+float holeNoise(float x) { float i = floor(x), t = fract(x); return mix(hash(i), hash(i + 1.0), t * t * (3.0 - 2.0 * t)); }
+// How much matter a jet carries that left the heart at time tau (the jet's
+// own clock, see holeLight), as far out as far: never at a fixed beat.
+float holeFlow(float tau, float far) {
+  // Clumps of matter, each its own size, spacing and brightness: two
+  // octaves of noise of the time it left (the fine one fades as the matter
+  // travels, so clumps soften and spread), each clump as bright as a slower
+  // noise has it; quiet stretches now and then (mood), and now and then a
+  // stronger outflow (burst).
+  float x = mix(holeNoise(tau * 1.1), holeNoise(tau * 2.7 + 40.0), 0.4 * exp(-far / 4.0));
+  float clump = smoothstep(0.42, 0.92, x);
+  float amp = 0.35 + 1.65 * holeNoise(tau * 0.55 + 17.3);
+  float mood = smoothstep(0.05, 0.45, holeNoise(tau * 0.04 + 80.0)), burst = smoothstep(0.75, 0.95, holeNoise(tau * 0.06 + 120.0));
+  return 0.3 + 2.0 * clump * clump * amp * (0.25 + 0.75 * mood) * (1.0 + 1.2 * burst);
+}
 float HoleRay, HoleJet;   // set by holeLight: the share of its light that casts rays, and that is a jet's
 // The disc's axis: up, leaning by b.w towards the way yaw.
 vec3 holeAxis(vec4 b, float yaw) { return vec3(sin(b.w) * sin(yaw), cos(b.w), sin(b.w) * cos(yaw)); }
@@ -98,6 +115,16 @@ vec3 holeLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
   // sight, F away from the eye; turn: X's angle from X0, a way fixed in the disc.
   vec3 v = normalize(b.xyz - uEye), R = normalize(vec3(-v.z, 0.0, v.x)), U = cross(R, v), n = holeAxis(b, yaw);
   float o = -dot(n, v), dc = length(b.xyz - uEye), depth = dot(rel, v), y = dot(rel, n);
+  // Most LEDs within its reach lie off the disc, off the lens's slab (which
+  // faces the eye, with the photon ring) and off the jets: they skip the rest.
+  float sheet = min(HOLE_SHEET.x * uLane.y, HOLE_SHEET.y);
+  float far = abs(y) - Rs * 1.05, up = step(0.0, y), reach = a.w * mix(HOLE_JET.z, HOLE_JET.x, up);
+  float w = max(0.9 * lane, HOLE_CONE.x + HOLE_CONE.y * far);
+  if (abs(y) >= sheet && abs(depth) >= max(HOLE_DEEP, 4.0 * lane)
+      && (far <= 0.0 || far >= reach || length(rel - n * y) > 3.5 * w + HOLE_FLOW.y * far)) {
+    HoleRay = 0.0; HoleJet = 0.0;
+    return vec3(0.0);
+  }
   vec3 F = normalize(v + n * o), X = cross(F, n), X0 = vec3(cos(yaw), 0.0, -sin(yaw));
   float turn = atan(dot(X, cross(n, X0)), dot(X, X0));
   vec2 S = vec2(dot(rel, R), dot(rel, U)) * dc / max(dc + depth, 0.1);   // where the eye sees it, at the heart's distance
@@ -108,7 +135,6 @@ vec3 holeLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
   float outer = mix(mix(a.z * 1.6, a.z, f.x), rin * 1.1, f.y);
   float inner = mix(a.z * 1.05, rin, smoothstep(0.0, 0.8, f.x));
   vec3 m = vec3(0.0);
-  float sheet = min(HOLE_SHEET.x * uLane.y, HOLE_SHEET.y);
   if (abs(y) < sheet) {
     // The disc itself: a thin sheet across the strands, about one LED of each.
     float x = dot(rel, X), z = dot(rel, F);
@@ -138,17 +164,21 @@ vec3 holeLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
   ring = exp(-ring * ring - depth * depth / (lane * lane * 1.6)) * step(0.01, Rs);
   float light = m.x + ring * 14.0 * smoothstep(0.4, 0.9, f.x) * smoothstep(0.04, 0.25, Rs / a.z);
   // The jets: narrow cones along the axis, from just outside the heart,
-  // widening and fading as they go, with knots that run outwards. The one
+  // widening and fading as they go, the matter in them running outwards. The one
   // that comes towards the eye is the brighter; the one that goes away dims
   // where the disc lies in front of it (where the line of sight to it crosses the disc).
-  float far = abs(y) - Rs * 1.05, jet = 0.0;
-  float up = step(0.0, y), reach = a.w * mix(HOLE_JET.z, HOLE_JET.x, up);
+  float jet = 0.0;
   if (far > 0.0 && far < reach) {
-    float w = max(0.9 * lane, HOLE_CONE.x + HOLE_CONE.y * far), d = length(rel - n * y);
-    float k = (far - 2.2 * uTime) / 3.0 + 0.5 * up, kk = fract(k) - 0.5;   // a knot every 3 units, 2.2 units a second
+    // The matter here left the heart at tau (each jet on its own clock), and
+    // sways a little from the axis, the more the farther it has gone, as the
+    // flow did when it left: so its sway, too, runs outwards with it.
+    float tau = uTime - far / HOLE_FLOW.x + 61.0 * up;
+    vec3 X0 = vec3(cos(yaw), 0.0, -sin(yaw));
+    vec3 side = rel - n * y - (X0 * (holeNoise(tau * 0.23 + 7.0) - 0.5) + cross(n, X0) * (holeNoise(tau * 0.23 + 31.0) - 0.5)) * 2.0 * HOLE_FLOW.y * far;
+    float d = length(side), r2 = d * d / (w * w);
     float he = o * dc, t = y * he < 0.0 ? he / (he - y) : 0.0;           // (the eye's height over the disc's plane; where the line of sight crosses it)
     float rc = length(mix(uEye - b.xyz, rel, t));
-    jet = exp(-d * d / (w * w)) * exp(-far / mix(HOLE_JET.w, HOLE_JET.y, up)) * (0.4 + 3.0 * exp(-kk * kk * 60.0) * hash(floor(k) + 7.0 * up))
+    jet = exp(-r2) * holeFlow(tau, far) * exp(-far / mix(HOLE_JET.w, HOLE_JET.y, up))
         * smoothstep(0.0, 0.6, far) * (1.0 - smoothstep(mix(0.45 * reach, reach - 1.5, up), reach, far)) * 44.0
         * mix(HOLE_CONE.z, 1.0, smoothstep(-0.1, 0.1, o * (up - 0.5))) * (1.0 - 0.5 * smoothstep(0.9 * rin, 1.2 * rin, rc) * (1.0 - smoothstep(0.8 * outer, outer, rc)));
   }
