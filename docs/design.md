@@ -774,12 +774,13 @@ the eye on one diagonal, the other going away on the other.
   Their matter runs outwards at 2.2 units a second (`HOLE_FLOW`), so what
   a jet shows at a distance is what left the heart that long ago: its
   light is a function of that time (`tau`, each jet on its own clock),
-  never of a fixed beat (`holeFlow`). Two octaves of a smooth noise of it
-  make clumps of matter, each its own size, spacing and brightness (a
-  slower noise sets each clump's brightness); the fine octave fades as the
-  matter travels, so clumps soften and spread; a noise over tens of
-  seconds makes quiet stretches now and then, and another a stronger
-  outflow now and then. The noise has a new value at each whole number of
+  never of a fixed beat (`holeFlow`). It is a steady faint beam, and now
+  and then a clump of matter where two octaves of a smooth noise of that
+  time rise high: so the clumps come sparse, each its own size, spacing
+  and brightness (a slower noise sets each clump's brightness); the fine
+  octave fades as the matter travels, so clumps soften and spread; a
+  noise over tens of seconds makes them fainter in quiet stretches. The
+  noise has a new value at each whole number of
   its time, from a hash, so nothing repeats. The flow also sways a little
   from the axis as it left, by up to 0.05 units per unit out, and the sway
   runs out with it. Clumps at a fixed interval would read as a blinking
