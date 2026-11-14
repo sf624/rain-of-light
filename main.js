@@ -555,7 +555,7 @@ function skyColors() {
 // nothing here: the show reads them every frame and blends into the change.
 // Only the picture reads these: the show's state does not depend on them, so a change leaves it as it is.
 const LATTICE = ['leds', 'aspect', 'grid', 'rows', 'layout', 'jitter'];
-const DRAW_ONLY = ['volume', 'quality', 'exposure', 'twinkle', 'haze', 'burn', 'mirror', 'walls', 'size', 'maxPx', 'rest',
+const DRAW_ONLY = ['volume', 'quality', 'exposure', 'twinkle', 'paleDrops', 'haze', 'burn', 'mirror', 'walls', 'size', 'maxPx', 'rest',
   'wire', 'rainGain', 'tipGain', 'bloom', 'fog', 'rays', 'rayLength', 'blackFloor', 'saturation', 'rainbow'];
 let rebuildTimer = 0;
 function apply(key) {
@@ -618,8 +618,9 @@ function ease(dt) {
 // ---------- the show: rain and forms of light, and the mirrors ----------
 // ?seed= gives the show's timeline; else each visit has its own.
 const show = createShow(S, { feet: -HEIGHT / 2, seed: SEED, eggs: fields.able }); // the layer lies just above the strands' feet
-// While no rain passage shows, a few pale drops still fall: more in heavier weather.
-const sparseShare = () => 0.03 + 0.05 * look.rain;
+// While no rain passage shows, a few pale drops still fall: more in heavier weather,
+// and S.paleDrops times as many (0: none at all; a rain passage still comes in from nothing).
+const sparseShare = () => S.paleDrops * (0.03 + 0.05 * look.rain);
 // The images of the lattice in the wall mirrors: per image, x sign and offset,
 // z sign and offset, and how much light is left after its reflections. The
 // walls stand half a strand spacing beyond the outer strands.
