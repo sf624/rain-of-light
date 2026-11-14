@@ -86,16 +86,20 @@ export function createTuner({ schema, lab = false, settings, defaults, storageKe
     root.append(section);
   }
 
-  // The other page, with the same URL settings and the panel open.
-  const other = document.createElement('p');
-  other.className = 'tuner-page';
-  const link = document.createElement('a');
-  link.href = `${lab ? './' : 'lab.html'}${location.search}#tune`;
-  link.textContent = lab ? 'Fewer settings' : 'All settings';
-  link.title = lab ? 'The viewer page' : 'The lab: every setting';
-  other.append(link);
+  // The lab links back to the viewer page (same URL settings, panel open). The
+  // viewer page has no link to the lab: that is opened by its address.
   const foot = footer();
-  root.append(other, foot);
+  if (lab) {
+    const other = document.createElement('p');
+    other.className = 'tuner-page';
+    const link = document.createElement('a');
+    link.href = `./${location.search}#tune`;
+    link.textContent = 'Fewer settings';
+    link.title = 'The viewer page';
+    other.append(link);
+    root.append(other);
+  }
+  root.append(foot);
   document.body.append(toggle, root);
   refresh();
   let versionAsked = false;

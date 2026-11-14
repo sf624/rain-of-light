@@ -225,7 +225,7 @@ body.idle .full-toggle:focus-visible, body.idle .rotate-toggle:focus-visible, bo
   color: var(--dim);
 }
 
-/* The link to the other page (all settings, or fewer). */
+/* The lab's link back to the viewer page (fewer settings). */
 .tuner-page { margin: 12px 0 0; font-size: 12px; }
 .tuner-page a { color: #9cc8ff; text-underline-offset: 2px; }
 .tuner-page a:focus-visible { outline: 2px solid #9cc8ff; outline-offset: 2px; border-radius: 2px; }

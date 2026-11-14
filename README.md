@@ -52,9 +52,9 @@ Inspired by teamLab's *Light Sculpture - Point*.
   | `r` | landscape / portrait |
 
 The settings panel (⚙ or `p`) has a few settings: the scene, the colour,
-the brightness, the quality and the sound's levels. Its link **All
-settings** opens the lab, [`lab.html`](https://sf624.github.io/rain-of-light/lab.html):
-the same page with every setting in its panel. Both pages keep what you
+the brightness, the quality and the sound's levels. The lab,
+[`lab.html`](https://sf624.github.io/rain-of-light/lab.html), is opened by
+its address: the same page with every setting in its panel. Both pages keep what you
 change in this browser; Reset brings back every default. Any setting can
 also go in the URL, on either page. A few that people use:
 

@@ -218,19 +218,25 @@ async function visit(cdp, base, query, interact, full = false, fetches = null) {
     const ta = await evalJs(`getComputedStyle(document.querySelector('.tuner input[type=range]')).touchAction`);
     if (ta !== 'pan-y') fail(`[${label}] the panel's sliders have touch-action ${ta}, not pan-y`);
     // The viewer page's panel has only the items marked `viewer` (in their order), the lab's every
-    // item; each links to the other page, with the panel open there. Both keep one set of saved
+    // item; the lab links to the viewer page, with the panel open there, and the viewer page has no
+    // link to the lab (it is opened by its address). Both keep one set of saved
     // settings: the lab saves a setting the viewer panel does not show, and the viewer's Reset clears it.
     const panel = await evalJs(`(() => ({ keys: [...document.querySelectorAll('.tuner-row')].map((r) => r.dataset.key),
       buttons: [...document.querySelectorAll('.tuner-buttons button')].map((b) => b.textContent),
-      other: document.querySelector('.tuner-page a')?.href, saved: localStorage.getItem(${JSON.stringify(STORAGE_KEY)}) }))()`);
+      other: document.querySelector('.tuner-page a')?.href,
+      labLinks: [...document.querySelectorAll('a[href*="lab"], a[href*="lab.html"]')].map((a) => a.getAttribute('href')), saved: localStorage.getItem(${JSON.stringify(STORAGE_KEY)}) }))()`);
     const want = lab ? schema.all : schema.viewer;
     if (panel.keys.join() !== want.join()) fail(`[${label}] the panel shows ${panel.keys.join()}, not ${want.join()}`);
     if (!lab && (panel.keys.includes('jitter') || want.length > 8)) fail(`[${label}] the viewer panel has lab settings: ${panel.keys.join()}`);
     const buttons = lab ? 'Copy,Reset,×' : 'Reset,×';
     if (panel.buttons.join() !== buttons) fail(`[${label}] the panel's buttons are ${panel.buttons.join()}, not ${buttons}`);
     const search = full ? '' : `?${LITE}`; // the link carries the URL settings
-    const other = lab ? `${base}${search}#tune` : `${base}lab.html${search}#tune`;
-    if (panel.other !== other) fail(`[${label}] the link to the other page is ${panel.other}, not ${other}`);
+    if (lab) {
+      const other = `${base}${search}#tune`;
+      if (panel.other !== other) fail(`[${label}] the lab's link to the viewer page is ${panel.other}, not ${other}`);
+    } else if (panel.other !== undefined || panel.labLinks.length) {
+      fail(`[${label}] the viewer page links to the lab: ${panel.other} ${panel.labLinks.join()}`);
+    }
     if (lab) {
       await evalJs(`(() => { const s = document.querySelector('.tuner-row[data-key="story"] select'); s.value = 'off';
         s.dispatchEvent(new Event('change')); })()`);

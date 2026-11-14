@@ -922,7 +922,8 @@ Two pages run the same app, with two panels:
   differs from `index.html` only in `data-page="lab"` on `<html>` (read by
   `main.js`), its title and its share tags.
 
-Each panel links to the other page with the same URL query and `#tune`.
+The lab's panel links to the viewer page with the same URL query and `#tune`;
+the viewer page has no link to the lab, which is opened by its address.
 Both pages read and save the same settings (`STORAGE_KEY`): a setting
 changed in the lab stays changed on the viewer page, which does not show
 it, and the viewer page's Reset sets it back with every other one. So a
@@ -1122,7 +1123,7 @@ Details and commands are in [development.md](development.md).
   scene change without a reload, and Reset), every colour mode, both panels
   (`lab.html#tune` and `#tune`: the GitHub link and the commit link from a
   fake `version.json`, the sliders' `touch-action`, which settings each
-  shows, the link to the other page, and the shared saved settings that
+  shows, the lab's link to the viewer page (and none from the viewer page to the lab), and the shared saved settings that
   the viewer page's Reset clears), the rain scene in the lab and the
   crystal scene (with the same click, keys and Reset), a seeded time with and without the story, four of the forms
   held, and `?jitter=pitch`. It then renders the sound: a held orb must be

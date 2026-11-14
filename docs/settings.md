@@ -95,17 +95,18 @@ The site has two pages, with the same picture, keys and URL parameters:
 - **The viewer page** (`index.html`, the address of the site) has a small
   panel: Scene, Colour mode, Brightness (the Exposure setting), Quality,
   and the levels of the sound (Pad, Bells, Rain, Forms). The volume is the
-  bar by the buttons. Its link **All settings** opens the lab.
+  bar by the buttons. It has no link to the lab: the lab is opened by its
+  address (`…/lab.html`).
 - **The lab** (`lab.html`) has every setting in its panel, in groups. Its
   link **Fewer settings** opens the viewer page.
 
-![The viewer page's small panel at the lower right: Scene, Colour mode, Brightness, Quality and four sound levels, a link to all settings, and the GitHub link](img/viewer-panel.jpg)
+![The viewer page's small panel at the lower right: Scene, Colour mode, Brightness, Quality and four sound levels, and the GitHub link](img/viewer-panel.jpg)
 
 ![The lab's panel open on the right of the picture: Scene, Form, Layer of light, the mirror sliders and more, each row with its default; Twinkle and Quality are not at theirs, and are marked](img/panel.jpg)
 
 The gear button or the `p` key opens the panel; a link that ends in
 `#tune` opens the page with it (`lab.html#tune`: the lab with its panel
-open). A link to the other page keeps the URL query, and opens its panel.
+open). The lab's link back to the viewer page keeps the URL query, and opens its panel.
 A change shows at once, without a reload.
 
 - Both pages keep what you change in this browser, in one set of saved
