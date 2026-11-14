@@ -272,8 +272,11 @@ about 12 s and out over about 10 s, while its own move takes 17 to 24 s;
 the orb, which has no move of its own, fades in over about 18 s and out
 over about 16 s. One form shows at a time: when one follows another, the
 first has gone before the next begins to come, with a moment of dark
-between them. While it shows, each form moves slowly in its own way, and
-the floor shows each move:
+between them. Each form rests on the layer of light: at the bottom of its
+slow rise and fall, its light just meets the top of the layer's bright band,
+and never sinks into it. With no layer, it rests where a layer would be.
+While it shows, each form moves slowly
+in its own way, and the floor shows each move:
 
 - **orb**: gathers where it hovers, growing a little, and shrinks a little
   as it goes; it drifts and breathes. It is pale at its heart and deepens
@@ -719,9 +722,8 @@ Query: `rain=on&form=none&layer=off&flow=down&color=sky&skyDay=80` at `t=0`, `t=
 A view narrower than 16:9 (a narrow window, a phone held upright) zooms out,
 smoothly with its shape: the field of view opens (up to 96 degrees) and the
 eye steps back from the centre. So the room and the forms keep about the
-size they have in landscape. In a tall view the eye looks level and the
-forms float higher, so a form stands in the upper middle with its image in
-the floor below.
+size they have in landscape. In a tall view the eye looks level, so a form
+stands in the upper middle with its image in the floor below.
 
 ### Moves
 

@@ -164,13 +164,12 @@ A view narrower than 16:9 would show too little of the room. So
 - The eye steps back: the distance grows by `need^0.35`, but stays inside
   the room.
 - The visible distance grows by half as much as the eye stepped back.
-- In a view as tall as a phone's, the eye looks level (`TALL.pitch`), and
-  the forms float up to 1.6 times higher over the floor (`TALL.rise`).
+- In a view as tall as a phone's, the eye looks level (`TALL.pitch`).
 
 Example: a phone held upright (9 : 19.5) is 3.85 times too narrow. The field
 of view opens from 76° to about 91°. The eye steps back from 10 to about 16
-units. It sees about 30% farther. It looks level, and the forms float 1.6
-times higher. At 16:9 and wider, nothing changes.
+units. It sees about 30% farther. It looks level. At 16:9 and wider,
+nothing changes.
 
 ## 3. One frame, step by step
 
@@ -602,14 +601,14 @@ pale palette (ice or candle); the lattice's light (`uLight`) and the rays
 apply as for every form. A LED outside the shape's box, or more than 2.5
 `w` outside its skin, costs one texture read or none.
 
-A baked form sits on the floor (the mirror shows it), its side to the
+A baked form rests on the layer of light (the mirror shows it), its side to the
 room, and sways about the vertical by up to 0.55 rad over about 140 s
 (`forms.js: baked`): its outline reads from the side, and a full turn
 would show it end-on. Like the orb, it has no move of its own to come and
 go (`forms.js: FADING`): its light fades in place, slowly, LED by LED
 (`SKY_IN_SLOW`, `SKY_OUT_SLOW`), and it grows from 0.75 of its size as it
-comes (`GROW`), its base kept on the floor; in a tall view, where the
-other forms float higher, it stays there (`onFloor`). It is one of the sky
+comes (`GROW`), its base kept on the layer of light, like the other forms
+(see How high a form floats). It is one of the sky
 forms, so it too shows only alone (see One form at a time). LEDs above the
 top of its shape in its box skip it before reading the field (the
 teapot fills only the lower half of its box).
@@ -784,6 +783,43 @@ its light is piled up along the line of sight, and it gives half as much
 (`shaders.js: ringLight`). The forms slowly turn to face the eye (eased
 over 5 s), and keep a little beyond their path as the eye sees them
 (`forms.js: BACK`).
+
+**How high a form floats.** A form rests on the layer of light. At the
+bottom of its bob, its lowest light that still shows clearly (a quarter of
+its brightest) meets the top of the layer's band as the eye sees it; at the
+top of its bob it floats a little over it (`forms.js: BOB`, 0.2 units). The
+band's top as seen is the layer's surface, plus the band's half thickness,
+plus its crests, which lie one behind another along the eye's way through
+the layer (`show.js: CRESTS`). Each layer has its own height
+(`config.js: LAYER`), so the forms rest on the layer that shows
+(`show.js: ground`): as it comes, goes or is replaced, the height moves
+with the layer's weight, so a form glides a little (at most about 0.8
+units, over the layer's fade) and never jumps. With no layer, a form rests
+on where a layer in the middle of the range would be (`REST`).
+
+Each form's own motion gives only how far above the lowest place of its
+path its centre is (`centre[1]`, 0 at the bottom of its bob), and how far
+below its centre its clearly visible light reaches now (`low`).
+`forms.js: motion` sets the centre at `ground + low` plus that height. For
+a rigid shape, `forms.js: lowestAt` gives the depth from its points
+(`figures.js`) in its pose: a solid rests on its lowest corner, and rocks a
+little as it turns, softly where one corner takes over from another
+(`SOFT`). The spiral rests on its rim at its lean, the orb on its rim as it
+breathes, a Lissajous knot on the bottom of its box. The ring rests on its
+rim upright and floats a little as it lies more level (half of its rim's
+rise), so it rolls a little as it tumbles and never floats far over the
+layer. The spinning knots (the Hopf link, the Moebius band) rest on their
+lowest point in their pose (`lowestSpun`, from the points round their rings
+or along the band's edge), so they rise and fall a little as they spin. The thin forms add the half thickness
+of their line (`ROD`, `THREAD`) or of a corner's point (`CORNER`). The
+veil, which is no rigid shape, states its own depth: its hem's lowest fold
+and the glow below it; a baked form, its base and its skin (the teapot, an
+easter egg held in the form slot, is drawn as a form and rests the same way).
+The clock, which faces the eye, keeps its lowest dots `CLEAR` over the same
+top of the band (`show.js: topOf`, see `egg-kinds.js: panel`). How far each
+light still shows clearly was measured on screen, from captures with the
+layer on and off at 1280x720, 390x844 and 1720x1960. Each form is sized so
+that its top stays in a 16:9 view.
 
 **The easter eggs come rarely.** From 10 minutes on, each form cast may
 be replaced by an easter egg of the rare slot (the teapot, the Penrose

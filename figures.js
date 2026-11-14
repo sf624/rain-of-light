@@ -2,7 +2,8 @@
 // (see show.js, variantOf): the solids (wireframes) and the knots (closed
 // curves, a link of two rings, a Moebius band). Their names are the
 // settings' options (config.js), their geometry the shader's tables
-// (shaders.js: SOLID, KNOT), their size and height the motions' (forms.js).
+// (shaders.js: SOLID, KNOT) and the motions' (forms.js: where each rests on
+// the layer of light), their size the motions' too.
 // The order is the shader's numbering.
 
 const TAU = Math.PI * 2;
@@ -29,7 +30,7 @@ function standing(points, axis) {
 // A solid from its corners: centred on `centre` (default: their middle),
 // scaled so that the farthest corner is 1 away, its edges the pairs of
 // corners `apart` away (default: the nearest pairs).
-function solidOf(name, { corners, axis, centre, apart, size, y }) {
+function solidOf(name, { corners, axis, centre, apart, size }) {
   const mid = centre || corners[0].map((_, i) => corners.reduce((s, p) => s + p[i], 0) / corners.length);
   let pts = corners.map((p) => sub(p, mid));
   const far = Math.max(...pts.map(len));
@@ -45,25 +46,25 @@ function solidOf(name, { corners, axis, centre, apart, size, y }) {
     const h = Math.min(1, Math.max(0, -dot(A, ba) / dot(ba, ba)));
     return len(A.map((v, k) => v + ba[k] * h));
   }));
-  return { name, corners: pts, edges, near, size, y };
+  return { name, corners: pts, edges, near, size };
 }
 
 const cube = [];
 for (const x of [-1, 1]) for (const yy of [-1, 1]) for (const z of [-1, 1]) cube.push([x, yy, z]);
 
-// The solids. size: how far its corners are from its centre (world units);
-// y: how high that centre floats (see forms.js: solid). Each stands on a
+// The solids. size: how far its corners are from its centre (world units).
+// Each stands on a
 // corner's axis and turns about it, leaning a little: no edge ever runs
 // along a strand.
 export const SOLIDS = [
   // A tetrahedron, point up.
   solidOf('tetrahedron', { corners: [[0, 1, 0], [0.94281, -0.33333, 0], [-0.47140, -0.33333, 0.81650], [-0.47140, -0.33333, -0.81650]],
-    centre: [0, 0, 0], size: 5.0, y: -3.7 }),
+    centre: [0, 0, 0], size: 4.2 }),
   // A cube on a corner.
-  solidOf('cube', { corners: cube, axis: [1, 1, 1], size: 4.5, y: -3.0 }),
+  solidOf('cube', { corners: cube, axis: [1, 1, 1], size: 3.3 }),
   // Two tetrahedra through each other (stella octangula), one point up, one
   // down: the diagonals of a cube's faces.
-  solidOf('star', { corners: cube, axis: [1, 1, 1], apart: 2 * Math.SQRT2, size: 4.8, y: -3.0 }),
+  solidOf('star', { corners: cube, axis: [1, 1, 1], apart: 2 * Math.SQRT2, size: 3.3 }),
 ];
 
 // The knots and links: closed curves, each part once round as t goes from 0
@@ -81,7 +82,8 @@ export const SOLIDS = [
 // band: a Moebius band about the axis that faces the room, R out from it
 //   and r wide each way (in units of size), seen aslant (lean, radians);
 //   it spins like the rings.
-// size: its half width, in world units; y: how high its centre floats (see forms.js: knot).
+// size: its half width, in world units. points: a rigid figure's points,
+// round its rings or along its band's edge, for where it rests (forms.js: knot).
 export const MOBIUS_RULINGS = 12;                 // the band's brighter straight lines, round it
 const turnPoint = ([x, y, z], yaw, tilt) => {
   const cy = Math.cos(yaw), sy = Math.sin(yaw);
@@ -102,16 +104,24 @@ function ringsOf(k) {
   // (It spins about z: its reach across and up is the farthest any point is from that axis.)
   const points = rings.flatMap((r) => Array.from({ length: 720 }, (_, i) => ringAt(r, TAU * i / 720)));
   const across = Math.max(...points.map(([x, y]) => Math.hypot(x, y))) * 1.001;
-  return { ...k, rings, reach: [across, across, (hi[2] - lo[2]) / 2 / half] };
+  return { ...k, rings, reach: [across, across, (hi[2] - lo[2]) / 2 / half],
+    points: rings.flatMap((r) => Array.from({ length: 48 }, (_, i) => ringAt(r, TAU * i / 48))) };
 }
+// A Moebius band's edge (see knotLight): at the angle phi about its axis, r
+// either way across from R out, turned phi / 2 out of its plane.
+const bandEdge = ({ R, r }) => Array.from({ length: 96 }, (_, i) => {
+  const phi = TAU * (i % 48) / 48, h = i < 48 ? r : -r;
+  const rho = R + h * Math.cos(phi / 2);
+  return [rho * Math.cos(phi), rho * Math.sin(phi), h * Math.sin(phi / 2)];
+});
 
 export const KNOTS = [
   // A Lissajous curve: twice across while once up and down (a figure of eight), three times in depth.
-  { name: 'lissajous', curve: 'lissajous', w: [2, 1, 3], box: [1, 0.9, 0.4], widest: 0, sway: 0.55, size: 4.6, y: -3.2 },
+  { name: 'lissajous', curve: 'lissajous', w: [2, 1, 3], box: [1, 0.9, 0.4], widest: 0, sway: 0.55, size: 4.05 },
   // Two rings, each through the other's centre, both aslant to the room.
   { name: 'hopf', curve: 'rings', rings: [{ centre: [-0.5, 0, 0], u: [1, 0, 0], v: [0, 1, 0] }, { centre: [0.5, 0, 0], u: [1, 0, 0], v: [0, 0, 1] }],
-    view: [0, Math.PI / 4], size: 5.0, y: -3.2 },
+    view: [0, Math.PI / 4], size: 3.6 },
   // A Moebius band: R out from its axis, r wide each way.
-  { name: 'mobius', curve: 'band', R: 0.66, r: 0.34, lean: 0.9, size: 5.2, y: -3.2 },
-].map((k) => (k.curve === 'rings' ? ringsOf(k) : k.curve === 'band' ? { ...k, reach: [k.R + k.r, k.R + k.r, k.r] }
+  { name: 'mobius', curve: 'band', R: 0.66, r: 0.34, lean: 0.9, size: 4.4 },
+].map((k) => (k.curve === 'rings' ? ringsOf(k) : k.curve === 'band' ? { ...k, reach: [k.R + k.r, k.R + k.r, k.r], points: bandEdge(k) }
   : { ...k, reach: k.box }));

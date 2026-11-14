@@ -361,6 +361,20 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
   const E = new Float32Array(SLOTS * 4), F = new Float32Array(SLOTS * 4);
   const tint = [...ROOM_TINT];
 
+  // The layer's surface height and its band's half thickness: each layer has
+  // its own. The forms rest on the top of its band as it is seen (ground, see
+  // motion in forms.js): its half thickness over its surface, and its crests
+  // with their glow, which lie one behind another along the eye's way through
+  // it (CRESTS, measured on screen; its waves rise 0.72 over its surface at
+  // most, see layerLight in shaders.js). They rest on it as far as it shows;
+  // with no layer, on one in the middle of its range (REST). So a form glides
+  // a little as a layer comes or goes, never jumps.
+  const CRESTS = 0.8;
+  const layerOf = (r) => ({ y: feet + between(...LAYER.height, hash(r * 61 + 1)), thick: between(...LAYER.thick, hash(r * 61 + 2)) });
+  const topOf = (r) => layerOf(r).y + layerOf(r).thick + CRESTS;
+  const REST = feet + between(...LAYER.height, 0.5) + between(...LAYER.thick, 0.5) + CRESTS;
+  let ground = REST;
+
   // Where a form is at its age, how large, how turned (see forms.js). The
   // forms follow the eye slowly as it moves (the way from the eye to a form: face).
   // Each layer has a height, a thickness and a brightness of its own.
@@ -371,17 +385,18 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
     const { form, r } = e;
     let m;
     if (form === LAYER) {                     // the layer: its surface height, its thickness
-      m = { centre: [0, feet + between(0.5, 1.8, hash(r * 61 + 1)), 0], size: between(0.2, 0.45, hash(r * 61 + 2)),
+      const { y, thick } = layerOf(r);
+      m = { centre: [0, y, 0], size: thick,
         turn: 0, tilt: 0, yaw: 0, f: [between(0.55, 1, hash(r * 61 + 3)), s.alone, LAYER_UNDER], dissolve: 0, bound: 1e4 };
     } else {
       const go = out ? { at: e.outAt - e.inAt, fade: e.outFade } : null;   // (its age as it began to go)
-      m = motion(form.name, age, w, go, r, s.face ?? 0, view?.rise, variantOf(e));
+      m = motion(form.name, age, w, go, r, s.face ?? 0, ground, variantOf(e));
       if (eye) {
         const goal = Math.atan2(m.anchor[0] - eye[0], m.anchor[2] - eye[2]);
         const turn = s.face === undefined ? 1 : 1 - Math.exp(-dt / 5);
         const d = goal - (s.face ?? goal);
         s.face = (s.face ?? goal) + (d - Math.round(d / (2 * Math.PI)) * 2 * Math.PI) * turn;
-        m = motion(form.name, age, w, go, r, s.face, view.rise, variantOf(e));
+        m = motion(form.name, age, w, go, r, s.face, ground, variantOf(e));
       }
     }
     A.set([form.type, w, m.size, m.turn], k * 4);
@@ -397,7 +412,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
     F.set([...m.f, m.bound], k * 4);
   }
 
-  // view: the camera ({ eye, rise }): the forms turn towards the eye, and float higher in a tall view.
+  // view: the camera ({ eye }): the forms turn towards the eye.
   // egg, rare: what the easter eggs ask (see wanted and eggs.js).
   let eggHeld = null;                         // the baked form an easter egg holds now (its name), if any
   function update(t, dt, view, egg = null, rare = 1) {
@@ -436,6 +451,9 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
     // if three would show at once (a quick change of setting), the faintest waits.
     // (An egg of the rare slot with a light of its own takes no slot: eggs.js draws it, see `egg` below.)
     const all = [...shown.values()].sort((a, b) => b.w - a.w);
+    const layers = all.filter((s) => s.x.e.form === LAYER).map((s) => ({ k: smooth(s.w), r: s.x.e.r }));
+    const lk = layers.reduce((n, l) => n + l.k, 0);
+    ground = REST + layers.reduce((n, l) => n + l.k * (topOf(l.r) - REST), 0) / Math.max(1, lk);
     const sky = all.filter((s) => s.x.e.form !== LAYER && !s.x.e.form.egg).slice(0, 2);
     const own = all.find((s) => s.x.e.form.egg && s.w > 0);
     const slots = [null, null, all.find((s) => s.x.e.form === LAYER)];
@@ -472,8 +490,9 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
     // flow: which way the rain goes now (see flowAt).
     // egg: the egg of the rare slot that shows in a form's place, with its own light ({ egg, w, age }), if any.
     const eggNow = own ? { egg: own.x.e.form.egg, w: own.w, age: own.x.age } : null;
-    // layer: the layer of light, how much it shows and the height of its surface (for the eggs, see egg-kinds.js).
-    const layer = slots[2] && slots[2].w > 0.001 ? { w: slots[2].w, y: B[9] } : null;
+    // layer: the layer of light, how much it shows and the top of its band as seen (topOf, the
+    // height the forms rest on; for the eggs, see egg-kinds.js).
+    const layer = slots[2] && slots[2].w > 0.001 ? { w: slots[2].w, top: topOf(slots[2].x.e.r) } : null;
     return { rain: rainNow, storm: rainNow * skyNow, A, B, C, D, E, F, tint, forms, flow: want.flow, egg: eggNow, layer };
   }
 

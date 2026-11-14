@@ -92,8 +92,10 @@ function facing(ctx, { w, h, t0, D0, lift, lo, hi }) {
 // n: a bar's length in units of its width (a face is one unit wide); thick: the
 // slab's half thickness in LED spacings; size: its circumradius as seen (tan);
 // roll: one turn in this long (s); breathe: its
-// period (s); come: s to come; tones: one step round in this long (s).
-const TRI = { n: 5, thick: 1.25, size: 0.36, roll: 200, breathe: 16, come: 7, tones: 30 };
+// period (s); come: s to come; tones: one step round in this long (s); tall: in a view as
+// tall as a phone's (camera.tall 1, see viewFit in main.js), which has room above the
+// horizon, it stands this share higher above the middle of the view.
+const TRI = { n: 5, thick: 1.25, size: 0.36, roll: 200, breathe: 16, come: 7, tones: 30, tall: 0.6 };
 // The three tones: a light face, a middle one and a dark one (as a drawing shades it).
 const TONES = [[1.0, 0.86, 0.62], [1.0, 0.42, 0.45].map((x) => x * 0.62), [0.35, 0.5, 1.0].map((x) => x * 0.4)];
 // The figure's circumradius in units: its farthest corner from its middle (in
@@ -115,7 +117,7 @@ registerEgg({
     const g = eased(s.age, TRI.come);
     const breath = 1 + 0.03 * Math.sin((g / TRI.breathe) * Math.PI * 2);
     const lane = ctx.lane[0];
-    const fit = facing(ctx, { w: 1, h: 1, t0: TRI.size * breath, D0: FAR, lift: 0.2 * (ctx.fov / 2) * (ctx.camera.rise ?? 1),
+    const fit = facing(ctx, { w: 1, h: 1, t0: TRI.size * breath, D0: FAR, lift: 0.2 * (ctx.fov / 2) * (1 + TRI.tall * (ctx.camera.tall ?? 0)),
       lo: -ctx.HEIGHT / 2 + 0.3, hi: ctx.HEIGHT / 2 - 0.3 });
     const unit = fit.unit / CIRCUM;                      // a face's width (a cube's edge, as drawn)
     const roll = Math.PI / 2 + (g / TRI.roll) * Math.PI * 2;   // (a corner on top as it comes)
@@ -140,6 +142,9 @@ registerEgg({
 // or two lines of up to 5 glyphs, each line with its own top left corner. It
 // stands where it fits whole above the floor (and above the layer of light,
 // while the layer shows), as large as fits.
+// CLEAR: how far its lowest dots keep above the top of the layer's band (show.js: topOf, where
+// the forms rest), so that the band stays well below the glyphs.
+const CLEAR = 1.875;
 const CODE = { ':': 10, ' ': 15 };
 const pack = (text) => [0, 1, 2, 3, 4].reduce((n, i) => n + (i < text.length ? CODE[text[i]] ?? Number(text[i]) : 15) * 16 ** i, 0);
 // lines: { text, y } (y: its top, in dots from the middle, down); w, h: the panel's half width and height in dots.
@@ -147,8 +152,8 @@ function panel(out, ctx, lines, { colour, w, h, share }) {
   const lane = ctx.lane[0];
   const tanW = Math.tan(Math.atan(Math.tan(ctx.fov / 2) * ctx.camera.aspect));
   const feet = -ctx.HEIGHT / 2;
-  // (the layer's band: its surface's swell and glow reach about this far above its middle)
-  const lo = Math.max(feet + 0.4, ctx.layer ? feet + 0.4 + (ctx.layer.y + 3.0 - feet - 0.4) * ctx.layer.w : -Infinity);
+  // (above the layer: CLEAR over the top of its band as seen, show.js: topOf)
+  const lo = Math.max(feet + 0.4, ctx.layer ? feet + 0.4 + (ctx.layer.top + CLEAR - feet - 0.4) * ctx.layer.w : -Infinity);
   const fit = facing(ctx, { w, h, t0: (share * tanW) / w, D0: FAR, lift: 0.15 * (ctx.fov / 2), lo, hi: ctx.HEIGHT / 2 - 0.4 });
   // It stands upright, as the strands do (so each dot is drawn by whole pieces of strands, and the
   // glyphs stay crisp however high it stands), as tall in the room as the facing panel would be.
