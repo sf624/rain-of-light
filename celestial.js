@@ -1,5 +1,5 @@
-// The celestial bodies: one form of light (config.js: FORMS, celestial)
-// whose variants are bodies of the sky (config.js: BODIES), one per
+// The celestial bodies: one family of forms of light (config.js: FORMS, celestial)
+// whose shapes are bodies of the sky (config.js: BODIES), one per
 // appearance: the ringed planets Saturn and Uranus (planets.js) and a black
 // hole (blackhole.js). Each body has colours of its own, in place of the
 // palettes of the other forms, and is of a kind (`kind`): the bodies of one

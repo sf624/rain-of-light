@@ -62,7 +62,7 @@ with `wire=1&rest=0.1` (strand), `wire=0&rest=0.1&size=0.03` (LED, cut out),
 `t=60` (a storm passage of the whole show);
 `rain=off&form=orb&layer=off&t=30` (form);
 `rain=off&form=none&layer=on&t=30` (layer);
-`rain=off&form=knot&knot=lissajous&layer=off&t=30` (knot);
+`rain=off&form=lissajous&layer=off&t=30` (knot);
 `rain=off&form=none&layer=off&t=30` and a click (ripple);
 `rain=off&form=orb&layer=off&t=30&mirror=1` (mirror image, lower half).
 
@@ -102,7 +102,7 @@ The site has two pages, with the same picture, keys and URL parameters:
 
 ![The viewer page's small panel at the lower right: Rain, Form, Colour mode, Brightness, Quality and four sound levels, and the GitHub link](img/viewer-panel.jpg)
 
-![The lab's panel open on the right of the picture: Rain, Form, Which solid, Which knot, Which celestial body, Layer of light, the mirror sliders and more, each row with its default; Twinkle is not at its default, and is marked](img/panel.jpg)
+![The lab's panel open on the right of the picture: Rain, Form, Layer of light, the mirror sliders and more, each row with its default; Twinkle is not at its default, and is marked](img/panel.jpg)
 
 The gear button or the `p` key opens the panel; a link that ends in
 `#tune` opens the page with it (`lab.html#tune`: the lab with its panel
@@ -199,10 +199,7 @@ things that are not in the panel:
 | Panel | URL key | Values | Default | What you see |
 | --- | --- | --- | --- | --- |
 | **Rain** | `rain` | `auto`, `on`, `off` | `auto` | `auto`: rain comes and goes with the show. `on`: rain always falls, and never ends. `off`: no rain; the forms of light have the room, on a timeline of their own. A change eases the rain in or out over a few seconds. |
-| **Form** | `form` | `auto`, `orb`, `spiral`, `ring`, `veil`, `solid`, `knot`, `celestial`, `none` | `auto` | `auto`: forms of light come and go with the show. A name holds that form for good. `none`: no form. A change fades the form that shows out over 4 s; the next fades in once it has gone. |
-| Which solid | `solid` | `auto`, `tetrahedron`, `cube` | `auto` | `auto`: each time the solid comes, another of its figures (see [Forms](#forms)). A name: always that one. |
-| Which knot | `knot` | `auto`, `lissajous`, `hopf`, `mobius` | `auto` | As for the solid. |
-| Which celestial body | `celestial` | `auto`, `saturn`, `uranus`, `blackhole` (black hole) | `auto` | As for the solid. |
+| **Form** | `form` | `auto`, `none`; a shape: `orb`, `spiral`, `ring`, `veil`, `tetrahedron`, `cube`, `lissajous`, `hopf`, `mobius`, `saturn`, `uranus`, `blackhole`; a family: `solid`, `knot`, `celestial` | `auto` | `auto`: forms of light come and go with the show. A shape's name holds that shape for good. A family's name (in the panel: any solid, any knot, any celestial body) holds one of its shapes for good, the one the seed picks. `none`: no form. The panel lists `auto` and `none`, the four shapes of their own, then each family under its heading (see [Forms](#forms)). A change fades the form that shows out over 4 s; the next fades in once it has gone. |
 | Layer of light | `layer` | `auto`, `on`, `off` | `auto` | `auto`: the layer comes and goes with the show (about 70% of the time). `on` holds it, `off` removes it. |
 | Floor mirror (0: off) | `mirror` | 0 to 1 | `0.6` | How bright the image in the floor is. |
 | Wall mirrors (copies per side) | `walls` | 0 or 1 | `0` | `1`: the room repeats beyond its walls, one copy on each side. Each copy draws the lattice again, so it is costly. |
@@ -223,7 +220,7 @@ falls through an orb.
 Rain and Form together choose what plays. Each `auto` lets the show
 decide that part; the others pin it.
 
-| Rain \ Form | `auto` | a form's name | `none` |
+| Rain \ Form | `auto` | a shape or a family | `none` |
 | --- | --- | --- | --- |
 | `auto` | The whole show: rain, forms, rain through a form, still rooms and sideways rain come and go (the passages below). | The form held for good; the show's rain comes and goes around it, sideways now and then. | Passages of rain (sideways now and then) and still rooms take turns. |
 | `on` | Rain that never ends, with the whole show's forms coming and going through it: a lasting storm. | The form held in rain that never ends. | Rain that never ends, and no form (the layer when it comes). |
@@ -264,8 +261,8 @@ top down, as if rain gathered into it or ran off it as rain.
 ![The seven forms alone in the still room: an amber orb, a blue spiral, an amber ring, a green veil, a pale cube of lines, a green knot and Saturn in its rings; the eighth picture, form=none, is the empty room](img/forms.jpg)
 
 Query: `rain=off&layer=off&t=30` with `form=orb`, `form=spiral`,
-`form=ring&t=60` (its face to the room), `form=veil`, `form=solid&solid=cube`,
-`form=knot&knot=lissajous`, `form=celestial&celestial=saturn` and `form=none`.
+`form=ring&t=60` (its face to the room), `form=veil`, `form=cube`,
+`form=lissajous`, `form=saturn` and `form=none`.
 
 Each form comes and goes where it floats, in a way of its own: none rises
 out of the floor or sinks into it. Its light fades in LED by LED over
@@ -295,10 +292,14 @@ in its own way, and the floor shows each move:
   it; its lower hem is a bright line that rises and falls, with rays of
   many heights above it. It goes by lifting away upward.
 
-Two forms come from mathematics. They come a little less often than the
-four above. Each time one comes, it is one of its figures for its whole
-life: never the figure it was the time before, and over an hour each
-figure about as often as the others.
+Each form is a family of shapes: the orb, the spiral, the ring and the
+veil are each a family of one. The show chooses a family, and the family
+chooses how often it comes and which of its shapes it is: each time it
+comes, one of its shapes for its whole life, never the shape it was the
+time before, and over an hour each shape about as often as the others.
+
+Two families come from mathematics, the solid and the knot. They come a
+little less often than the four above.
 
 - **solid**: the edges of a solid as rods of light, with a bright point at
   each corner: a tetrahedron (`tetrahedron`) or a cube (`cube`). Its corners come first, as bright points; the edges are drawn
@@ -314,15 +315,14 @@ figure about as often as the others.
   which line passes in front where two cross. A knot is drawn once round
   as it comes (a link: all its rings at once), and undone as it goes.
 
-![The figures of the two forms of mathematics: the solid's tetrahedron and cube; the knot's Lissajous figure, Hopf link and Möbius band](img/figures.jpg)
+![The shapes of the two families of mathematics: the solid's tetrahedron and cube; the knot's Lissajous figure, Hopf link and Möbius band](img/figures.jpg)
 
-Query: `rain=off&layer=off&t=40` with `form=solid&solid=tetrahedron`,
-`solid=cube`; `form=knot&knot=lissajous`, `knot=hopf`,
-`knot=mobius`.
+Query: `rain=off&layer=off&t=40` with `form=tetrahedron`, `form=cube`,
+`form=lissajous`, `form=hopf` and `form=mobius`.
 
-One form is a celestial body (`form=celestial`), about as often as the
-orb. Each time it is one of its bodies, never the same twice in a row: a
-ringed planet,
+One family is the celestial bodies (`form=celestial`, any celestial
+body), about as often as the orb. Each time it is one of its bodies, never
+the same twice in a row: a ringed planet,
 
 - **Saturn**: a pale gold ball with soft bands, in broad rings: the faint
   dusky C ring next to the ball, the bright cream B ring, the dark Cassini
@@ -368,16 +368,20 @@ or
 
 ![Saturn, a pale gold ball in broad cream and grey rings seen a little from above, the near rings crossing in front of the ball; Uranus, a pale cyan ball with thin rings standing round it; a black hole, a dark round heart in an orange disc tilted aslant, with an arch of light over the heart and pale jets on the diagonal](img/celestial.jpg)
 
-Query: `rain=off&layer=off&t=45` with `form=celestial&celestial=saturn`,
-`celestial=uranus` and `celestial=blackhole`.
+Query: `rain=off&layer=off&t=45` with `form=saturn`, `form=uranus` and
+`form=blackhole`.
 
 A planet's rings turn their face to you and open and close a little,
 slowly, but never close to a line; the ball turns, its bands drifting. It
 comes as a thin crescent that waxes as the sun comes round from behind
 it, while its rings spread out from the ball, and goes the same way back.
-Each body has colours of its own, not palettes. The lab's Which
-celestial body pins one (`celestial=saturn`). Links that name the planet
-(`form=planet`, `planet=saturn`) show the celestial body.
+Each body has colours of its own, not palettes.
+
+Links that choose a shape with its family's own key (`form=knot&knot=hopf`,
+`form=celestial&celestial=saturn`, `form=planet&planet=saturn`) show that
+shape, and saved settings that do so are rewritten once as Form's shape;
+with any other Form, such a key is ignored. `form=planet` is any celestial
+body.
 
 Each form takes its colours from a few palettes of its own
 (`config.js: FORMS`). The forms keep a little beyond the middle of the room
@@ -852,7 +856,7 @@ fades:
   it is seen (it follows the form as it moves): the orb a warm, low hum, the
   spiral a slow figure of notes that climbs and turns, the ring a clear, glassy tone, the veil a soft, open air,
   the solid a still chord of pure fifths, the knot two tones that beat
-  against each other. Each form keeps its voice whichever figure it shows; a planet
+  against each other. Each form keeps its voice whichever of its shapes it shows; a planet
   has the orb's warm hum, the black hole a low, slow drone, with a faint
   high tone as its jets grow.
   As it leaves, the harmony comes home to D.

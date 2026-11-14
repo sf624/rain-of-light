@@ -28,7 +28,7 @@
     {
       "name": "knot",
       "seed": 1,
-      "q": "rain=off&form=knot&knot=lissajous&layer=on&seed=1&t=40&orbit=0.05&leds=1000"
+      "q": "rain=off&form=lissajous&layer=on&seed=1&t=40&orbit=0.05&leds=1000"
     },
     {
       "name": "veil",

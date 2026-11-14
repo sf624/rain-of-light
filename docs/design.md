@@ -575,16 +575,18 @@ itself: a planet's are its ball's two and its rings' two, the black
 hole's its disc's two and its jets' (`config.js: BODIES`).
 
 **The celestial body.** The celestial body (`celestial`, shown as
-"celestial body") is a form whose variants are bodies of the sky
-(`config.js: BODIES`): each time it comes it is one of them, Saturn,
-Uranus (ringed planets) or a black hole. A body is of a kind (`kind`:
-`planet` or `hole`) and has its own four colours in place of palettes,
-the room's tint and the layer's palettes under it, and the voice it sings
-with. It is the form's figure, picked and pinned like the solid's
-(`variants`; `?form=celestial&celestial=saturn`). The HUD's forms row
-shows the body also where a form shows its palette. Old links and saved
-settings that name the planet (`form=planet`, `planet=saturn`) are read
-as the celestial body (`config.js: RENAMED`, `tuner.js: loadSettings`).
+"celestial body") is a family whose shapes are bodies of the sky
+(`config.js: BODIES`, its `members`): each time it comes it is one of
+them, Saturn, Uranus (ringed planets) or a black hole. A body is of a kind
+(`kind`: `planet` or `hole`) and has its own four colours in place of
+palettes, the room's tint and the layer's palettes under it, and the
+voice it sings with. It is picked like any family's shape, and held by its
+own name (`?form=saturn`; `?form=celestial` holds one the seed picks).
+The HUD's forms row shows the body also where a form shows its palette.
+Old links and saved settings that name the planet (`form=planet`,
+`planet=saturn`), or choose a body with the family's own key
+(`form=celestial&celestial=saturn`), are read as Form's family or body
+(`config.js: RENAMED`, `tuner.js: loadSettings`).
 
 - *Its own programs* (`celestial.js`). A body's code is in the points'
   shader only while a body shows, and there in place of the other sky
@@ -626,10 +628,11 @@ as the celestial body (`config.js: RENAMED`, `tuner.js: loadSettings`).
   `BodyThread`) and `bodyShade` (what is left of any light behind it: 1
   but for the black hole). A new kind is a module with its GLSL, one
   entry in `celestial.js: KINDS`, its move in `forms.js: KIND_MOVES`, and
-  its bodies in `BODIES`.
+  its bodies in `BODIES` (a new body of a kind is one entry there: the Form
+  setting, its list and the tools follow from it).
 - *Casting.* It comes as often as its weight, 0.8, gives (as much as the
-  solid and the knot together); its bodies come in rounds like a solid's
-  figures: each round has every body once, in a shuffled order, never the
+  solid and the knot together); its bodies come in rounds like any family's
+  shapes: each round has every body once, in a shuffled order, never the
   same twice running. It has no palette, so it takes no part in the
   colour story; the layer under it takes the body's `under` palettes.
   A planet sings with the orb's voice, the black hole with its own (the
@@ -647,11 +650,11 @@ with a size, a spin and its rings; its light is `planetLight`.
   per strand gap, and the far side would show through it). Saturn has
   pale zones and tan belts whose edges wave, so they drift as it turns;
   Uranus is pale cyan, a little deeper to its poles.
-- *The rings.* Each variant's rings are a list of bands (`rings`: from,
+- *The rings.* Each planet's rings are a list of bands (`rings`: from,
   to, density, tone, in radii as the real planet's), spread out from the
   innermost edge by `stretch` (Saturn's 1.45 times: wider than the real
   rings, so they are the star of the form). `planets.js:
-  createRingMap` bakes them into a texture (unit 6), a row per variant:
+  createRingMap` bakes them into a texture (unit 6), a row per body:
   density and tone along the radius; broad bands get ringlets (a smooth
   noise along the radius), and a band narrower than the lattice is
   widened to 0.6 of a strand gap, so a thin ring (Uranus's, Saturn's F
@@ -682,7 +685,7 @@ with a size, a spin and its rings; its light is `planetLight`.
 - *Facing the eye* (`forms.js: planet`). The rings turn their face to the
   eye: each frame, `planets.js: planetFrame` works out their axis and the
   sun from where the eye is (the same for the images in the mirrors), so
-  that they open to it by `open` (between the variant's two, slowly to
+  that they open to it by `open` (between the body's two, slowly to
   and fro over 75 s), whatever the camera does: never edge-on. They
   reach the shader as `uFormN`, `uFormS` and `uFormT` (a way across the
   axis, turning with the ball). Saturn stands upright,
@@ -972,17 +975,26 @@ another, from hashes of the seed and the passage's number:
   Over an hour a form comes about 36 times: each of the first four about
   5.4 times, the solid and the knot about 4, the celestial body about 5
   (`tools/story-stats.mjs`).
-- A form with figures (the solid, the knot; the celestial bodies) is each time one of them for
-  its whole life (`show.js: figureOf`). They come in
-  rounds: each round has every figure once, in an order shuffled from the
-  passage's hash, and never begins with the figure the last round ended
-  on. So no figure comes twice running, and each comes about as often as
-  the others (the knot's about 1.4 times an hour each, the solid's about
-  2, the celestial bodies about 1.7: a fourth body would bring each to
-  about 1.3). An egg that takes a form's place uses
-  none of its figures (in a celestial body's place, which has no palettes, it
-  takes the orb's). The lab can pin one (`solid=`, `knot=`, `celestial=`;
-  `show.js: variantOf`).
+- Each form is a family of shapes (`config.js: FORMS`, `members`): the
+  orb, the spiral, the ring and the veil are families of one; the solid's
+  shapes are the solids, the knot's the knots (`figures.js`), the celestial
+  body's the bodies (`config.js: BODIES`). The casting above chooses
+  families; a family only decides how often it comes (its weight) and in
+  what turns its shapes come. One mechanism serves every family
+  (`show.js: shapeIn`): each time it comes it is one of its shapes for its
+  whole life, in rounds: each round has every shape once, in an order
+  shuffled from the passage's hash, and never begins with the shape the
+  last round ended on. So no shape comes twice running, and each comes
+  about as often as the others of its family (the knot's about 1.4 times
+  an hour each, the solid's about 2, the celestial bodies about 1.7: a
+  fourth body would bring each to about 1.3); a family of one is its shape
+  every time. An egg that takes a form's place uses none of its shapes (in
+  a celestial body's place, which has no palettes, it takes the orb's).
+- The Form setting names a shape or a family, each by a name of its own
+  (`config.js: CHOICES`, `formNames`, which refuses two things of one
+  name): a shape is held for good, as the shape it is (`?form=hopf`); a
+  family is held as the shape the seed picks (`?form=knot`; `show.js:
+  holdOf`).
 
 The Rain setting chooses the timeline (`show.js: POOLS`, `timelineFor`):
 `auto` and `on` play the whole show's (`all`, every passage); `off` plays
@@ -1244,7 +1256,7 @@ The layers:
   pair that beats very slowly, swelling late, and a faint high fifth
   three octaves over that comes later still, as its jets grow),
   and a baked form the ring's glassy tone, softer, with the chord's third
-  over it, on D. The voice is the form's, whichever figure it shows; a celestial body sings with the voice its body names (`config.js: BODIES`, `voice`): a planet with the orb's, the black hole with its own.
+  over it, on D. The voice is the form's, whichever of its shapes it shows; a celestial body sings with the voice its body names (`config.js: BODIES`, `voice`): a planet with the orb's, the black hole with its own.
   The veil also gets a little high noise (`AIRY`).
 - **Pale drops.** In a still room a high, soft note falls now and then.
 - **Reverb.** A 6 s convolution reverb (`impulse`), then a compressor.
@@ -1477,7 +1489,7 @@ GitHub link shows.
 | `show.js` | The show's timeline of passages, fades, casting into slots, form colours, the rain's direction over time. |
 | `forms.js` | How each form moves through its life: centre, size, turn, tilt, its own measures, reach. |
 | `fields.js` | The baked forms' fields: the 3D texture, fetching a field when its form draws near, `able`. |
-| `figures.js` | The figures of the solid and the knot: names, corners and edges, curves, sizes and heights (one per life). |
+| `figures.js` | The shapes of the solid and the knot: names and labels, corners and edges, curves, sizes and heights (one per life). |
 | `celestial.js` | The celestial bodies: their kinds, and the programs they show with (`bodyShader`, `BODY_GLSL`). |
 | `blackhole.js` | The black hole: its measures (`BH`) and the shader's `holeLight` and its shadow. |
 | `planets.js` | The ringed planets: their rings' extent and lowest light, and the shader's `planetLight`. |
@@ -1550,10 +1562,13 @@ Details and commands are in [development.md](development.md).
   the viewer page's Reset clears), rain alone in the lab and no rain
   (with the same click, keys and Reset), rain that never ends with a form
   through it, a seeded time with and without the story, four of the forms
-  held, a celestial body held (Saturn and the black hole in the lab, each
-  drawn by its kind's own programs, and by a name it does not have), and `?jitter=pitch`; that a `scene=` in a link or in saved
-  settings is read as Rain, Form and Layer; and that `form=planet` and
-  `planet=` are read as the celestial body. It then renders the sound: a held orb must be
+  held, knots and celestial bodies held by their own names (Saturn and the
+  black hole in the lab, each drawn by its kind's own programs), an old
+  link's body or solid that no longer exists, and `?jitter=pitch`; that a `scene=` in a link or in saved
+  settings is read as Rain, Form and Layer; that `form=planet`, `planet=`,
+  `solid=`, `knot=` and `celestial=` are read as Form's family or shape;
+  that Form's names are one per thing; and that its list groups each
+  family under its heading. It then renders the sound: a held orb must be
   audible, a still room at least 3 dB quieter, and neither may clip. The
   `test` workflow runs it on every pull request and push to main.
 - **`test/render-audio.mjs`** renders the page's real sound for a seed and a

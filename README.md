@@ -67,7 +67,7 @@ also go in the URL, on either page. A few that people use:
 | `?rain=on&form=none&layer=off` | only the rain |
 | `?rain=on` | rain that never ends, the forms coming and going through it |
 | `?rain=off` | only the forms of light |
-| `?form=orb` | always the orb (also `spiral`, `ring`, `veil`, `solid`, `knot`, `celestial`, `none`) |
+| `?form=orb` | always the orb (also any shape by its name, such as `hopf` or `saturn`; a family, such as `knot`: one of its shapes; `none`) |
 | `?color=cloud&weather=drizzle` | a colour mode and a weather |
 | `?seed=7&t=120` | one order of the show, from 2 minutes in |
 | `?breath=off` | no breathing swell of the light |

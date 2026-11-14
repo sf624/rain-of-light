@@ -61,11 +61,17 @@ export function createTuner({ schema, lab = false, settings, defaults, storageKe
       let input, out = null;
       if (item.options) {
         input = document.createElement('select');
+        let list = input;   // where the options go: the select, or the heading's group they come under
         item.options.forEach((opt, i) => {
+          if (item.heads?.[opt]) {
+            list = document.createElement('optgroup');
+            list.label = item.heads[opt];
+            input.append(list);
+          }
           const o = document.createElement('option');
           o.value = opt;
           o.textContent = item.labels?.[i] ?? opt; // a plain name, when the value is not one
-          input.append(o);
+          list.append(o);
         });
         input.addEventListener('change', () => set(item.key, input.value));
       } else {
@@ -290,10 +296,12 @@ export function viewerSchema(schema) {
 }
 
 // Old names (see RENAMED in config.js) turned into the new ones, in place:
-// an old key's value goes to its new key (unless that is set too), and an
-// old value of a key becomes its new value. get, set, del: the store's own
-// (the URL's or the saved settings'). Whether anything changed.
-function rename(renamed, get, set, del) {
+// an old key's value goes to its new key (unless that is set too), an old
+// value of a key becomes its new value, and an old key that chose a shape of
+// the family a key names gives the key that shape, then goes. get, set, del:
+// the store's own (the URL's or the saved settings'); now: a key's value
+// where the store has none (for the URL: the saved one). Whether anything changed.
+function rename(renamed, get, set, del, now = () => undefined) {
   let changed = false;
   for (const [old, key] of Object.entries(renamed.keys ?? {})) {
     if (get(old) === undefined) continue;
@@ -304,6 +312,15 @@ function rename(renamed, get, set, del) {
   for (const [key, values] of Object.entries(renamed.values ?? {})) {
     const v = get(key);
     if (v !== undefined && Object.hasOwn(values, v)) { set(key, values[v]); changed = true; }
+  }
+  for (const [key, olds] of Object.entries(renamed.into ?? {})) {
+    for (const [old, shapes] of Object.entries(olds)) {
+      const v = get(old);
+      if (v === undefined) continue;
+      if ((get(key) ?? now(key)) === old && shapes.includes(v)) set(key, v);
+      del(old);
+      changed = true;
+    }
   }
   return changed;
 }
@@ -330,7 +347,7 @@ export function loadSettings(defaults, storageKey, params, scenes = {}, renamed 
     if (changed) localStorage.setItem(storageKey, JSON.stringify(saved));
   } catch { /* nothing saved, or storage blocked */ }
   params = new URLSearchParams(params);
-  rename(renamed, (k) => params.get(k) ?? undefined, (k, v) => params.set(k, v), (k) => params.delete(k));
+  rename(renamed, (k) => params.get(k) ?? undefined, (k, v) => params.set(k, v), (k) => params.delete(k), (k) => settings[k]);
   for (const key of Object.keys(defaults)) {
     if (!params.has(key)) continue;
     const raw = params.get(key);

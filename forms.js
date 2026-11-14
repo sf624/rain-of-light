@@ -324,7 +324,7 @@ export const FADING = new Set(['orb', ...BAKED.map((egg) => egg.name)]);
 // ground: the height the forms rest on, the top of the layer's band (see
 // show.js): at the lowest of its path (centre[1] 0), a form's lowest light
 // (low below its centre) just touches it.
-// v: which of its figures it is (the solid, the knot, see figures.js; the celestial body).
+// v: which of its family's shapes it is (the solid's, the knot's, see figures.js; the celestial body's, BODIES).
 // eye: where the eye is, for a form that shows itself to it (a planet's frame).
 // sight: how the show's own camera sees the form ({ rise: how far it looks up at it, az: from which way }, rad; the black hole stands its disc for it).
 export function motion(name, age, w, go, r, face, ground, v = 0, eye = null, sight) {
