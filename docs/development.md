@@ -33,6 +33,7 @@ reload.
 | `fields.js`, `fields/` | the baked forms' fields of distance (`fields/*.bin`), fetched only when one is about to show (see Baking a form's field) |
 | `figures.js` | the figures of the solid and the knot: their names, corners and edges, curves, sizes |
 | `planets.js` | the planet: its rings, its lowest light and its shader |
+| `comet.js` | the comet (a variant of the planet): its tails, its lowest light and its shader |
 | `shaders.js` | the GLSL shaders: the points of light, bloom and tone mapping |
 | `lattice.js` | the strands and LEDs, and the order in which they thin out |
 | `gl.js` | WebGL helpers and vector maths |
@@ -136,7 +137,7 @@ about 11 s to 3 s. It visits:
 - rain alone (`rain=on&form=none&layer=off`, in the lab) and no rain
   (`rain=off`), both with the click, keys and Reset; rain that never ends
   with a form through it (`rain=on&seed=1&t=60`); a time part-way through the show
-  (with and without the colour story), four of the forms held, the planet held (Saturn in the lab, and
+  (with and without the colour story), four of the forms held, the planet held (Saturn and the comet in the lab, and
   a planet name it does not have, which falls back to auto),
   `?jitter=pitch`, two easter eggs pinned (penrose, and the teapot with its
   field; `form=teapot` falls back to `auto`), and the lab's clock (opened paused, it stands still;

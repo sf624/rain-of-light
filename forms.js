@@ -21,6 +21,8 @@
 import { BAKED, PLANETS } from './config.js';
 import { SOLIDS, KNOTS } from './figures.js';
 import { planetLow, planetReach, planetFrame, ringsOut } from './planets.js';
+import { cometLow, cometReach } from './comet.js';
+import { sub, dot, norm } from './gl.js';
 
 // A form's lowest light is where it still shows clearly: a quarter of its
 // brightest, as measured on screen. The thin forms' light around their line
@@ -231,6 +233,7 @@ const CRESCENT = 2.7;                               // the phase angle as it beg
 const OPEN_TURN = 75;                               // s: its rings open and close once in this time
 function planet(age, w, leave, ph, face, go, variant = 0) {
   const P = PLANETS[variant] || PLANETS[0], drift = 1.6;
+  if (P.comet) return comet(P.comet, age, leave, ph, face);
   const wax = smooth(age / 22) * (1 - smooth(leave * 1.1));
   const low = planetLow(P), phase = CRESCENT + (P.phase - CRESCENT) * wax;
   const open = P.open[0] + (P.open[1] - P.open[0]) * (0.5 + 0.5 * Math.sin(TAU * age / OPEN_TURN + ph));
@@ -241,6 +244,58 @@ function planet(age, w, leave, ph, face, go, variant = 0) {
     f: [variant, phase, ringsOut(P, smooth(age / 18) * (1 - smooth(leave * 1.15)))],
     frame: (centre, eye) => planetFrame(P, centre, eye, open, roll, phase, P.spin * age + ph),
     bound: planetReach(P),
+  };
+}
+
+// A comet (the planet's variant `comet`, see comet.js): it crosses the room
+// on a gentle arc, as the eye sees it, coming nearer as it goes: it comes far
+// away as a faint star, a little over its way's lowest place, brightens and
+// grows its tails as it nears its sun, and slows as it nears the end of its
+// way (it stays as long as its passage, which it does not know). Its sun is
+// a point (C.sun, out of the picture to the side it crosses to, below it
+// and a little nearer the eye), so its tails point away from it: across the
+// view, rising a little, their far ends receding, and they swing a little
+// as it passes. Its dust tail lags behind along its way (opposite its
+// motion, across the way from the sun), in a plane turned towards the eye
+// (C.open), so that the two tails part. It goes by sailing on and away,
+// dimming, its tails drawn in. Which way it crosses is each time's own
+// (ph). It rests at its way's lowest place on its lowest light (see
+// cometLow).
+// across: its place across the view and away from the eye (see motion).
+// size: its coma's radius; f[1]: how bright its tails are (0 .. 1); f[2]:
+// how bright its head is (0 .. 1). frame: the way from its sun (n), the
+// side its dust tail lags on (sun), and its tails' lengths and brightness (t).
+function comet(C, age, leave, ph, face) {
+  const dir = ph < Math.PI ? 1 : -1;                // across to the right, or to the left
+  const way = (a) => 1 - Math.exp(-a / C.cross);    // how far along its way it has come (0 .. 1)
+  const go = smooth(leave) ** 2;
+  // Its place in the eye's frame: across (to the right), up (over its way's lowest place), away.
+  const at = (u) => [dir * (C.from + (C.to - C.from) * u + C.away[0] * go),
+    C.arc * (1 - u) ** 2 + C.away[2] * go, C.depth[0] + (C.depth[1] - C.depth[0]) * u + C.away[1] * go];
+  const u = way(age), p = at(u), dp = sub(at(1), at(0));   // (its way as a whole)
+  const sun = [dir * C.sun[0], C.sun[1], C.sun[2]];
+  const toSun = sub(p, sun), far = Math.hypot(...toSun);
+  const A = toSun.map((x) => x / far);              // the way from its sun
+  // The side its dust lags on: behind its motion, across A, turned towards
+  // the side across A that turns the tails' plane most towards the eye (z:
+  // away from it), and always the side that bends it towards the level
+  // (never towards the vertical, and it never flips).
+  const facing = norm(cross(A, [0, 0, 1])).map((x, _, v) => x * (v[1] * A[1] > 0 ? -1 : 1));
+  const behind = sub(A.map((x) => x * dot(dp, A)), dp), lag = norm(behind.map((x) => x * (dot(behind, facing) < 0 ? -1 : 1)));
+  const G = norm(lag.map((x, i) => x * (1 - C.open) + facing[i] * C.open));
+  const grown = smooth(age / 30) * (1 - smooth(leave * 1.25));
+  const tails = grown * Math.max(0, Math.min(1, (C.near[1] - far) / (C.near[1] - C.near[0])));
+  const ion = C.ion[0] * (0.25 + 0.75 * tails), dust = C.dust[0] * (0.2 + 0.8 * tails);
+  // The eye's frame in the room: across, up, away (face: the way from the eye).
+  const sf = Math.sin(face), cf = Math.cos(face);
+  const room = (v) => [-v[0] * cf + v[2] * sf, v[1], v[0] * sf + v[2] * cf];
+  const n = room(A), lagRoom = room(G);
+  return {
+    centre: [0, p[1] + BOB * (1 + Math.sin(0.05 * age + ph)) * 0.5, 0], across: [p[0], p[2]],
+    low: cometLow(A[1], G[1], dust * tails), size: C.size,
+    f: [PLANETS.findIndex((P) => P.comet === C), tails, smooth(age / 12) * (1 - 0.5 * smooth(leave))],   // (its light also goes as the form's does)
+    frame: () => ({ n, sun: lagRoom, t: [ion, dust, tails] }),
+    bound: cometReach(ion, dust),
   };
 }
 
@@ -273,7 +328,9 @@ export function motion(name, age, w, go, r, face, ground, v = 0, eye = null) {
   const m = MOTIONS[name](age, w, leave, r * TAU, face, go, v);
   const [x, h, z] = m.centre, back = BACK[name] || 0;
   const y = ground + (m.low ?? m.bound) + h;
-  const centre = [x + back * Math.sin(face), y, z + back * Math.cos(face)];
+  // (A form that crosses the view, the comet, is placed across it and away from the eye: across.)
+  const [ax, az] = m.across ?? [0, 0], sf = Math.sin(face), cf = Math.cos(face);
+  const centre = [x + (back + az) * sf - ax * cf, y, z + (back + az) * cf + ax * sf];
   return { turn: 0, tilt: 0, yaw: 0, f: [0, 0, 0], dissolve: 0, ...m,
     anchor: [x, y, z], centre, frame: m.frame && eye ? m.frame(centre, eye) : null };
 }

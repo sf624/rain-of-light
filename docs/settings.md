@@ -49,7 +49,7 @@ pictures again (see [development.md](development.md#the-pictures-of-the-docs)).
 | **wire** | The thin line between two LEDs of a strand. It glows faintly with their light (Wire glow). |
 | **rain** | Light that runs down the strands, drop after drop: a bright head and a fading trail. |
 | **passage** | One stretch of the show: rain, a form, rain through a form (storm), a still room, or sideways rain (drift). Each lasts from about 20 seconds to over a minute. |
-| **form** | A large shape of light that gathers in the room: an orb, a spiral, a ring or a veil; a solid or a knot; or a planet with rings. |
+| **form** | A large shape of light that gathers in the room: an orb, a spiral, a ring or a veil; a solid or a knot; or a planet with rings, or a comet. |
 | **layer of light** | A sea of light near the floor. It comes and goes beside the forms. |
 | **knot** | The form drawn as closed lines of light, with two lights running round each: a figure of eight woven in depth, two linked rings or a Möbius band. |
 | **ripple** | A wave of light from a click or a tap, or from the show itself. It also rings a bell. |
@@ -202,7 +202,7 @@ things that are not in the panel:
 | **Form** | `form` | `auto`, `orb`, `spiral`, `ring`, `veil`, `solid`, `knot`, `planet`, `none` | `auto` | `auto`: forms of light come and go with the show. A name holds that form for good. `none`: no form. A change fades the form that shows out over 4 s; the next fades in once it has gone. |
 | Which solid | `solid` | `auto`, `tetrahedron`, `cube` | `auto` | `auto`: each time the solid comes, another of its figures (see [Forms](#forms)). A name: always that one. |
 | Which knot | `knot` | `auto`, `lissajous`, `hopf`, `mobius` | `auto` | As for the solid. |
-| Which planet | `planet` | `auto`, `saturn`, `uranus` | `auto` | As for the solid. |
+| Which planet | `planet` | `auto`, `saturn`, `uranus`, `comet` | `auto` | As for the solid. |
 | Layer of light | `layer` | `auto`, `on`, `off` | `auto` | `auto`: the layer comes and goes with the show (about 70% of the time). `on` holds it, `off` removes it. |
 | Floor mirror (0: off) | `mirror` | 0 to 1 | `0.6` | How bright the image in the floor is. |
 | Wall mirrors (copies per side) | `walls` | 0 or 1 | `0` | `1`: the room repeats beyond its walls, one copy on each side. Each copy draws the lattice again, so it is costly. |
@@ -320,8 +320,8 @@ Query: `rain=off&layer=off&t=40` with `form=solid&solid=tetrahedron`,
 `solid=cube`; `form=knot&knot=lissajous`, `knot=hopf`,
 `knot=mobius`.
 
-One form is a planet with rings, as often as the solid or the knot. Each
-time it is one of two, never the same twice in a row:
+One form is a planet with rings, or a comet, as often as the solid or the
+knot. Each time it is one of three, never the same twice in a row:
 
 - **Saturn**: a pale gold ball with soft bands, in broad rings: the faint
   dusky C ring next to the ball, the bright cream B ring, the dark Cassini
@@ -331,18 +331,34 @@ time it is one of two, never the same twice in a row:
   the ball as a dark band.
 - **Uranus**: a smaller, pale cyan ball lying on its side, with a few
   thin rings standing round it, the outer one the brightest.
+- **comet**: a small head, a soft green-cyan glow with a white heart, and
+  two tails that point away from its sun (out of the picture): a narrow,
+  straight blue tail, and a broad, pale gold tail that fans out and bends
+  a little away from it. Both stream sideways across the view, rising a
+  little, their far ends going away from you. Matter streams down the
+  tails in wisps and clumps that never repeat; the gold tail sparkles here
+  and there, and the head breathes a little.
 
-![Saturn, a pale gold ball in broad cream and grey rings seen a little from above, the near rings crossing in front of the ball; Uranus, a pale cyan ball with thin rings standing round it](img/planets.jpg)
+![Saturn, a pale gold ball in broad cream and grey rings seen a little from above, the near rings crossing in front of the ball; Uranus, a pale cyan ball with thin rings standing round it; the comet, a green-cyan head with a blue tail and a pale gold tail streaming up and aside](img/planets.jpg)
 
-Query: `rain=off&layer=off&t=45` with `form=planet&planet=saturn` and
-`planet=uranus`.
+Query: `rain=off&layer=off&t=45` with `form=planet&planet=saturn`,
+`planet=uranus` and `planet=comet`.
 
 The planet's rings turn their face to you and open and close a little,
 slowly, but never close to a line; the ball turns, its bands drifting. It
 comes as a thin crescent that waxes as the sun comes round from behind
 it, while its rings spread out from the ball, and goes the same way back.
-It has colours of its own, not palettes. The lab's Which planet pins one
-(`planet=saturn`).
+The comet crosses the room slowly as you look at it, coming nearer: it
+comes far away as a faint star, a little above where it will rest,
+brightens and grows its tails as it nears its sun, and slows as it nears
+the end of its way; it goes by sailing on and away, dimming, its tails
+drawn in. Each time it crosses the other way or the same, its tails
+always streaming back from where it goes. Like the other forms it turns
+to face you as you move: drag the view, and you see it from aside for a
+few seconds while it turns back.
+
+Each has colours of its own, not palettes. The lab's Which planet pins
+one (`planet=saturn`).
 
 Each form takes its colours from a few palettes of its own
 (`config.js: FORMS`). The forms keep a little beyond the middle of the room

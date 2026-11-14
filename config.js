@@ -104,6 +104,31 @@ export const PLANETS = [
     rings: [[1.64, 1.66, 0.55, 2.6], [1.75, 1.79, 0.65, 2.5], [1.86, 1.9, 0.7, 2.4], [1.99, 2.02, 1.0, 2.0]], stretch: 1.5,
     colors: [[0.5, 0.92, 0.96], [0.3, 0.72, 0.9], [0.92, 0.98, 1.0], [0.55, 0.68, 0.8]], room: [0.35, 0.75, 0.95],
     under: ['sakura', 'amber'] },
+  // A comet: no ball and no rings, a head and two tails away from its sun
+  // (comet.js; its way across the room: forms.js, comet). colors: its
+  // heart, its coma, its ion tail, its dust tail. comet: size (the coma's
+  // radius), window (how far out the head's LEDs reach, of it), clear (where
+  // the coma still shows clearly, of it), heart and coma (how bright),
+  // core (the heart's radius, of the coma's); ion [length, half width at
+  // the head, its growth per unit, how bright], ionFlow [speed out of the
+  // head, its gain per second], kink (how far the wind shakes it, per unit
+  // out); dust [length, half width at
+  // the head, its growth per unit, bend, how bright], dustFlow (its speed),
+  // dustClear (how far along it still shows clearly, of its length). Its
+  // way, in the eye's frame (across to the right, up, away), from its place
+  // beyond the path: cross (s: how soon it goes most of its way), from and to
+  // (across), depth [as it comes, at the end], arc (how far over its lowest
+  // place it comes), away [across, away, up] (as it goes); sun (where its
+  // sun is, as it crosses to the right), near [full, none] (how far from
+  // the sun its tails are full and none); open (0 .. 1: how far its tails'
+  // plane turns from its way round the sun to face the eye).
+  { name: 'comet', colors: [[0.85, 1.0, 0.96], [0.45, 0.95, 0.82], [0.35, 0.6, 1.0], [1.0, 0.9, 0.72]], room: [0.4, 0.62, 0.95],
+    under: ['amber', 'sakura'],
+    comet: { size: 1.1, window: 2.2, clear: 0.9, heart: 80, core: 0.25, coma: 26,
+      ion: [20, 0.14, 0.02, 45], ionFlow: [1.6, 0.25], kink: 0.06,
+      dust: [15, 0.22, 0.12, 0.05, 110], dustFlow: 0.6, dustClear: 0.7,
+      cross: 45, from: -6, to: 5, depth: [4, -4], arc: 2.5, away: [3, 10, 1.5],
+      sun: [26, -13, -6], near: [25, 32], open: 0.6 } },
 ];
 
 // Forms of light. Sky forms come one at a time (two while one turns into the

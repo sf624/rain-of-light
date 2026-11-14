@@ -15,7 +15,7 @@ You stand in a dark room full of hanging strands of tiny LEDs, over a floor
 of black glass. Light falls down the strands like rain. Now and then the rain
 stops, and a large form of light gathers among the same LEDs: an orb, a
 spiral, a ring or a veil, one of two forms of mathematics (a
-solid, a knot), or a ringed planet (Saturn, Uranus). A low sea of light (the layer) glows near
+solid, a knot), a ringed planet (Saturn, Uranus) or a comet. A low sea of light (the layer) glows near
 the floor. The colours drift slowly together, and calm music follows what is
 shown. A click sends a wave of light through the room and rings a bell.
 
@@ -516,7 +516,7 @@ the form's first colour to its second:
   points glinting.
 - `bakedLight`: a baked form (see Baked forms below), a shape's skin.
 - `planetLight` (in `planets.js`, see below): a planet, Saturn or Uranus,
-  with its rings.
+  with its rings, or the comet (`comet.js: cometLight`).
 
 Each is a field: a function of the LED's position relative to the
 form's centre, size and turn. Where the form is moves in `forms.js` (see
@@ -566,8 +566,9 @@ ball's two in the slot's first and second, its rings' two in a third and
 a fourth (`uFormG`, `uFormH`); `planetLight` mixes its LED's colour itself.
 
 **The planet.** The planet is a form with variants (`config.js:
-PLANETS`): each time it comes it is Saturn or Uranus. A variant has its
-own four colours in place of palettes, a size, a spin and its rings. It
+PLANETS`): each time it comes it is Saturn, Uranus or a comet (see
+**The comet** below). A variant has its own four colours in place of
+palettes; a planet also a size, a spin and its rings. It
 is the planet's figure, picked and pinned like the solid's (`variants`;
 `?form=planet&planet=saturn`). The HUD's forms row shows the variant also
 where a form shows its palette. Its light is `planets.js: planetLight`.
@@ -635,8 +636,8 @@ where a form shows its palette. Its light is `planets.js: planetLight`.
   high a form floats** below), on its lowest light: the ball, or its rings'
   lowest edge at their lean (`planets.js: planetLow`).
 - *Casting.* It comes as often as the solid and the knot (weight 0.4).
-  Its variants come in rounds like a solid's figures, so with two they
-  take turns, never the same twice running. It has no palette, so it takes no part in the colour story;
+  Its variants come in rounds like a solid's figures, so they take
+  turns, never the same twice running. It has no palette, so it takes no part in the colour story;
   the layer under it takes the variant's `under` palettes. Its voice is
   the orb's (`audio.js: VOICE_OF`).
 - *Cost.* Its code is in the points' shader only while a planet shows
@@ -652,8 +653,76 @@ where a form shows its palette. Its light is `planets.js: planetLight`.
   (960 x 540, and 390 x 844 at dpr 2) rain and the orb take as long as
   without the planet (within the noise, about 5%), and a planet about
   22% less than the orb; on the RTX 3090 (GPU timer, 1920 x 1080, 1700
-  thousand LEDs, wall mirrors) a planet takes 0.2 to 0.4% more than the
-  orb.
+  thousand LEDs) Saturn takes about 5% more than the orb, most of it for
+  the comet's code in the same programs (see **The comet**).
+
+**The comet** is the planet's third variant (`config.js: PLANETS`,
+`comet`; `?form=planet&planet=comet`): no ball and no rings, but a head and
+two tails, its light `comet.js: cometLight`, which `planetLight` hands its
+LEDs to. Its measures are the variant's `comet` (one place for the shader,
+its lowest light and its reach).
+
+- *The head.* A ball of LEDs (`window` times the coma's radius), each
+  showing the coma by how near its line of sight passes the heart (as the
+  planet's ball shows its face): a soft green-cyan glow with a small
+  white-hot heart (`core`), which alone of the comet casts rays. It
+  breathes a little (a slow noise of the time).
+- *The tails.* Both point away from its sun: a narrow, straight, blue ion
+  tail exactly away from it, and a broad, pale gold dust tail that fans
+  out and bends towards the side it lags on. Each is a tube of LEDs about
+  its middle line, wider than the tail: each LED shows the tail by how
+  near its line of sight passes that line (`cometNear`: the nearest place
+  between the two lines, one step along the dust tail's bend), and gives
+  its share, as many LEDs showing the same place as lie along the line of
+  sight's chord through the tube. So a tail is a continuous stroke,
+  however the lattice lies, never a fence of dotted columns (a thin sheet
+  facing the eye did that: strands run along it, and each lies in it or
+  not). The tails are longest and brightest near the sun and fade to
+  nothing at their ends.
+- *Streaming.* What a tail shows at a place depends on when the matter
+  there left the head (the ion tail's matter speeds up as it goes, the
+  dust's drifts out slowly): clumps and wisps from a value noise of that
+  time, so they come in every size and spacing and never repeat. The ion
+  tail's middle line is shaken aside where it leaves the head, by another
+  noise of that time, and the shake is carried out, growing: faint kinks
+  stream down it. A few dust LEDs glint now and then.
+- *Its way* (`forms.js: comet`). It crosses the room on a gentle arc as
+  the eye sees it, coming nearer: `motion` places it across the view and
+  away from the eye (`across`), in the frame of the way from the eye to
+  its path (`face`, as every form keeps beyond its path). It does not know
+  how long it will stay, so it goes most of its way in the first minute
+  (`cross`, 45 s) and then slows. Its sun is a point out of the picture,
+  on the side it crosses to, below it and a little nearer the eye
+  (`sun`): so its tails stream back across the view, rising about 25
+  degrees (well away from the vertical, where a strand would carry a long
+  stretch of a tail), their far ends receding, and they swing a little as
+  it passes. How bright and long they are goes with how near the sun it is
+  (`near`). The dust tail's side is behind its way (opposite its motion,
+  across the way from the sun), turned towards the eye (`open`) so that
+  the two tails part; it is worked out from the way as a whole, so it
+  never flips. Which way it crosses is each time's own.
+- *Coming and going.* It comes far away, a little over its way's lowest
+  place, as a faint star (12 s), and grows its tails as it nears the sun
+  (30 s). It goes by sailing on and away from the eye, a little up, while
+  its light and its tails go.
+- *Facing the eye.* Like the other forms it turns with the eye, eased over
+  5 s, so whatever the camera does it crosses the view with its tails
+  across it. A drag shows it from aside, looking along its tails, until it
+  has turned back. (Fixed in the room, or set from the show's own camera
+  so that a drag looks round it, the eye would often look along its tails:
+  a short, bright blob with a tail going up.)
+- *Height.* Its lowest light is its coma, or its dust tail's lower edge
+  where that bends below the head (`comet.js: cometLow`); at its way's
+  lowest place (the end of its way) that rests on the layer's band, and it
+  comes in a little over it (`arc`).
+- *Cost.* Its code is in the planet's programs (`planetShader`), so
+  scenes without a planet are as before (rain, the orb, Saturn and Uranus
+  draw the same pictures, bit for bit on SwiftShader). Those programs hold
+  it whichever planet shows: measured (GPU timer, RTX 3090, 1920 x 1080,
+  1700 thousand LEDs, six interleaved rounds, medians), Saturn takes 4%
+  longer with it (2.19 against 2.11 ms a frame), and the comet 6% longer
+  than the orb (2.22 against 2.09 ms); the planet's programs take about a
+  third longer to build (about 250 against 185 ms, in the background).
 
 **The layer** gives way where a sky form already lights the LED, so the two
 never add up to a white flare. It is dark within 4.5 units of the eye and
@@ -808,8 +877,8 @@ another, from hashes of the seed and the passage's number:
   rounds: each round has every figure once, in an order shuffled from the
   passage's hash, and never begins with the figure the last round ended
   on. So no figure comes twice running, and each comes about as often as
-  the others (the knot's about 1.4 times an hour each, the solid's,
-  Saturn's and Uranus's about 2.1). An egg that takes a form's place uses
+  the others (the solid's about 2.1 times an hour each; the knot's, and
+  Saturn, Uranus and the comet, about 1.4). An egg that takes a form's place uses
   none of its figures (in the planet's place, which has no palettes, it
   takes the orb's). The lab can pin one (`solid=`, `knot=`, `planet=`;
   `show.js: variantOf`).
@@ -1293,6 +1362,7 @@ GitHub link shows.
 | `fields.js` | The baked forms' fields: the 3D texture, fetching a field when its form draws near, `able`. |
 | `figures.js` | The figures of the solid and the knot: names, corners and edges, curves, sizes and heights (one per life). |
 | `planets.js` | The planet: its rings' extent and lowest light, and the shader's `planetLight`. |
+| `comet.js` | The comet: its tails' shape, its reach and lowest light, and the shader's `cometLight`. |
 | `director.js` | Seeded tracks (weather, colour, density, camera), the colour story's mood, the shared `hash`. |
 | `direction.js` | The change of the rain's direction: weights and gates per direction. |
 | `audio.js` | The generative music: pad, bells, rain, form voices, reverb. |
@@ -1329,6 +1399,9 @@ flowchart TD
   forms --> planets
   planets --> config
   planets --> gl
+  planets --> comet["comet.js"]
+  forms --> comet
+  comet --> config
   show --> config
   show --> director
   show --> forms["forms.js"]
@@ -1357,7 +1430,7 @@ Details and commands are in [development.md](development.md).
   the viewer page's Reset clears), rain alone in the lab and no rain
   (with the same click, keys and Reset), rain that never ends with a form
   through it, a seeded time with and without the story, four of the forms
-  held, the planet held (named in the lab, and by a name it does not
+  held, the planet held (Saturn and the comet named in the lab, and by a name it does not
   have), and `?jitter=pitch`; and that a `scene=` in a link or in saved
   settings is read as Rain, Form and Layer. It then renders the sound: a held orb must be
   audible, a still room at least 3 dB quieter, and neither may clip. The

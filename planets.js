@@ -22,6 +22,7 @@
 
 import { small, PLANETS } from './config.js';
 import { sub, dot, cross, norm } from './gl.js';
+import { COMET_GLSL } from './comet.js';
 
 // A variant's rings as shown: its bands spread out from the first band's
 // inner edge by its stretch ([from, to, density, tone], in radii).
@@ -118,7 +119,7 @@ function profile(P) {
 }
 export function createRingMap(gl, unit) {
   const px = new Uint8Array(RINGS_W * 2 * PLANETS.length);
-  PLANETS.forEach((P, v) => px.set(profile(P), v * RINGS_W * 2));
+  PLANETS.forEach((P, v) => P.rings && px.set(profile(P), v * RINGS_W * 2));   // (the comet has none)
   const tex = gl.createTexture();
   gl.activeTexture(gl.TEXTURE0 + unit);
   gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -142,6 +143,7 @@ export const planetShader = (src) => src.replace('#version 300 es\n', '#version 
 
 const f = (x) => (Number.isInteger(x) ? `${x}.0` : `${+x.toFixed(4)}`);
 const URANUS = PLANETS.findIndex((P) => P.name === 'uranus');
+const COMET = PLANETS.findIndex((P) => P.comet);
 
 // The shader's planet (only in planetShader's programs). It needs hash3,
 // uTime, uLane, uEye and the slot's colours from POINT_VS.
@@ -155,7 +157,7 @@ uniform vec3 uFormN[3];     // a planet's axis, its sun, and the way across its 
 uniform vec3 uFormS[3];
 uniform vec3 uFormT[3];
 const float P_SLAB = ${f(SLAB)};
-
+${COMET_GLSL}
 // The rings at r (radii): how dense (0 .. 1), and their tone (0 .. 1 from the third colour to the fourth).
 vec2 ringAt(int v, float r) {
   return textureLod(uRings, vec2(r / ${f(RINGS_R)}, (float(v) + 0.5) / ${f(PLANETS.length)}), 0.0).rg;
@@ -168,6 +170,7 @@ vec2 ringAt(int v, float r) {
 vec3 planetLight(vec3 p, vec4 a, vec4 b, vec4 f, int k, out vec3 col) {
   col = vec3(0.0);
   int v = int(f.x + 0.5);
+  if (v == ${COMET}) return cometLight(p, a, b, f, k, col);   // (comet.js)
   float R = a.z;
   vec3 q = p - b.xyz, n = uFormN[k], sun = uFormS[k];
   // Outside the ball, only the LEDs in the rings' slab (see SLAB): apart is

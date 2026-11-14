@@ -45,9 +45,10 @@
       {"q": "form=knot&knot=hopf", "label": "knot=hopf"},
       {"q": "form=knot&knot=mobius", "label": "knot=mobius"}
     ] },
-    { "name": "planets", "cols": 2, "base": "rain=off&layer=off&t=45", "pre": 100, "cells": [
+    { "name": "planets", "cols": 3, "base": "rain=off&layer=off&t=45", "pre": 100, "cells": [
       {"q": "form=planet&planet=saturn", "label": "planet=saturn"},
-      {"q": "form=planet&planet=uranus", "label": "planet=uranus"}
+      {"q": "form=planet&planet=uranus", "label": "planet=uranus"},
+      {"q": "form=planet&planet=comet", "label": "planet=comet"}
     ] },
     { "name": "layer", "cols": 3, "base": "rain=off&t=30", "cells": [
       {"q": "form=orb&layer=off", "label": "form=orb&layer=off"},
