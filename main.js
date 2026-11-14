@@ -1046,6 +1046,9 @@ function frame(now) {
   gl.uniform3fv(u.uFormC, shown.C);
   gl.uniform3fv(u.uFormD, shown.D);
   gl.uniform3fv(u.uTint, shown.tint);
+  // A black hole's shadow: the light behind it, as the eye sees it, goes out (holeShade in shaders.js).
+  gl.uniform4fv(u.uHole, shown.hole);
+  gl.uniform1f(u.uHoleDark, shown.holeDark);
   gl.uniform1f(u.uTwinkle, S.twinkle);
   gl.uniform4fv(u.uCopy, copies);
   gl.uniform1fv(u.uCopyGain, copyGain);

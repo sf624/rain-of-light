@@ -193,6 +193,38 @@ function knot(age, w, leave, ph, face, go, v) {
   };
 }
 
+// A black hole: a dark heart (its shadow) in a thick disc of matter that
+// turns about it and is drawn into it (see holeLight in shaders.js). The
+// disc faces the room, leaning a little and swaying slowly, never edge-on.
+// It comes as a wide, faint spiral of matter that winds in until the disc
+// has formed, while the heart goes dark; it goes as the disc drains into the
+// heart, then the ring at the heart's edge shrinks to a point and goes out,
+// the darkness last.
+// hole: the shadow's radius now; dark: how dark it is (0 .. 1; see show.js).
+// f[0]: how far the disc has formed; f[1]: how far it has drained; f[2]: hole.
+// BH: size, the disc's outer radius; shadow, the heart's full radius; deep,
+// the disc's half thickness (HOLE_DEEP in shaders.js).
+const BH = { size: 3.6, shadow: 1.9, deep: 1.6 };
+const BH_RIM = 0.95;                                // its light shows clearly out to this share of its outer edge (see holeLight; the wisps are faint)
+function blackhole(age, w, leave, ph, face) {
+  const { size } = BH, drift = 1.3;
+  const hole = BH.shadow * (1 - smooth((leave - 0.3) / 0.6));   // shrinks to a point as the disc drains
+  const f = [smooth(age / 20), smooth(leave * 1.8), hole];
+  const tilt = Math.PI / 2 - 0.15 + 0.1 * Math.sin(0.025 * age + 3 * ph);   // its face, leaning at most 0.25 rad from upright
+  // Its outer edge (as in holeLight): wide as it gathers. (As it drains the edge is drawn in,
+  // and the heart stays where it is: it does not sink.)
+  const outer = size * (1.6 - 0.6 * f[0]);
+  const bound = size * 1.1 + 0.8;                   // (the wide spiral it gathers from reaches past it, and is cut there)
+  return {
+    centre: [drift * Math.sin(0.021 * age + ph), BOB * (1 + Math.sin(0.027 * age + ph)), drift * Math.cos(0.017 * age + ph)],
+    low: BH_RIM * Math.min(outer, bound) * Math.sin(tilt) + BH.deep * Math.abs(Math.cos(tilt)),   // the disc's edge at its lean, and its thickness
+    size, turn: 0.05 * age + ph,                    // turn: where its brighter side is
+    yaw: face + 0.2 * Math.sin(0.019 * age + 2 * ph),
+    tilt, f, hole, dark: smooth((age - 5) / 12) * (1 - smooth((leave - 0.8) / 0.2)),
+    bound,
+  };
+}
+
 // A baked form (see BAKED): it rests on the layer of light, its side to the
 // room, and sways slowly about the vertical, so that it shows its profile
 // and, now and then, a little of its front and its back; it never turns
@@ -214,11 +246,11 @@ function baked(egg, age, w, leave, ph, face) {
   };
 }
 
-export const MOTIONS = { orb, spiral, ring, veil, solid, knot,
+export const MOTIONS = { orb, spiral, ring, veil, solid, knot, blackhole,
   ...Object.fromEntries(BAKED.map((egg) => [egg.name, (age, w, leave, ph, face) => baked(egg, age, w, leave, ph, face)])) };
 // How far beyond its own path each form keeps, as the eye sees it: the loose
 // and the wide ones read from a distance, and none flares right at the eye.
-const BACK = { orb: 2.5, spiral: 2.5, ring: 2.5, veil: 3, solid: 2.5, knot: 3.5, ...Object.fromEntries(BAKED.map((egg) => [egg.name, 3])) };
+const BACK = { orb: 2.5, spiral: 2.5, ring: 2.5, veil: 3, solid: 2.5, knot: 3.5, blackhole: 2, ...Object.fromEntries(BAKED.map((egg) => [egg.name, 3])) };
 
 // How large the orb (and a baked form) is as it begins to come and as it has gone, of its full size.
 const GROW = 0.75;

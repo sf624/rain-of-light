@@ -49,7 +49,7 @@ pictures again (see [development.md](development.md#the-pictures-of-the-docs)).
 | **wire** | The thin line between two LEDs of a strand. It glows faintly with their light (Wire glow). |
 | **rain** | Light that runs down the strands, drop after drop: a bright head and a fading trail. |
 | **passage** | One stretch of the show: rain, a form, rain through a form (storm), a still room, or sideways rain (drift). Each lasts from about 20 seconds to over a minute. |
-| **form** | A large shape of light that gathers in the room: an orb, a spiral, a ring or a veil; or a solid or a knot. |
+| **form** | A large shape of light that gathers in the room: an orb, a spiral, a ring or a veil; a solid or a knot; or a black hole. |
 | **layer of light** | A sea of light near the floor. It comes and goes beside the forms. |
 | **knot** | The form drawn as closed lines of light, with two lights running round each: a figure of eight woven in depth, two linked rings or a Möbius band. |
 | **ripple** | A wave of light from a click or a tap, or from the show itself. It also rings a bell. |
@@ -199,7 +199,7 @@ things that are not in the panel:
 | Panel | URL key | Values | Default | What you see |
 | --- | --- | --- | --- | --- |
 | **Rain** | `rain` | `auto`, `on`, `off` | `auto` | `auto`: rain comes and goes with the show. `on`: rain always falls, and never ends. `off`: no rain; the forms of light have the room, on a timeline of their own. A change eases the rain in or out over a few seconds. |
-| **Form** | `form` | `auto`, `orb`, `spiral`, `ring`, `veil`, `solid`, `knot`, `none` | `auto` | `auto`: forms of light come and go with the show. A name holds that form for good. `none`: no form. A change fades the form that shows out over 4 s; the next fades in once it has gone. |
+| **Form** | `form` | `auto`, `orb`, `spiral`, `ring`, `veil`, `solid`, `knot`, `blackhole` (black hole), `none` | `auto` | `auto`: forms of light come and go with the show. A name holds that form for good. `none`: no form. A change fades the form that shows out over 4 s; the next fades in once it has gone. |
 | Which solid | `solid` | `auto`, `tetrahedron`, `cube`, `star` | `auto` | `auto`: each time the solid comes, another of its figures (see [Forms](#forms)). A name: always that one. |
 | Which knot | `knot` | `auto`, `lissajous`, `hopf`, `mobius` | `auto` | As for the solid. |
 | Layer of light | `layer` | `auto`, `on`, `off` | `auto` | `auto`: the layer comes and goes with the show (about 70% of the time). `on` holds it, `off` removes it. |
@@ -260,11 +260,11 @@ top down, as if rain gathered into it or ran off it as rain.
 
 ### Forms
 
-![The six forms alone in the still room: an amber orb, a blue spiral, an amber ring, a green veil, a pale cube of lines and a green knot; the seventh picture, form=none, is the empty room](img/forms.jpg)
+![The seven forms alone in the still room: an amber orb, a blue spiral, an amber ring, a green veil, a pale cube of lines, a green knot and a black hole, a dark round heart in a swirling orange disc; the eighth picture, form=none, is the empty room](img/forms.jpg)
 
 Query: `rain=off&layer=off&t=30` with `form=orb`, `form=spiral`,
 `form=ring&t=60` (its face to the room), `form=veil`, `form=solid&solid=cube`,
-`form=knot&knot=lissajous` and `form=none`.
+`form=knot&knot=lissajous`, `form=blackhole` and `form=none`.
 
 Each form comes and goes where it floats, in a way of its own: none rises
 out of the floor or sinks into it. Its light fades in LED by LED over
@@ -321,7 +321,26 @@ Query: `rain=off&layer=off&t=40` with `form=solid&solid=tetrahedron`,
 `solid=cube`, `solid=star`; `form=knot&knot=lissajous`, `knot=hopf`,
 `knot=mobius`.
 
-Each form takes its colours from a few palettes of its own
+And one form comes from the stars, about as often as one of mathematics:
+
+- **black hole** (`blackhole`): a perfectly dark round heart in a thick
+  disc of orange light that faces the room, leaning a little. The disc
+  turns about the heart, its inner parts faster, and its streaks wind
+  inward, so the matter is seen drawn into the centre. It is deep
+  orange-red at its edge, where thin wisps trail off, and pale yellow and
+  near white at its inner rim; one side is brighter, and that side goes
+  slowly round. A thin bright ring hugs the dark heart, and now and then
+  a brighter knot of light runs in and goes out at the rim. Nothing
+  behind the heart shows through it, not even the room's faint lattice,
+  in the floor too. It comes as a wide, faint spiral of matter that
+  winds in until the disc has formed, while the heart goes dark; it goes
+  as the disc drains into the heart, the ring shrinks to a point, and the
+  darkness closes last. Its colours are its own, not a palette's, and the
+  room turns deep navy while it shows. On a small screen's sparser
+  lattice the disc is coarser, a ring of orange points about the dark
+  heart.
+
+Each other form takes its colours from a few palettes of its own
 (`config.js: FORMS`). The forms keep a little beyond the middle of the room
 as you look at them.
 
@@ -527,9 +546,9 @@ Query: `rain=on&form=none&layer=off&flow=down&t=30&color=mono&palette=aurora` wi
 
 ### Exposure
 
-![A veil over the layer, darker, as by default, and brighter](img/exposure.jpg)
+![A solid, a star of lines, over the layer, darker, as by default, and brighter](img/exposure.jpg)
 
-Query: `t=110` (a veil passage of the whole show) with `exposure=0.8`,
+Query: `t=110` (a solid passage of the whole show) with `exposure=0.8`,
 `exposure=2.2`, `exposure=3.5`.
 
 ### Glow
@@ -650,7 +669,7 @@ The palette and the set are as seed 1 has them at that time.
 
 ### Colour story
 
-![Five moments of the same show, in two rows: with the story the colours stay near one family (pink, blue, violet); without it they jump between blue, amber, white and pink](img/story.jpg)
+![Five moments of the same show, in two rows: with the story the colours stay near pink and blue, with some green; without it they jump between blue, many colours at once, pink, green and amber](img/story.jpg)
 
 Query: `seed=1` with `story=on` (top) and `story=off` (bottom), at
 `t=60`, `t=180`, `t=360`, `t=480`, `t=840`.
@@ -727,7 +746,7 @@ stands in the upper middle with its image in the floor below.
 
 ### Moves
 
-![The same moment from each camera move: orbit sees a veil over the layer; walk and spin look elsewhere in the room; gaze tilts; rise looks from lower down](img/camera.jpg)
+![The same moment from each camera move: orbit sees a solid, a star of lines, over the layer; walk and spin look elsewhere in the room; gaze tilts; rise looks from lower down](img/camera.jpg)
 
 Query: `t=110` with `camera=orbit`, `camera=walk`, `camera=spin`,
 `camera=gaze`, `camera=rise`. A still shows where each move has the eye at
@@ -778,7 +797,7 @@ is 10 seconds). The default depth, 0.3, is gentler.
 | **Pad** | `music` | 0 to 1 | `0.6` | The slow pad in D major. |
 | **Bells** | `chimes` | 0 to 1 | `0.6` | The ripples' bells, and the still room's high notes. |
 | **Rain** | `rainSound` | 0 to 1 | `0.3` | The hush of rain. |
-| **Forms** | `formSound` | 0 to 1 | `0.4` | The voice each form brings: the orb a low hum, the spiral a turning figure, the ring a glassy tone, the veil a soft air, the solid a chord of pure fifths, the knot two beating tones. |
+| **Forms** | `formSound` | 0 to 1 | `0.4` | The voice each form brings: the orb a low hum, the spiral a turning figure, the ring a glassy tone, the veil a soft air, the solid a chord of pure fifths, the knot two beating tones, the black hole a low, slow drone. |
 
 `m` or the note button turns the sound on and off. Browsers start sound
 only after a click or a key, so the music begins with your first one
@@ -794,7 +813,7 @@ fades:
   it is seen (it follows the form as it moves): the orb a warm, low hum, the
   spiral a slow figure of notes that climbs and turns, the ring a clear, glassy tone, the veil a soft, open air,
   the solid a still chord of pure fifths, the knot two tones that beat
-  against each other. Each form keeps its voice whichever figure it shows.
+  against each other, the black hole a low, slow drone. Each form keeps its voice whichever figure it shows.
   As it leaves, the harmony comes home to D.
 - **rain through a form**: both, fuller but not louder.
 - **a still room**: close to silence. The pad thins out, and now and then a

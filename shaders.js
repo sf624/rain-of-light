@@ -139,6 +139,8 @@ uniform vec4 uFormF[3];   // the form's own measures (see forms.js), and how far
 uniform vec3 uFormC[3];   // the form's colour
 uniform vec3 uFormD[3];   // its second colour
 uniform vec3 uTint;       // the colour of the room: of the forms shown now
+uniform vec4 uHole;       // a black hole's shadow: its centre and radius (see show.js and holeShade)
+uniform float uHoleDark;  // how dark that shadow is (0: no black hole shows, and nothing is tested)
 uniform sampler3D uFields; // the baked forms' fields, a slab each (see fields.js)
 uniform float uTwinkle;
 uniform vec3 uMirror;     // floor height, reflection gain (> 0: drawing the reflection), its fade length
@@ -634,18 +636,122 @@ vec3 bakedLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
   return vec3(light * 2.4, skin * 0.12 + deep * deep * 0.2, clamp(0.3 + deep, 0.0, 1.0));
 }
 
+// A black hole: a thick disc of matter about a dark heart (its shadow, see
+// holeShade), facing the room. The matter falls in at a steady pace in log
+// radius (HOLE_FALL), turning the faster the nearer it is (HOLE_SPIN at the
+// inner rim, as r^-1.5 farther out), so each piece follows a fixed spiral
+// path: its angle less the turn it has still to make on its way in (path).
+// What moves with the matter keeps its path and the time it reaches the rim
+// (rim): the streaks, arms along the paths broken into strokes, and now and
+// then a brighter knot, run in with it. Light and heat rise towards the
+// inner rim (deep orange-red outside, pale yellow and near white at the
+// rim); one side is brighter, and it goes slowly round (a.w). Thin wisps
+// trail off the outer edge. A thin bright ring hugs the shadow's edge as the
+// eye sees it (the photon ring: across the line of sight, not in the disc).
+// a.z: the disc's outer radius; f.x: how far it has formed (it gathers from
+// wide and faint); f.y: how far it has drained into the heart; f.z: the
+// shadow's radius now.
+const float HOLE_SPIN = 0.4, HOLE_FALL = 0.12;
+const float HOLE_WISP = 1.1;                        // the wisps reach this far, of the disc's outer radius
+const float HOLE_DEEP = 1.6;                        // the disc's half thickness (forms.js: BH.deep)
+const float HOLE_KNOT = 13.0;                       // s between the knots that may come
+float HoleRay;   // set by holeLight: the share of its light that casts rays
+vec3 holeLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
+  vec3 rel = p - b.xyz;
+  vec3 q = turned(rel, yaw, b.w);
+  float lane = max(uLane.x, uLane.y), Rs = f.z;
+  // Where the LED is as the eye sees it: off the line of sight (at the
+  // heart's distance), and how far to the side (1 beside the heart, 0 above or below it).
+  vec3 v = normalize(b.xyz - uEye), side = rel - v * dot(rel, v);
+  float dc = length(b.xyz - uEye), depth = dot(rel, v);
+  float off = length(side) * dc / max(dc + depth, 0.1);
+  float across = abs(dot(side, normalize(vec3(-v.z, 0.0, v.x)))) / max(length(side), 1e-3);
+  float ring = (off - Rs) / (0.45 * lane) - 1.0;
+  ring = exp(-ring * ring - depth * depth / (lane * lane * 1.6)) * step(0.01, Rs);
+  float light = 0.0, heat = 0.0, kn = 0.0;
+  // The disc is thick across (HOLE_DEEP each side), so that LEDs at many depths
+  // draw it: seen face-on its streaks read smooth on any lattice, never as the
+  // few strands of a thin slab.
+  float r = length(q.xz), rin = max(Rs, 0.3) * 1.05;
+  float outer = mix(mix(a.z * 1.6, a.z, f.x), rin * 1.1, f.y);
+  float inner = mix(a.z * 1.05, rin, smoothstep(0.0, 0.8, f.x));
+  float u = (r - inner) / max(outer - inner, 1e-3); // 0 at the inner rim .. 1 at the outer edge
+  if (abs(q.y) < HOLE_DEEP && u > -0.1 && u < HOLE_WISP + 0.1 && r > rin * 0.97) {
+    float x = rin / r, th = atan(q.z, q.x);
+    float path = th - HOLE_SPIN * x * sqrt(x) / (1.5 * HOLE_FALL);
+    float rim = uTime - log(x) / HOLE_FALL;
+    vec2 c = vec2(cos(path), sin(path));
+    float arms = lane > 0.35 ? 4.0 : 6.0;            // (a few LED gaps wide)
+    float st = smoothstep(0.3, 0.9, 0.5 + 0.5 * cos(arms * path + 5.0 * noise3(vec3(c * 0.9, rim * 0.08))))
+             * smoothstep(0.3, 0.6, noise3(vec3(c * 1.4 + 3.0, rim * 0.28)));
+    // A knot: a lump of the matter, at one path and reaching the rim at one time.
+    float kc = floor(rim / HOLE_KNOT), kr = rim / HOLE_KNOT - kc - 0.5;
+    vec2 kd = vec2(cos(hash(kc * 5.1 + 2.9) * 6.2831853), sin(hash(kc * 5.1 + 2.9) * 6.2831853)) - c;
+    kn = step(hash(kc * 3.7 + 1.3), 0.7) * exp(-kr * kr * 400.0 - dot(kd, kd) * 12.0) * 3.0;
+    float hot = clamp(1.0 - u, 0.0, 1.0), beam = 0.5 + 0.5 * cos(th - a.w);   // beam: the brighter side
+    // (On a sparse lattice the dark between the streaks is filled, and the disc
+    // is brighter: its few LEDs would leave only faint dots.)
+    float sparse = smoothstep(0.3, 0.45, lane);
+    float glow = smoothstep(-0.06, 0.04, u) * (1.0 - smoothstep(0.9, 1.05, u)) * (0.8 + 2.2 * hot * hot)
+               * (0.1 + 0.3 * sparse + 1.8 * st) * (0.5 + beam) * (1.0 + 1.2 * sparse);
+    float wisp = smoothstep(0.85, 1.0, u) * (1.0 - smoothstep(1.0, HOLE_WISP, u)) * st * st;
+    float edge = exp(-u * u * 100.0) * (1.0 + 2.0 * f.y) * (0.7 + 0.6 * beam);   // the inner rim, brightest as the disc drains
+    light = (1.0 - smoothstep(HOLE_DEEP * 0.6, HOLE_DEEP, abs(q.y))) * mix(0.25, 1.0, f.x) * (1.0 - 0.75 * f.y)
+          * (glow * 5.5 + wisp * 4.0 + edge * 4.0 + kn * 8.0 * step(0.0, u));
+    heat = clamp(hot * hot * (0.6 + 0.4 * beam) + edge * 0.5 + kn * 0.3, 0.0, 1.0) * smoothstep(-0.1, 0.0, u);
+  }
+  light += ring * 14.0 * smoothstep(0.4, 0.9, f.x) * smoothstep(0.04, 0.25, Rs / a.z);
+  float white = clamp(heat * heat * heat * 0.3 + ring * 0.7, 0.0, 1.0);
+  // Only the hottest light casts rays, and none that would run across the heart.
+  HoleRay = max(smoothstep(0.25, 0.7, white) * across * across, smoothstep(0.5, 2.0, kn));
+  return vec3(light, white, heat * heat);
+}
+
+// A black hole's shadow (see holeLight): how much of an LED's light is
+// hidden, as the eye sees it at seen, by a sphere at C of radius uHole.w: all
+// of it where the line of sight passes through the sphere on its way to the
+// LED (the LED lies inside it or behind it), none outside; the edge is soft
+// over about one LED gap at the sphere's distance, so it is crisp and round.
+float hideBy(vec3 seen, vec3 C) {
+  float R = uHole.w, soft = 0.6 * max(uLane.x, uLane.y);
+  vec3 to = seen - uEye, c = C - uEye;
+  float L = length(to);
+  float tc = dot(c, to) / L;                          // the sphere's centre, along the line of sight
+  float d2 = max(dot(c, c) - tc * tc, 0.0);           // and its distance from that line, squared
+  if (d2 > R * R) return 0.0;
+  float front = tc - sqrt(R * R - d2);                // where the line of sight enters the sphere
+  return (1.0 - smoothstep(R - soft, R, sqrt(d2))) * smoothstep(front - soft, front + soft, L);
+}
+// What is left of an LED's light: its own line of sight is tested against
+// the hole; an image's (in the floor, in a wall) also against the image of
+// the hole there, which is where its line of sight runs past the mirror.
+float holeShade(vec3 seen) {
+  float h = hideBy(seen, uHole.xyz);
+  vec4 cp = uCopy[gl_InstanceID];
+  if (uMirror.y > 0.0 || gl_InstanceID > 0) {
+    vec3 C = vec3(cp.x * uHole.x + cp.y, uHole.y, cp.z * uHole.z + cp.w);
+    if (uMirror.y > 0.0) C.y = 2.0 * uMirror.x - C.y;
+    h = max(h, hideBy(seen, C));
+  }
+  return 1.0 - uHoleDark * h;
+}
+
 // The light of the forms at p (v: 0 at the top .. 1 at the floor). Each comes
 // and goes LED by LED in a random order, or, while rain falls, from the top down.
 // A form that rises away as points (e.w) is seen by each LED a random way
 // below it: its light lifts off as points, the high ones rising fastest.
 // thread: the share of that light the strand's wire shows; around: how near
 // p is to a sky form (1 within its reach, 0 well away): rain gives way there.
+// FormRay: the share of that light that casts rays (see main): all of it,
+// but of a black hole's disc only its hottest parts (HoleRay).
+vec3 FormRay;
 const vec2 LAYER_NEAR = vec2(4.5, 11.0);   // the layer is dark nearer the eye than x, full from y on
 const float FORM_BODY = 1.25;              // the sky forms' light, over what their own functions give
 vec3 formsAt(vec3 p, float id, float v, out vec3 thread, out float around) {
   vec3 c = vec3(0.0);
   thread = vec3(0.0);
   around = 0.0;
+  FormRay = vec3(0.0);
   // Only as far as the last slot that shows a form: some GPUs (SwiftShader)
   // run a loop's body for every LED, those that skip it masked, as long as
   // any goes on; so where no form shows, none of the forms' code runs.
@@ -684,13 +790,15 @@ vec3 formsAt(vec3 p, float id, float v, out vec3 thread, out float around) {
     else if (type == 4) f = veilLight(q, a, b, e.z, ff);
     else if (type == 5) f = solidLight(q, a, b, e.z, ff);
     else if (type == 6) f = knotLight(q, a, b, e.z, ff);
+    else if (type == 9) f = holeLight(q, a, b, e.z, ff);
     else f = bakedLight(q, a, b, e.z, ff);
     if (type != 2) f.x *= FORM_BODY;
     float order = mix(hash(id + float(k) * 7.7), e.y > 0.0 ? v : 1.0 - v, e.x * 0.8);
     float on = clamp((a.y * 1.25 - order) / 0.25, 0.0, 1.0) * smoothstep(0.0, 0.4, a.y);
     vec3 light = mix(mix(uFormC[k], uFormD[k], f.z), WHITE_HOT, clamp(f.y, 0.0, 1.0)) * f.x * on * keep;
     c += light;
-    thread += light * (type == 2 || type == 3 || type >= 5 ? 0.5 : 1.0);   // a hoop or a line is not its strands
+    FormRay += type == 9 ? light * HoleRay : light;
+    thread += light * (type == 9 ? 0.12 : type == 2 || type == 3 || type >= 5 ? 0.5 : 1.0);   // a hoop or a line is not its strands, nor a disc
   }
   return c;
 }
@@ -775,7 +883,7 @@ void main() {
   vec3 c = (form + flare * 2.5 * ring) * uLight.x;
   // The light that casts rays: all of the LED's light but the rain's trails
   // and the LEDs' light at rest (a drop's head, a form, a wave, a twinkle).
-  vec3 glint = c;
+  vec3 glint = c - (form - FormRay) * uLight.x;
   vec3 wireCol = (thread + flare * ring) * uLight.y;
   float wireRest = uRest * 1.5 * near * uLight.y, wireWave = ring * 1.2 * uLight.y;
   float wireRain = uRainGain * 0.2 / uRainK[1].y;     // a wire's light does not grow with its LEDs' light
@@ -870,6 +978,8 @@ void main() {
   // Each mirror dims its image a little; the floor's image fades with the height above it.
   float g = uCopyGain[gl_InstanceID] * fog;
   if (uMirror.y > 0.0) g *= uMirror.y * exp(-(pos.y - uMirror.x) / uMirror.z);
+  // A black hole hides what lies behind it (its own disc too).
+  if (uHoleDark > 0.0) g *= holeShade(seen);
   c *= g;
   glint *= g;
   wireCol *= g;

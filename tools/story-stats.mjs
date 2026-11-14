@@ -21,7 +21,8 @@ const hueOfAll = (cs) => {
   for (const c of cs) { const [h, s] = hueOf(c); x += s * Math.cos(h * Math.PI / 180); y += s * Math.sin(h * Math.PI / 180); }
   return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 };
-const pal = (n) => PALETTES.find((p) => p.name === n);
+// A palette by name, or the colours of a form that has its own (see FORMS).
+const pal = (n) => PALETTES.find((p) => p.name === n) || FORMS.find((f) => f.colors?.name === n)?.colors;
 const ONE_PALETTE = ['mono', 'comet', 'accent'];
 // The passages of rain alone: falling, and sideways.
 const RAIN_ALONE = ['rain', 'drift'];
@@ -147,7 +148,7 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
   table('Colour modes (share of the time rain falls alone)', 'modes', COLOR_MODES.map((m) => m.name));
   table('Palettes of the rain (mono, gradient, accent, comet)', 'pals', PALETTES.map((p) => p.name));
   table('Sets of the palette rain', 'sets', SETS.map((p) => p.name));
-  table('Palettes of the forms (share of the time a form shows)', 'forms', PALETTES.map((p) => p.name));
+  table('Palettes of the forms (share of the time a form shows)', 'forms', [...PALETTES, ...FORMS.filter((f) => f.colors).map((f) => f.colors)].map((p) => p.name));
   table('Palettes of the layer', 'layers', PALETTES.map((p) => p.name));
   // The mood: how far it moves within 20 minutes.
   const ranges = [];
