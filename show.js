@@ -367,7 +367,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
   const tint = [...ROOM_TINT];
   // A black hole's shadow (see forms.js: blackhole, and holeShade in shaders.js):
   // its centre and radius, and how dark it is (0: none, and the shader skips it).
-  const HOLE = new Float32Array(4);
+  const HOLE = new Float32Array(4), JET = new Float32Array(3);   // (and the colour of its jets)
   let holeDark = 0;
 
   // The layer's surface height and its band's half thickness: each layer has
@@ -405,7 +405,9 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
         const turn = s.face === undefined ? 1 : 1 - Math.exp(-dt / 5);
         const d = goal - (s.face ?? goal);
         s.face = (s.face ?? goal) + (d - Math.round(d / (2 * Math.PI)) * 2 * Math.PI) * turn;
-        m = motion(form.name, age, w, go, r, s.face, ground, variantOf(e));
+        // (and how far the eye looks up at it, at once: a black hole shows its disc to the eye)
+        const [cx, cy, cz] = m.centre, rise = Math.atan2(cy - eye[1], Math.hypot(cx - eye[0], cz - eye[2]));
+        m = motion(form.name, age, w, go, r, s.face, ground, variantOf(e), rise);
       }
     }
     A.set([form.type, w, m.size, m.turn], k * 4);
@@ -423,7 +425,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
     // fades with the form's weight (a change of setting), never at once.
     if (m.hole !== undefined) {
       const dark = (m.dark ?? 1) * smooth(Math.min(1, w / HOLE_FADE));
-      if (dark > holeDark) { HOLE.set([...m.centre, m.hole]); holeDark = dark; }
+      if (dark > holeDark) { HOLE.set([...m.centre, m.hole]); JET.set(form.colors.jet); holeDark = dark; }
     }
   }
 
@@ -509,7 +511,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
     // layer: the layer of light, how much it shows and the top of its band as seen (topOf, the
     // height the forms rest on; for the eggs, see egg-kinds.js).
     const layer = slots[2] && slots[2].w > 0.001 ? { w: slots[2].w, top: topOf(slots[2].x.e.r) } : null;
-    return { rain: rainNow, storm: rainNow * skyNow, A, B, C, D, E, F, tint, forms, flow: want.flow, egg: eggNow, layer, hole: HOLE, holeDark };
+    return { rain: rainNow, storm: rainNow * skyNow, A, B, C, D, E, F, tint, forms, flow: want.flow, egg: eggNow, layer, hole: HOLE, holeJet: JET, holeDark };
   }
 
   // The colour key: every form, shown now or later, takes its next palette.

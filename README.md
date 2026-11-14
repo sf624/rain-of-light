@@ -5,7 +5,8 @@ through it. Now and then the rain eases off, and a large form of light
 gathers in the room: an orb, a spiral, a ring, or a veil
 like an aurora; a form of mathematics: a solid (a tetrahedron, a cube,
 a star) or a knot (a Lissajous figure, linked rings, a Möbius band); or a
-black hole, a dark heart in a swirling disc of orange light. Sometimes the rain falls through the form. The show moves
+black hole, a dark heart in a flat disc of orange light, bent over it by its
+gravity, with pale jets. Sometimes the rain falls through the form. The show moves
 between these on its own, with slow cross-fades. The weather, the colours
 and the direction of the rain change on their own too, and the camera
 circles the room slowly. Calm generative music follows the show, and every

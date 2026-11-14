@@ -260,7 +260,7 @@ top down, as if rain gathered into it or ran off it as rain.
 
 ### Forms
 
-![The seven forms alone in the still room: an amber orb, a blue spiral, an amber ring, a green veil, a pale cube of lines, a green knot and a black hole, a dark round heart in a swirling orange disc; the eighth picture, form=none, is the empty room](img/forms.jpg)
+![The seven forms alone in the still room: an amber orb, a blue spiral, an amber ring, a green veil, a pale cube of lines, a green knot and a black hole, a dark round heart in a flat orange disc with an arch of light over it and pale jets; the eighth picture, form=none, is the empty room](img/forms.jpg)
 
 Query: `rain=off&layer=off&t=30` with `form=orb`, `form=spiral`,
 `form=ring&t=60` (its face to the room), `form=veil`, `form=solid&solid=cube`,
@@ -323,22 +323,29 @@ Query: `rain=off&layer=off&t=40` with `form=solid&solid=tetrahedron`,
 
 And one form comes from the stars, about as often as one of mathematics:
 
-- **black hole** (`blackhole`): a perfectly dark round heart in a thick
-  disc of orange light that faces the room, leaning a little. The disc
-  turns about the heart, its inner parts faster, and its streaks wind
-  inward, so the matter is seen drawn into the centre. It is deep
+- **black hole** (`blackhole`): a perfectly dark round heart, and a thin
+  disc of orange light seen from a little above, wide and flat, its near
+  side crossing in front of the heart. Over the heart the disc's far side
+  shows lifted into an arch that hugs it, and a thinner arch under it, as
+  gravity bends its light; a thin bright ring hugs the dark heart. Two
+  narrow pale blue-white jets rise and fall along the disc's axis, with
+  brighter knots running out along them; the lower one fades out just
+  over the layer of light. The disc shows itself to the eye from every
+  side and height. Its matter turns about the heart, its inner parts
+  faster, and its streaks wind inward, over the arch too. It is deep
   orange-red at its edge, where thin wisps trail off, and pale yellow and
-  near white at its inner rim; one side is brighter, and that side goes
-  slowly round. A thin bright ring hugs the dark heart, and now and then
-  a brighter knot of light runs in and goes out at the rim. Nothing
-  behind the heart shows through it, not even the room's faint lattice,
-  in the floor too. It comes as a wide, faint spiral of matter that
-  winds in until the disc has formed, while the heart goes dark; it goes
-  as the disc drains into the heart, the ring shrinks to a point, and the
-  darkness closes last. Its colours are its own, not a palette's, and the
-  room turns deep navy while it shows. On a small screen's sparser
-  lattice the disc is coarser, a ring of orange points about the dark
-  heart.
+  near white at its inner rim; the side that comes towards the eye (the
+  left) is brighter. Now and then a brighter knot of light runs in and
+  goes out at the rim. Nothing behind the heart shows through it, not even
+  the room's faint lattice, in the floor too. It comes as a wide, faint
+  spiral of matter that winds in until the disc has formed, while the
+  heart goes dark, and then the jets grow out; it goes: the jets first,
+  then the disc drains into the heart, the ring shrinks to a point, and
+  the darkness closes last. Its colours are its own, not a palette's, and
+  the room turns deep navy while it shows. On a small screen's sparser
+  lattice the disc, the arches and the ring run together into one orange
+  ring with wings, crossed by the jets.
+
 
 Each other form takes its colours from a few palettes of its own
 (`config.js: FORMS`). The forms keep a little beyond the middle of the room
@@ -797,7 +804,7 @@ is 10 seconds). The default depth, 0.3, is gentler.
 | **Pad** | `music` | 0 to 1 | `0.6` | The slow pad in D major. |
 | **Bells** | `chimes` | 0 to 1 | `0.6` | The ripples' bells, and the still room's high notes. |
 | **Rain** | `rainSound` | 0 to 1 | `0.3` | The hush of rain. |
-| **Forms** | `formSound` | 0 to 1 | `0.4` | The voice each form brings: the orb a low hum, the spiral a turning figure, the ring a glassy tone, the veil a soft air, the solid a chord of pure fifths, the knot two beating tones, the black hole a low, slow drone. |
+| **Forms** | `formSound` | 0 to 1 | `0.4` | The voice each form brings: the orb a low hum, the spiral a turning figure, the ring a glassy tone, the veil a soft air, the solid a chord of pure fifths, the knot two beating tones, the black hole a low, slow drone and, as its jets grow, a faint high tone. |
 
 `m` or the note button turns the sound on and off. Browsers start sound
 only after a click or a key, so the music begins with your first one
@@ -813,7 +820,7 @@ fades:
   it is seen (it follows the form as it moves): the orb a warm, low hum, the
   spiral a slow figure of notes that climbs and turns, the ring a clear, glassy tone, the veil a soft, open air,
   the solid a still chord of pure fifths, the knot two tones that beat
-  against each other, the black hole a low, slow drone. Each form keeps its voice whichever figure it shows.
+  against each other, the black hole a low, slow drone, with a faint high tone as its jets grow. Each form keeps its voice whichever figure it shows.
   As it leaves, the harmony comes home to D.
 - **rain through a form**: both, fuller but not louder.
 - **a still room**: close to silence. The pad thins out, and now and then a

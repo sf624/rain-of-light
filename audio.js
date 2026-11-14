@@ -13,7 +13,8 @@
 //   clear, glassy tone; the veil a soft, open air; the solid a still chord of
 //   pure fifths; the knot two tones that beat against each other, each at its
 //   own pace; the black hole a low, slow drone, the chord's root and its
-//   fifth, each a pair that beats very slowly; a baked form (an egg) the ring's glassy tone, softer, with a
+//   fifth, each a pair that beats very slowly, and a faint high fifth as
+//   its jets grow; a baked form (an egg) the ring's glassy tone, softer, with a
 //   high third over it, like a music box heard from another room. As a form gathers, a chord of its own blooms; as it leaves, the
 //   harmony comes home to D. Each voice comes from where its form is seen.
 // - With a form the pad opens (brighter); in rain it is veiled.
@@ -290,6 +291,8 @@ export function createAudio({ settings }) {
       const r = notes[0];
       sustain(r, [['sine', 0, -0.8, 1], ['sine', 0, 0.8, 1], ['triangle', 0, 0, 0.25]], { t, hold, attack: 12, peak: level, cutoff: 420, pan: 0, dest, follow: false });
       sustain(r + 7, [['sine', 0, -1.2, 1], ['sine', 0, 1.2, 0.8]], { t, hold, attack: 14, peak: level * 0.55, cutoff: 500, pan: 0.15, dest, follow: false });
+      // Its jets: a faint high fifth, three octaves over, that comes later still, as they grow.
+      sustain(r + 43, [['sine', 0, -3, 1], ['sine', 0, 3, 1]], { t, hold, attack: 22, peak: level * 0.07, cutoff: 4000, pan: -0.1, dest, follow: false });
     } else if (name === 'knot') {
       // Two lines that cross: two notes of the chord an octave up, each a
       // pair a little apart in tune, the one beating half again as fast as
