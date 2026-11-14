@@ -289,23 +289,48 @@ export function viewerSchema(schema) {
   return sections;
 }
 
+// Old names (see RENAMED in config.js) turned into the new ones, in place:
+// an old key's value goes to its new key (unless that is set too), and an
+// old value of a key becomes its new value. get, set, del: the store's own
+// (the URL's or the saved settings'). Whether anything changed.
+function rename(renamed, get, set, del) {
+  let changed = false;
+  for (const [old, key] of Object.entries(renamed.keys ?? {})) {
+    if (get(old) === undefined) continue;
+    if (get(key) === undefined) set(key, get(old));
+    del(old);
+    changed = true;
+  }
+  for (const [key, values] of Object.entries(renamed.values ?? {})) {
+    const v = get(key);
+    if (v !== undefined && Object.hasOwn(values, v)) { set(key, values[v]); changed = true; }
+  }
+  return changed;
+}
+
 // Defaults, then what this browser saved, then the URL (?key=value).
 // scenes: the settings an old `scene` (in the URL, else saved) stands for
 // (see SCENES in config.js); they fill in those still at their default. A
 // saved scene is turned into its settings once, and is then no more kept.
-export function loadSettings(defaults, storageKey, params, scenes = {}) {
+// renamed: old names of settings and of their values (RENAMED), read as the
+// new ones; saved ones are rewritten once.
+export function loadSettings(defaults, storageKey, params, scenes = {}, renamed = {}) {
   const settings = { ...defaults };
   let scene = null;
   try {
     const saved = JSON.parse(localStorage.getItem(storageKey) || '{}');
+    let changed = rename(renamed, (k) => saved[k], (k, v) => { saved[k] = v; }, (k) => { delete saved[k]; });
     for (const key of Object.keys(defaults)) if (key in saved) settings[key] = saved[key];
     if ('scene' in saved) {
       scene = saved.scene;
       for (const [key, v] of Object.entries(scenes[scene] ?? {})) if (!(key in saved)) saved[key] = v;
       delete saved.scene;
-      localStorage.setItem(storageKey, JSON.stringify(saved));
+      changed = true;
     }
+    if (changed) localStorage.setItem(storageKey, JSON.stringify(saved));
   } catch { /* nothing saved, or storage blocked */ }
+  params = new URLSearchParams(params);
+  rename(renamed, (k) => params.get(k) ?? undefined, (k, v) => params.set(k, v), (k) => params.delete(k));
   for (const key of Object.keys(defaults)) {
     if (!params.has(key)) continue;
     const raw = params.get(key);

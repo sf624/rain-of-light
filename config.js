@@ -77,8 +77,9 @@ export const CAMERAS = [
   { name: 'rise',  hold: [25, 40], weight: 1.5 },
 ];
 
-// The planet's variants (see planets.js): one of them each time it comes.
-// Per variant: size (the ball's radius); upright (its axis near the
+// The celestial bodies (the form celestial's variants, see celestial.js):
+// one of them each time it comes. The ringed planets (see planets.js), per
+// body: size (the ball's radius); upright (its axis near the
 // vertical, its rings seen a little from above) or on its side (its rings
 // standing); open ([least, most]: how far its rings open to the eye, rad
 // from edge-on, slowly to and fro); roll (how far their ellipse leans to
@@ -91,7 +92,7 @@ export const CAMERAS = [
 // see planetLight in planets.js); room (the room's tint
 // while it shows); under (the layer's palettes under it).
 const TAU = Math.PI * 2;
-export const PLANETS = [
+export const BODIES = [
   // Saturn: C ring faint and dusky, B ring bright cream (brightest outward),
   // the dark Cassini division, A ring greyer with the Encke gap, and the thin F ring.
   { name: 'saturn', size: 2.3, upright: true, open: [0.3, 0.44], roll: 0.16, spin: TAU / 45, phase: 0.65,
@@ -112,7 +113,8 @@ export const PLANETS = [
 // form's number in the shader (see formsAt in shaders.js); weight is how
 // often it comes (see the casting in show.js): the forms of nature come more
 // often than the forms of mathematics. variants: the figures a form may be,
-// one for each of its lives (see figures.js, PLANETS, and show.js: variantOf).
+// one for each of its lives (see figures.js, BODIES, and show.js: variantOf);
+// label: its name as shown, if not its key.
 export const FORMS = [
   { name: 'orb',       type: 0, weight: 1,   palettes: ['amber', 'candle', 'sakura', 'deep sea'] },
   { name: 'spiral',    type: 1, weight: 1,   palettes: ['deep sea', 'sakura', 'ice', 'aurora'] },
@@ -120,8 +122,9 @@ export const FORMS = [
   { name: 'veil',      type: 4, weight: 1,   palettes: ['aurora', 'sakura', 'deep sea', 'amber'] },
   { name: 'solid',     type: 5, weight: 0.4, palettes: ['ice', 'amber', 'aurora', 'sakura'], variants: SOLIDS.map((x) => x.name) },
   { name: 'knot',      type: 6, weight: 0.4, palettes: ['aurora', 'amber', 'sakura', 'deep sea'], variants: KNOTS.map((x) => x.name) },
-  // Each of its variants (PLANETS) has colours of its own, so it has no palettes.
-  { name: 'planet',    type: 8, weight: 0.4, palettes: [], variants: PLANETS.map((x) => x.name) },
+  // A celestial body: each of its bodies (BODIES) has colours of its own, so it has no palettes.
+  { name: 'celestial', type: 8, weight: 0.4, label: 'celestial body', palettes: [], variants: BODIES.map((x) => x.name),
+    whichHint: 'auto: each time a celestial body comes, another of them / or always this one' },
 ];
 // The layer's surface lies height over the strands' feet, its bright band
 // thick around it (each a range: each time the layer has its own). The forms
@@ -164,10 +167,14 @@ export const PASSAGES = [
 // scene instead: its settings fill in those still at auto (see loadSettings
 // in tuner.js). The scene mix asks for nothing.
 export const SCENES = { rain: { rain: 'on', form: 'none', layer: 'off' }, crystal: { rain: 'off' } };
+// Settings renamed since links and saved settings named them (see
+// loadSettings in tuner.js): keys, an old key for its new one; values, per
+// key an old value for its new one. The planet became the celestial body.
+export const RENAMED = { keys: { planet: 'celestial' }, values: { form: { planet: 'celestial' } } };
 
 // ---------- tunable settings (panel: p key or the gear button; also ?key=value) ----------
 export const DEFAULTS = {
-  rain: 'auto', form: 'auto', solid: 'auto', knot: 'auto', planet: 'auto', layer: 'auto', mirror: 0.6, walls: 0, haze: 0, burn: 0.7, twinkle: 0.4, paleDrops: 1, rainShare: 1,
+  rain: 'auto', form: 'auto', solid: 'auto', knot: 'auto', celestial: 'auto', layer: 'auto', mirror: 0.6, walls: 0, haze: 0, burn: 0.7, twinkle: 0.4, paleDrops: 1, rainShare: 1,
   leds: small ? 210 : 1000, aspect: 1, grid: 0, rows: 0,
   layout: 'strands', jitter: 'off', density: 'auto', strandShare: 1.0, rowShare: 1.0, strandMin: 0.66, rowMin: 0.68,
   size: 0.018, maxPx: 4.5, rest: 0.03, wire: 0.2,
@@ -195,9 +202,10 @@ export const SCHEMA = [
     { key: 'rain', label: 'Rain', options: ['auto', 'on', 'off'], viewer: 1,
       hint: 'auto: rain comes and goes with the show / on: rain always falls, and the forms come and go through it / off: no rain, the forms of light have the room' },
     { key: 'form', label: 'Form', options: ['auto', ...FORMS.map((f) => f.name), 'none'], viewer: 2,
+      labels: ['auto', ...FORMS.map((f) => f.label ?? f.name), 'none'],
       hint: 'auto: forms of light come and go with the show / or hold one form (none: no form)' },
-    ...FORMS.filter((f) => f.variants).map((f) => ({ key: f.name, label: `Which ${f.name}`, options: ['auto', ...f.variants],
-      hint: `auto: each time the ${f.name} comes, another of its figures / or always this one` })),
+    ...FORMS.filter((f) => f.variants).map((f) => ({ key: f.name, label: `Which ${f.label ?? f.name}`, options: ['auto', ...f.variants],
+      hint: f.whichHint ?? `auto: each time the ${f.name} comes, another of its figures / or always this one` })),
     { key: 'layer', label: 'Layer of light', options: ['auto', 'on', 'off'] },
     { key: 'mirror', label: 'Floor mirror (0: off)', min: 0, max: 1, step: 0.05 },
     { key: 'walls', label: 'Wall mirrors (copies per side)', min: 0, max: 1, step: 1,

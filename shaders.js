@@ -635,7 +635,7 @@ vec3 bakedLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
   return vec3(light * 2.4, skin * 0.12 + deep * deep * 0.2, clamp(0.3 + deep, 0.0, 1.0));
 }
 
-#ifdef PLANET
+#ifdef CELESTIAL
 ${PLANET_GLSL}
 #endif
 
@@ -674,10 +674,10 @@ vec3 formsAt(vec3 p, float id, float v, out vec3 thread, out float around) {
     if (far > ff.w) continue;                        // too far from it for any of its light
     int type = int(a.x + 0.5);
     vec3 f = vec3(0.0);
-    vec3 own = vec3(0.0);   // (the planet gives its own colour)
-    // While a planet shows, no other sky form does (one comes only once the
-    // other has gone): its programs hold only it and the layer (planets.js: planetShader).
-#ifdef PLANET
+    vec3 own = vec3(0.0);   // (a celestial body gives its own colour)
+    // While a celestial body shows, no other sky form does (one comes only once the
+    // other has gone): its programs hold only it and the layer (celestial.js: bodyShader).
+#ifdef CELESTIAL
     if (type == 8) f = planetLight(q, a, b, ff, k, own);
 #else
     if (type == 0) f = orbLight(q, a, b);
@@ -692,7 +692,7 @@ vec3 formsAt(vec3 p, float id, float v, out vec3 thread, out float around) {
       vec3 eye = -(transpose(mat3(uView)) * uView[3].xyz);
       f.x *= smoothstep(LAYER_NEAR.x, LAYER_NEAR.y, length(q.xz - eye.xz));
     }
-#ifndef PLANET
+#ifndef CELESTIAL
     else if (type == 3) f = ringLight(q, a, b, e.z, ff);
     else if (type == 4) f = veilLight(q, a, b, e.z, ff);
     else if (type == 5) f = solidLight(q, a, b, e.z, ff);
@@ -725,7 +725,7 @@ void main() {
   vec4 cp = uCopy[gl_InstanceID];
   vec3 seen = vec3(cp.x * pos.x + cp.y, pos.y, cp.z * pos.z + cp.w);
   if (uMirror.y > 0.0) seen.y = 2.0 * uMirror.x - pos.y;
-#ifdef PLANET
+#ifdef CELESTIAL
   Eye = vec3(cp.x * (uEye.x - cp.y), uMirror.y > 0.0 ? 2.0 * uMirror.x - uEye.y : uEye.y, cp.z * (uEye.z - cp.w));
 #endif
   vec4 mv = uView * vec4(seen, 1.0);

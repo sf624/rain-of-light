@@ -495,10 +495,10 @@ await visit(cdp, base, 'lab.html?rain=off&egg=teapot&seed=2&t=40', false, false,
   { what: 'the teapot egg to show', js: `window.__lab.eggs().on.startsWith('teapot ')` });
 await visit(cdp, base, 'lab.html?rain=off&form=teapot&seed=2&t=40', false, false, null,
   { what: 'form=teapot to fall back to auto', js: `window.__lab.setting('form') === 'auto'` });
-// The planet held in the lab, and by a planet name it does not have (which falls back to auto).
-await visit(cdp, base, 'lab.html?rain=off&form=planet&planet=saturn&seed=2&t=40', false);
-await visit(cdp, base, 'lab.html?rain=off&form=planet&planet=earth&seed=3&t=40', false, false, null,
-  { what: 'planet=earth to fall back to auto', js: `window.__lab.setting('planet') === 'auto'` });
+// A celestial body held in the lab, and by a body name it does not have (which falls back to auto).
+await visit(cdp, base, 'lab.html?rain=off&form=celestial&celestial=saturn&seed=2&t=40', false);
+await visit(cdp, base, 'lab.html?rain=off&form=celestial&celestial=earth&seed=3&t=40', false, false, null,
+  { what: 'celestial=earth to fall back to auto', js: `window.__lab.setting('celestial') === 'auto'` });
 // A solid by a name it no longer has (the star): back to auto, and a solid shows.
 await visit(cdp, base, 'lab.html?rain=off&form=solid&solid=star&seed=2&t=40', false, false, null,
   { what: 'solid=star to fall back to auto', js: `window.__lab.setting('solid') === 'auto'` });
@@ -519,12 +519,12 @@ await visit(cdp, base, 'lab.html?egg=penrose&t=30', false, false, null,
     if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);
     return r.result.value;
   };
-  const read = async (q, saved) => {
+  const read = async (q, saved, keys = ['rain', 'form', 'layer']) => {
     if (saved !== undefined) await ev(`localStorage.setItem(${JSON.stringify(STORAGE_KEY)}, ${JSON.stringify(JSON.stringify(saved))})`);
     const url = `${base}lab.html?${q}${q ? '&' : ''}${LITE}`;
     await cdp.send('Page.navigate', { url }, sessionId);
     return poll(`lab.html?${q} to load its panel`, () => ev(`location.href === ${JSON.stringify(url)} && document.readyState === 'complete'
-      && !!document.querySelector('.tuner-row') && ['rain', 'form', 'layer'].map((k) => document.querySelector(\`.tuner-row[data-key="\${k}"] select\`).value).join()`));
+      && !!document.querySelector('.tuner-row') && ${JSON.stringify(keys)}.map((k) => document.querySelector(\`.tuner-row[data-key="\${k}"] select\`).value).join()`));
   };
   await read('');   // (the page's origin, for its storage)
   await ev(`localStorage.removeItem(${JSON.stringify(STORAGE_KEY)})`);
@@ -545,8 +545,25 @@ await visit(cdp, base, 'lab.html?egg=penrose&t=30', false, false, null,
     }
     await ev(`localStorage.removeItem(${JSON.stringify(STORAGE_KEY)})`);
   }
-  await cdp.send('Target.closeTarget', { targetId });
   console.log('ok  old scene= links and saved scenes read as Rain, Form and Layer');
+  // Renamed settings (config.js: RENAMED): an old link's or a saved setting's planet is the
+  // celestial body, and the saved one is rewritten under the new names.
+  for (const [q, saved, want, kept] of [
+    ['form=planet&planet=uranus', undefined, 'celestial,uranus'],
+    ['form=planet', undefined, 'celestial,auto'],
+    ['', { form: 'planet', planet: 'saturn' }, 'celestial,saturn', { form: 'celestial', celestial: 'saturn' }],
+    ['planet=uranus', { celestial: 'saturn' }, 'auto,uranus', { celestial: 'saturn' }],
+  ]) {
+    const got = await read(q, saved, ['form', 'celestial']);
+    if (got !== want) fail(`?${q} with ${JSON.stringify(saved ?? {})} saved reads form, celestial as ${got}, not ${want}`);
+    if (kept) {
+      const now = await ev(`localStorage.getItem(${JSON.stringify(STORAGE_KEY)})`);
+      if (now !== JSON.stringify(kept)) fail(`saved ${JSON.stringify(saved)} was kept as ${now}, not ${JSON.stringify(kept)}`);
+    }
+    await ev(`localStorage.removeItem(${JSON.stringify(STORAGE_KEY)})`);
+  }
+  await cdp.send('Target.closeTarget', { targetId });
+  console.log('ok  old form=planet, planet= links and saved settings read as the celestial body');
 }
 
 // The sound follows the show: rendered offline on the page's own clock (see

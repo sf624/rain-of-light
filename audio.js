@@ -45,8 +45,8 @@ const BELLS = [62, 64, 66, 69, 71, 74, 76, 78, 81]; // D major pentatonic
 const BAKED_VOICES = BAKED.map((e) => e.name);
 const FORM_CHORD = { orb: 2, spiral: 3, ring: 1, veil: 4, solid: 3, knot: 2, ...Object.fromEntries(BAKED_VOICES.map((n) => [n, HOME])) };
 const VOICES = Object.keys(FORM_CHORD);
-// The forms that sing with another's voice: the planet with the orb's (a ball of light, as it is).
-const VOICE_OF = { planet: 'orb' };
+// The forms that sing with another's voice: the celestial body with the orb's (a ball of light, as it is).
+const VOICE_OF = { celestial: 'orb' };
 const AIRY = { veil: 0.007 };                            // the forms with the air of the noise, and how much
 const SETTLE = 6;    // s: a chord a form brought is not changed again sooner
 

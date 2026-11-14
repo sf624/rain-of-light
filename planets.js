@@ -1,11 +1,10 @@
-// The planet: a form of light with variants, one per appearance (Saturn,
-// Uranus). Each variant has colours of its own (in place of the palettes of
-// the other forms), a size, a spin and rings (config.js: PLANETS; show.js
-// picks one as it picks a solid's figure). Here: its rings' extent and
-// lowest light, the frame it shows itself in (planetFrame), its rings'
-// profile as a texture (createRingMap), and the shader's planet
-// (PLANET_GLSL, put into POINT_VS by shaders.js). How it moves is in
-// forms.js (planet).
+// The ringed planets, celestial bodies (see celestial.js): Saturn and Uranus.
+// Each has colours of its own, a size, a spin and rings (config.js: BODIES;
+// show.js picks one as it picks a solid's figure). Here: their rings' extent
+// and lowest light, the frame a planet shows itself in (planetFrame), their
+// rings' profile as a texture (createRingMap), and the shader's planet
+// (PLANET_GLSL, put into POINT_VS by shaders.js, in the celestial bodies'
+// programs only). How a planet moves is in forms.js (planet).
 //
 // The ball is drawn as the eye sees it: every LED inside the ball shows the
 // place on the ball's near surface that lies behind it along the line of
@@ -16,14 +15,13 @@
 // LEDs that crosses the plane gives it the same light: the rings read as
 // continuous bands, not as dotted arcs.
 //
-// SwiftShader (no GPU) pays for the planet's code in every frame, planet or
-// not: what is the same for all its LEDs (its axis, the sun) is worked out
+// What is the same for all a planet's LEDs (its axis, the sun) is worked out
 // here once a frame, and its rings' profile is read from a texture.
 
-import { small, PLANETS } from './config.js';
+import { small, BODIES } from './config.js';
 import { sub, dot, cross, norm } from './gl.js';
 
-// A variant's rings as shown: its bands spread out from the first band's
+// A planet's rings as shown: its bands spread out from the first band's
 // inner edge by its stretch ([from, to, density, tone], in radii).
 export function bandsOf(P) {
   const r0 = P.rings[0][0], at = (r) => r0 + (r - r0) * P.stretch;
@@ -49,7 +47,7 @@ const SUN = 0.17;
 const SLAB = 5;
 const LANE_MAX = 0.5;   // the coarsest lattice step it is made for (a phone's: 0.45)
 
-// How far below its centre a variant's light ever reaches: its ball, or its
+// How far below its centre a planet's light ever reaches: its ball, or its
 // rings' lowest edge as far as they lean (LEAN, with the roll). The eye on
 // the floor looks up at it, so they lean about that far most of the time
 // (each frame's lean would make it rise and fall as the eye moves). The
@@ -92,7 +90,7 @@ export function planetFrame(P, centre, eye, open, roll, phase, turn) {
   return { n, sun, t: add(scale(t0, Math.cos(turn)), scale(cross(n, t0), Math.sin(turn))) };
 }
 
-// The rings' profile: per variant a row of RINGS_W texels out to RINGS_R
+// The rings' profile: per body a row of RINGS_W texels out to RINGS_R
 // radii, r: how dense (0 .. 1), g: the tone (2 .. 3 along the colours, as
 // 0 .. 1). The bands' edges are a quarter of a lattice step soft, and a band
 // narrower than 0.6 of a step is widened to that (for the default lattice
@@ -117,13 +115,13 @@ function profile(P) {
   return px;
 }
 export function createRingMap(gl, unit) {
-  const px = new Uint8Array(RINGS_W * 2 * PLANETS.length);
-  PLANETS.forEach((P, v) => px.set(profile(P), v * RINGS_W * 2));
+  const px = new Uint8Array(RINGS_W * 2 * BODIES.length);
+  BODIES.forEach((P, v) => px.set(profile(P), v * RINGS_W * 2));
   const tex = gl.createTexture();
   gl.activeTexture(gl.TEXTURE0 + unit);
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG8, RINGS_W, PLANETS.length, 0, gl.RG, gl.UNSIGNED_BYTE, px);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG8, RINGS_W, BODIES.length, 0, gl.RG, gl.UNSIGNED_BYTE, px);
   gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -133,17 +131,10 @@ export function createRingMap(gl, unit) {
   return tex;
 }
 
-// The vertex shader `src` (POINT_VS) with the planet's light in place of the
-// other sky forms' (while it shows, none of them does). The page draws with
-// it only while a planet shows (see main.js): SwiftShader (no GPU) runs a
-// shader the slower the more code it holds, even code that does not run, and
-// the planet's code in every frame cost rain alone 10% there, the orb 15%.
-export const planetShader = (src) => src.replace('#version 300 es\n', '#version 300 es\n#define PLANET\n');
-
 const f = (x) => (Number.isInteger(x) ? `${x}.0` : `${+x.toFixed(4)}`);
-const URANUS = PLANETS.findIndex((P) => P.name === 'uranus');
+const URANUS = BODIES.findIndex((P) => P.name === 'uranus');
 
-// The shader's planet (only in planetShader's programs). It needs hash3,
+// The shader's planet (only in the celestial bodies' programs, celestial.js: bodyShader). It needs hash3,
 // uTime, uLane, uEye and the slot's colours from POINT_VS.
 export const PLANET_GLSL = `
 // ---------- the planet (see planets.js) ----------
@@ -158,11 +149,11 @@ const float P_SLAB = ${f(SLAB)};
 
 // The rings at r (radii): how dense (0 .. 1), and their tone (0 .. 1 from the third colour to the fourth).
 vec2 ringAt(int v, float r) {
-  return textureLod(uRings, vec2(r / ${f(RINGS_R)}, (float(v) + 0.5) / ${f(PLANETS.length)}), 0.0).rg;
+  return textureLod(uRings, vec2(r / ${f(RINGS_R)}, (float(v) + 0.5) / ${f(BODIES.length)}), 0.0).rg;
 }
 
 // The planet in slot k: a = (type, weight, radius, -), b = (centre, -),
-// f = (variant, -, how far out its rings show (radii), reach). Its frame
+// f = (body, -, how far out its rings show (radii), reach). Its frame
 // is uFormN (its axis), uFormS (its sun) and uFormT (a way across its axis,
 // turning with it). col: the LED's colour (its own colours: the slot's four).
 vec3 planetLight(vec3 p, vec4 a, vec4 b, vec4 f, int k, out vec3 col) {
