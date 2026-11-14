@@ -324,8 +324,8 @@ of `POINT_VS` (`eggAt`, added to the forms' light).
 | Egg | What | Comes |
 | --- | --- | --- |
 | `teapot` | the Utah teapot, a baked form (`config.js: BAKED`) | rare slot, secret, pin |
-| `penrose` | the Penrose tribar: three beams at right angles that close into an impossible triangle, set up anew each frame for where the eye is, so it reads as the impossible figure the whole time; it turns slowly in the plane of the picture; the floor's image is a true reflection, and quietly gives the trick away | rare slot, secret, pin |
-| `clock` | the time of day, HH:MM in 5 x 7 dot glyphs facing the eye (two lines in a tall view) | rare slot, secret, pin |
+| `penrose` | the impossible triangle, drawn in light: a thin slab of LEDs (2.5 LED spacings thick) that faces the eye, at one distance from it, with the classic figure drawn in it (three bars of three tones, each band of one tone an L over two bars, each band lying over the next in turn); it turns slowly in its plane, breathes a little, its tones travel round; it comes LED by LED round the figure, as a pen would draw it, and goes back the same way; the floor shows the slab's true reflection | rare slot, secret, pin |
+| `clock` | the time of day, HH:MM in 5 x 7 dot glyphs facing the eye (two lines in a tall view), whole above the floor and the layer of light | rare slot, secret, pin |
 | `fireworks` | shells rise along the strands and burst into spheres of sparks that fall and fade; no sound | rare slot, secret, pin |
 | `tanabata` | the Milky Way rising slantwise over the room, with a dark rift, Vega and Altair on either side | rare slot, secret, pin |
 | `snow` | slow snow in place of the rain, and a tree of light with a garland and a star | 24 and 25 December, secret, pin |
@@ -379,8 +379,8 @@ of `POINT_VS` (`eggAt`, added to the forms' light).
   setting (the snapshots go); a seek back before a summons shows no egg, as
   with a click's wave. `window.__lab.eggs()` gives the tests the egg that
   shows and its uniforms.
-- **Registry**: `registerEgg({ name, slot, type, form, rain, layer, hold,
-  hush, params, secret, when, rare })` (the top of `eggs.js`
+- **Registry**: `registerEgg({ name, slot, type, form, rain, layer, hold, fade,
+  steady, hush, params, secret, when, rare })` (the top of `eggs.js`
   describes the fields). A baked form becomes an egg with one line,
   `registerEgg({ name: 'teapot', form: 'teapot', rare: true })`: the show
   holds that form while the egg shows (its field loads first).
@@ -390,8 +390,17 @@ of `POINT_VS` (`eggAt`, added to the forms' light).
   egg shows, the page builds programs with its function only
   (`eggShader`), without waiting for them (`gl.js: programLater`; the plain
   programs draw until they are done), and draws with them while it shows.
-  Each egg skips the LEDs far from it first (the tribar's reach; the glyph
+  Each egg skips the LEDs far from it first (the penrose's reach; the glyph
   panel's slab; a shell's sphere).
+- **Where a figure stands** (`egg-kinds.js: facing`, the penrose and the
+  clock): ahead of the eye, facing it, 18 units away (nearer where a wall
+  is), inside the view and inside the lattice, above its feet (the clock
+  also above the layer of light while it shows), as large as it wants to
+  be or as the view and the room leave room for. All of it comes from the
+  camera, so a time shows one picture. Looking down, the view leaves only a
+  thin band of lattice above the floor: while an egg with `steady` shows
+  (both of these), the camera's gaze looks only 40% as far up and down
+  (`main.js: cameraPose`), and the figure is still a little smaller there.
 - **When an egg cannot be built**: if its programs fail, the egg is
   dropped for the rest of the visit (`eggs.drop`) and the show goes on
   without it. A WebGL context may be lost at any time (a GPU reset; Chrome

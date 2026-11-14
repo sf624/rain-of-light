@@ -42,88 +42,58 @@ float eggPoint() { return 1.0 / max(uLight.x, 0.25); }
 float eggNear(float d, float r) { float c = max(r, 0.45 * uLane.x); return 1.0 - smoothstep(c, c + 0.5 * uLane.x, d); }
 
 #ifdef EGG_1
-// ---------- penrose: the tribar ----------
-// Three square beams along three axes at right angles, end to end, P0 -> P1
-// -> P2 -> P3, set up for this pass's eye so that P3 lies on the line from
-// the eye to P0: there the ends meet, and the three close into an impossible
-// triangle. Each beam's faces glow in one of three tones (by the axis they
-// face), only the faces towards the eye, and a beam hides what lies behind
-// it. A beam's width and its shell grow with the distance from the eye, so
-// that as seen every part of it is as wide, and the far end looks as wide as
-// the near end where they meet.
-// v0: P0, the anchor's distance from the eye (F); v1 .. v3: the beams (axis
-// times length), v1.w: the width at F, v2.w, v3.w: how far beams 0 and 1 have
-// come (0 .. 1); v4: the anchor, the shell's half thickness at F; v5: this
-// pass's eye, how far beam 2 has come; v6 .. v8: the tones of the faces across
-// each axis; v9.x: the reach from the anchor.
-float pBox(vec3 o, vec3 d, vec3 S, vec3 A, vec3 B, vec3 C, float len, float hw) {
-  // Where the line o + t d (t 0 .. 1) enters the beam's box, or 2 if it misses it.
-  vec3 lo = vec3(dot(o - S, A), dot(o - S, B), dot(o - S, C));
-  vec3 ld = vec3(dot(d, A), dot(d, B), dot(d, C));
-  vec3 mn = vec3(-hw, -hw, -hw), mx = vec3(len + hw, hw, hw);
-  vec3 inv = 1.0 / mix(ld, vec3(1e-5), lessThan(abs(ld), vec3(1e-5)));
-  vec3 t0 = (mn - lo) * inv, t1 = (mx - lo) * inv;
-  vec3 ta = min(t0, t1), tb = max(t0, t1);
-  float tin = max(max(ta.x, ta.y), max(ta.z, 0.0)), tout = min(min(tb.x, tb.y), min(tb.z, 1.0));
-  return tin <= tout ? tin : 2.0;
+// ---------- penrose: the impossible triangle, drawn in light ----------
+// A picture, not a solid: a slab of LEDs a few spacings thick (v0.w: its half
+// thickness) through C (v0.xyz) that faces the eye, with the classic figure
+// drawn in it. Each LED is seen where the line from the eye through it meets
+// the slab's middle plane, so the edges are crisp as seen. In the picture a
+// point is a ex + b ey, with ex, ey, ez one unit long, 120 degrees apart (ez
+// up; ex + ey + ez = 0): the drawing of a tribar of cubes as an isometric
+// picture shows it. The faces that look one way make one band, an L over two
+// bars (a long arm of n units, a short one of n - 1, both one unit wide): Z
+// (the tops), X, Y. Where two bands overlap, X lies over Z, Z over Y and Y
+// over X: no order in depth does that, which is the trick of the figure.
+// v1: cos and sin of its turn, 1 / the unit's length, n; v2: how far it has
+// come (0 .. 1), its shimmer, the edges' sharpness (1 / their softness, in units);
+// v3 .. v5: the tones of Z, X, Y (v3.w: its gain); v6: its reach from C, where
+// the pen starts round it (a share of a turn).
+float pIn(float v, float lo, float hi, float k) { return clamp(min(v - lo, hi - v) * k + 0.5, 0.0, 1.0); }
+// A band: its long arm (x 0 .. n, y 0 .. 1) and its short arm (x n - 1 .. n, y 0 .. n - 1).
+float pBand(float x, float y, float n, float k) {
+  return max(pIn(x, 0.0, n, k) * pIn(y, 0.0, 1.0, k), pIn(x, n - 1.0, n, k) * pIn(y, 0.0, n - 1.0, k));
 }
 vec3 penroseLight(vec3 p, float id, vec4 a) {
-  vec4 v4 = uEggV[4], v9 = uEggV[9];
-  vec3 qc = p - v4.xyz;
-  if (dot(qc, qc) > v9.x * v9.x) return vec3(0.0);   // (beyond its farthest corner and widest beam)
-  vec3 E = uEggV[5].xyz;
-  float dist = length(p - E);
-  vec4 v0 = uEggV[0];
-  float F = v0.w;
-  float L = length(uEggV[1].xyz);
-  float sc = dist / F;
-  float hw = 0.5 * uEggV[1].w * sc, T = v4.w * sc;
-  vec3 ax[3] = vec3[3](uEggV[1].xyz / L, uEggV[2].xyz / L, uEggV[3].xyz / L);
-  float come[3] = float[3](uEggV[2].w, uEggV[3].w, uEggV[5].w);
-  vec3 P = v0.xyz;
-  vec3 S[3] = vec3[3](P, P + ax[0] * L, P + (ax[0] + ax[1]) * L);
-  vec3 tone = vec3(0.0);
-  float best = 0.0;
-  int hit = -1;
-  for (int k = 0; k < 3; k++) {
-    if (come[k] <= 0.0) continue;
-    vec3 A = ax[k], B = ax[(k + 1) % 3], C = ax[(k + 2) % 3];
-    vec3 q = p - S[k];
-    float s = dot(q, A), x = dot(q, B), y = dot(q, C);
-    // The distance in from each face (negative outside it).
-    float dx = hw - abs(x), dyy = hw - abs(y), ds = min(s + hw, L + hw - s);
-    float din = min(min(dx, dyy), ds);
-    if (din < -T * 2.0) continue;
-    // Which face is nearest: its normal, and whether it looks towards the eye.
-    vec3 n = dx < dyy ? B * sign(x) : C * sign(y);
-    float second = max(dx < dyy ? dyy : dx, 0.0);
-    if (ds < min(dx, dyy)) { n = A * (s < L * 0.5 ? -1.0 : 1.0); second = min(dx, dyy); }
-    if (dot(n, E - p) <= 0.0) continue;
-    float shell = exp(-din * din / (T * T));
-    if (shell < 0.02) continue;
-    // (each beam comes LED by LED)
-    shell *= clamp((come[k] * 1.25 - hash(id + 67.0 + float(k))) / 0.25, 0.0, 1.0);
-    float edge = exp(-second * second / (T * T * 1.5));   // where two faces meet: a brighter line
-    // The tone: by the axis the face looks along (three tones, as the drawing has).
-    float ta = abs(dot(n, ax[0])), tb = abs(dot(n, ax[1]));
-    int which = ta > 0.5 ? 0 : tb > 0.5 ? 1 : 2;
-    vec3 col = uEggV[6 + which].xyz;
-    float k2 = which == 0 ? 1.0 : which == 1 ? 0.75 : 0.55;
-    float light = shell * (k2 * 3.0 + edge * 9.0);
-    if (light > best) { best = light; tone = col * shell * k2 * 5.0 + mix(col, WHITE_HOT, 0.6) * edge * shell * 13.0; hit = k; }
-  }
-  if (hit < 0) return vec3(0.0);
-  // Hidden behind another beam: the line from the eye to here passes through it first.
-  vec3 d = p - E;
-  for (int k = 0; k < 3; k++) {
-    if (k == hit || come[k] <= 0.0) continue;
-    vec3 A = ax[k], B = ax[(k + 1) % 3], C = ax[(k + 2) % 3];
-    // (the beam's width where the line passes closest to its middle, near enough)
-    float tc = clamp(dot(S[k] + A * L * 0.5 - E, d) / dot(d, d), 0.0, 1.0);
-    float t = pBox(E, d, S[k], A, B, C, L, 0.5 * uEggV[1].w * tc * dist / F);
-    if (t < 1.0 - T * 0.7 / dist) return vec3(0.0);
-  }
-  return tone;
+  vec4 v0 = uEggV[0], v1 = uEggV[1], v2 = uEggV[2];
+  vec3 d = p - v0.xyz;
+  float reach = uEggV[6].x;
+  if (dot(d, d) > reach * reach) return vec3(0.0);   // (the most of the LEDs: far from it)
+  vec3 toE = uEye - v0.xyz;
+  float D = length(toE);
+  vec3 N = toE / D;
+  float z = dot(d, N);
+  // In the slab: its LEDs at one depth, with a soft face one LED spacing deep (so the light
+  // a line of LEDs across it gives is the same wherever the lattice stands).
+  float depth = clamp((v0.w - abs(z)) / uLane.x + 0.5, 0.0, 1.0);
+  if (depth <= 0.0) return vec3(0.0);
+  vec3 R = normalize(cross(vec3(0.0, 1.0, 0.0), N)), U = cross(N, R);
+  vec2 q = vec2(dot(d, R), dot(d, U)) * (D / (D - z));
+  q = vec2(q.x * v1.x + q.y * v1.y, q.y * v1.x - q.x * v1.y) * v1.z;   // (turned back, in units)
+  float n = v1.w, k = v2.z;
+  // a, b from the triangle's middle (2n/3, n/3), then each band's own two coordinates.
+  float A = 0.57735027 * q.x - q.y + 2.0 * n / 3.0, B = -0.57735027 * q.x - q.y + n / 3.0;
+  float Z = pBand(A + 1.0, B + 1.0, n, k);
+  float X = pBand(B + n - A, n - A, n, k);
+  // (Y's arms the other way about: x 0 .. n - 1 along a, and its short arm down, 1 - n .. 1)
+  float zy = 1.0 - B, xy = A + 1.0 - B;
+  float Y = max(pIn(xy, 0.0, n - 1.0, k) * pIn(zy, 0.0, 1.0, k), pIn(xy, 0.0, 1.0, k) * pIn(zy, 1.0 - n, 1.0, k));
+  vec3 col = uEggV[3].xyz * Z * (1.0 - X) + uEggV[4].xyz * X * (1.0 - Y) + uEggV[5].xyz * Y * (1.0 - Z);
+  // It comes LED by LED, round the figure from a corner (+x: the top as it comes) as a pen would draw
+  // it, and goes back the same way.
+  float pen = fract(atan(q.y, q.x) / 6.2831853 + 1.0 - uEggV[6].y);
+  float order = 0.55 * hash(id + 67.0) + 0.45 * pen;
+  float gate = clamp((v2.x * 1.6 - order) / 0.6, 0.0, 1.0);   // (each LED over a good part of the way)
+  float shimmer = 1.0 + v2.y * sin(uTime * (1.1 + 1.6 * hash(id + 68.0)) + 6.2831853 * hash(id + 69.0));
+  return col * depth * gate * shimmer * uEggV[3].w * eggPoint();
 }
 
 #endif
@@ -146,6 +116,10 @@ vec3 clockLight(vec3 p, vec4 a) {
     vec3 q = p - Ln.xyz;
     float z = dot(q, N);
     if (abs(z) > R.w * 3.0) continue;
+    // Where the line from the eye through the LED meets the panel's plane: so a dot is as crisp as
+    // seen however thick the slab, and however far above or below the eye the panel stands.
+    float k = 1.0 - z / dot(p - uEye, N);
+    q = q * k + (Ln.xyz - uEye) * (k - 1.0);
     float x = dot(q, R.xyz) / s2, y = dot(q, D.xyz) / s2;
     if (x < 0.0 || y < 0.0 || y >= 7.0 || x >= 30.0) continue;
     int ch = int(x) / 6, cx = int(x) - ch * 6;

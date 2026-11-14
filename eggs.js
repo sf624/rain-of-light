@@ -13,7 +13,12 @@
 //   rain     null: the rain as the show has it; 0: none (not even the pale drops); 1: a rain passage
 //   layer    false: the layer of light gives way while it shows
 //   hold     s: how long a summons shows it
+//   fade     s: how long it takes to come and to go when summoned or by date (FADE; one that
+//            gives way to an earlier egg goes in FADE)
 //   hush     0 .. 1: how much it dims the rain's light while it shows (its light only, not the show's state)
+//   steady   0 .. 1: how much less far the camera's gaze looks up and down while it shows (main.js:
+//            cameraPose), for a figure that stands ahead of the eye: looking down, the view
+//            leaves only a thin band of lattice above the floor
 //   params   (entry, ctx, out): fills out.v (10 vectors) for the shader;
 //            may return its weight (else the entry's)
 // How it comes (the lab can pin any egg, ?egg=name):
@@ -43,7 +48,7 @@ import { isTyping } from './keys.js';
 
 export const REGISTRY = [];
 export function registerEgg(def) {
-  const egg = { slot: 'form', rain: null, layer: true, hold: 50, secret: true, rare: false, ...def };
+  const egg = { slot: 'form', rain: null, layer: true, hold: 50, fade: FADE, hush: 0, steady: 0, secret: true, rare: false, ...def };
   const i = REGISTRY.findIndex((e) => e.name === egg.name);
   if (i >= 0) REGISTRY[i] = egg; else REGISTRY.push(egg);
   return egg;
@@ -59,6 +64,7 @@ const FADE = 3;                               // s: an egg comes and goes over t
 // s: an egg that comes while another shows waits this long, as the other goes:
 // longer than FADE, and than a form takes to go (show.js: BLEND), for the rare form.
 export const HAND = 5;
+const CALM = 8;                               // s: the camera's gaze steadies over this long for an egg of the rare slot
 const LOOK = HAND + FADE;                     // s: how far back what came before still matters
 const smooth = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 
@@ -119,7 +125,7 @@ export function createEggs({ lab, params, canvas, start = 0, now = () => 0, onCh
     const out = [];
     if (summons && !broken.has(summons.egg)) {
       const { egg, from } = summons;
-      out.push({ egg, why: 'secret', from, end: (d) => from + d + egg.hold + FADE, fade: FADE });
+      out.push({ egg, why: 'secret', from, end: (d) => from + d + egg.hold + egg.fade, fade: egg.fade });
     }
     const back = Math.min(t - LOOK, summons ? summons.from : Infinity);
     for (const egg of REGISTRY) {
@@ -130,7 +136,7 @@ export function createEggs({ lab, params, canvas, start = 0, now = () => 0, onCh
         if (!span || seen.has(span.from)) continue;
         seen.add(span.from);
         const to = showAt(span.to);
-        out.push({ egg, why: 'date', from: showAt(span.from), end: () => to, fade: FADE });
+        out.push({ egg, why: 'date', from: showAt(span.from), end: () => to, fade: egg.fade });
       }
     }
     for (const s of rare(back, t)) if (!broken.has(s.egg)) out.push({ egg: s.egg, why: 'rare', from: s.from, end: () => s.to, fade: 0 });
@@ -139,8 +145,8 @@ export function createEggs({ lab, params, canvas, start = 0, now = () => 0, onCh
   // Which egg shows at t, and how much: { egg, why, w, age } or null; rare: how much of the
   // show's rare form may show (0 .. 1; it shows with the show's own weight).
   function eggOrder(t) {
-    if (pin === 'off') return { on: null, rare: 0 };
-    if (pin) return { on: { egg: eggNamed(pin), why: 'pin', w: 1, age: t }, rare: 0 };
+    if (pin === 'off') return { on: null, rare: 0, calm: 0 };
+    if (pin) return { on: { egg: eggNamed(pin), why: 'pin', w: 1, age: t }, rare: 0, calm: eggNamed(pin).steady };
     const list = near(t);
     // One that comes while a later one is there (came before it, and has not gone) waits HAND.
     for (const [i, c] of list.entries()) {
@@ -148,7 +154,7 @@ export function createEggs({ lab, params, canvas, start = 0, now = () => 0, onCh
       c.start = c.from + (later ? HAND : 0);
       c.to = c.end(c.start - c.from);
     }
-    let on = null, rareGate = 0;
+    let on = null, rareGate = 0, rareCalm = 0;
     for (const [i, c] of list.entries()) {
       // How much the earlier ones leave it: one that came first goes as an earlier one comes,
       // one that would come while an earlier one is there waits; both come back as it has gone.
@@ -158,20 +164,25 @@ export function createEggs({ lab, params, canvas, start = 0, now = () => 0, onCh
         gate *= t >= h.to ? smooth((t - h.to) / FADE) : c.from < h.from ? 1 - smooth((t - h.from) / FADE) : 0;
       }
       if (c.why === 'rare') {
-        if (!on && t >= c.from && t <= c.to) rareGate = Math.max(rareGate, gate);
+        if (!on && t >= c.from && t <= c.to) {
+          rareGate = Math.max(rareGate, gate);
+          // (the rare form's own weight is the show's: near enough, it is there from its coming to its going)
+          rareCalm = Math.max(rareCalm, c.egg.steady * gate * smooth((t - c.from) / CALM) * smooth((c.to - t) / CALM));
+        }
         continue;
       }
       const w = smooth((t - c.start) / c.fade) * smooth((c.to - t) / c.fade) * gate;
       if (w > 0 && !on) on = { egg: c.egg, why: c.why, w, age: t - c.start };
     }
     // (No rare span near: the show's rare form, if it shows at all, may.)
-    return { on, rare: list.some((c) => c.why === 'rare') ? rareGate : on ? 0 : 1 };
+    // calm: how much the camera's gaze steadies (see steady), a function of the time like the rest.
+    return { on, rare: list.some((c) => c.why === 'rare') ? rareGate : on ? 0 : 1, calm: on ? on.egg.steady * on.w : rareCalm };
   }
 
   // What shows at t, before the show's step: for the show, the egg in the form slot (its weight
   // and what it wants of the rain, the forms and the layer) and how much of its eggs of the rare
-  // slot may show; dry: how much of the pale drops go. Then settle: the show's own egg of the
-  // rare slot (show.js: update), when no other shows.
+  // slot may show; dry: how much of the pale drops go; calm: how much the camera's gaze steadies.
+  // Then settle: the show's own egg of the rare slot (show.js: update), when no other shows.
   let shown = null, rareNow = 1;
   function at(t) {
     const o = eggOrder(t);
@@ -182,6 +193,7 @@ export function createEggs({ lab, params, canvas, start = 0, now = () => 0, onCh
       show: form ? { w: k, age: s.age, form: s.egg.form, rain: s.egg.rain, layer: s.egg.layer } : null,
       rare: o.rare,
       dry: form && s.egg.rain === 0 ? k : 0,
+      calm: o.calm,
     };
   }
   function settle(own) {

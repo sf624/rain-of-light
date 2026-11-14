@@ -472,7 +472,9 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
     // flow: which way the rain goes now (see flowAt).
     // egg: the egg of the rare slot that shows in a form's place, with its own light ({ egg, w, age }), if any.
     const eggNow = own ? { egg: own.x.e.form.egg, w: own.w, age: own.x.age } : null;
-    return { rain: rainNow, storm: rainNow * skyNow, A, B, C, D, E, F, tint, forms, flow: want.flow, egg: eggNow };
+    // layer: the layer of light, how much it shows and the height of its surface (for the eggs, see egg-kinds.js).
+    const layer = slots[2] && slots[2].w > 0.001 ? { w: slots[2].w, y: B[9] } : null;
+    return { rain: rainNow, storm: rainNow * skyNow, A, B, C, D, E, F, tint, forms, flow: want.flow, egg: eggNow, layer };
   }
 
   // The colour key: every form, shown now or later, takes its next palette.

@@ -551,8 +551,9 @@ let lastDir = [0, 0, -1];
 
 
 // Where one move puts the eye at clock t, and which way it looks. On a floor
-// (ground: the eye's height there) the rise goes up from it and back.
-function cameraPose(name, t, R, bob, ground) {
+// (ground: the eye's height there) the rise goes up from it and back. calm
+// (0 .. 1): how much less far the gaze looks up and down (an easter egg may ask it, see eggs.js: steady).
+function cameraPose(name, t, R, bob, ground, calm = 0) {
   const a = t * 0.025;                                   // orbit angle
   const inward = [-Math.sin(a), 0, -Math.cos(a)];        // towards the centre
   const onOrbit = (y) => [Math.sin(a) * R, y, Math.cos(a) * R];
@@ -567,7 +568,7 @@ function cameraPose(name, t, R, bob, ground) {
       return { eye: [0, bob, 0], dir: [Math.sin(b), 0, Math.cos(b)] };
     }
     case 'gaze': {                                       // look up into the rain, then down
-      const p = 0.6 * Math.sin(t * 0.08);
+      const p = 0.6 * (1 - calm) * Math.sin(t * 0.08);
       return { eye: onOrbit(bob), dir: [inward[0] * Math.cos(p), Math.sin(p), inward[2] * Math.cos(p)] };
     }
     case 'rise':                                         // drift up and down through the lattice
@@ -694,7 +695,7 @@ function advance(dt, replay = false) {
   CAMERAS.forEach((cam, i) => {
     camW[i] = camFrom[i] + ((cam === camMode ? 1 : 0) - camFrom[i]) * kb;
     if (camW[i] < 1e-4) return;
-    const pose = cameraPose(cam.name, camClock, fit.radius, bob, ground);
+    const pose = cameraPose(cam.name, camClock, fit.radius, bob, ground, egg.calm);
     for (let k = 0; k < 3; k++) {
       eye[k] += pose.eye[k] * camW[i];
       dir[k] += pose.dir[k] * camW[i];
@@ -899,7 +900,7 @@ function hudSnapshot() {
 // eggs: the egg that shows, its uniforms, and the type of the egg drawn by its own program in the last frame.
 if (lab) {
   window.__lab = { state: () => JSON.stringify(saveState()), seek: (t) => { pendingSeek = t; }, turn: () => pointer.x, setting: (key) => S[key],
-    eggs: () => ({ on: eggs.info(), ...eggs.uniforms(), drawn: eggDrawn, eye: camera?.eye }) };
+    eggs: () => ({ on: eggs.info(), ...eggs.uniforms(), drawn: eggDrawn, eye: camera?.eye }), summon: (name) => eggs.summon(name) };
 }
 const hud = createHud({ lab, params, bar: clock.bar, snapshot: hudSnapshot });
 
@@ -948,7 +949,7 @@ function frame(now) {
   // For the lab's readout (see hudSnapshot): the frame's last state.
   lastShown = shown; lastGlow = glow; lastBreath = S.breath === 'on' ? breath : null;
   rainShareNow = (sparseShare() + (S.rainShare * (1 - 0.35 * shown.storm) - sparseShare()) * rk) * (1 - egg.dry);
-  eggs.frame(time, { camera, fov: fovRad(), SPAN, HEIGHT, FLOOR, lane: [SPAN / (GRID - 1), HEIGHT / ROWS] });
+  eggs.frame(time, { camera, fov: fovRad(), SPAN, HEIGHT, FLOOR, lane: [SPAN / (GRID - 1), HEIGHT / ROWS], layer: shown.layer });
   fallLightNow = rk * (1 - direction.mix);
 
   // Points.

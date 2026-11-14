@@ -786,8 +786,8 @@ over 5 s), and keep a little beyond their path as the eye sees them
 (`forms.js: BACK`).
 
 **The easter eggs come rarely.** From 10 minutes on, each form cast may
-be replaced by an easter egg of the rare slot (the teapot, the tribar, the
-clock, the fireworks, the Milky Way), each with a chance of 1.2%, from the
+be replaced by an easter egg of the rare slot (the teapot, the Penrose
+triangle, the clock, the fireworks, the Milky Way), each with a chance of 1.2%, from the
 passage's random number (`show.js: rareOf`; `eggs.js: RARE`), with at
 least three forms between two eggs. Everything else runs as if the
 replaced form had come: it counts as seen, and its palette as told, so the
