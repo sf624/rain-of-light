@@ -191,6 +191,8 @@ things that are not in the panel:
 | `pause` | `1` | off | The lab only: opens with the show paused (see [the lab's clock](development.md#the-labs-clock)). |
 | `rate` | a number from `0.1` to `60` | `1` | The lab only: opens with the show running at this speed (`0.25`: a quarter as fast). |
 | `hud` | `1` / `0` | as last chosen | The lab only: opens with the readout of the show's state shown / hidden. |
+| `egg` | an easter egg's name, `off` | none | The lab only: pins that egg (see [Easter eggs](development.md#easter-eggs)). `egg=cubes` shows a study: the room filled with a lattice of cubes of light, over whatever plays (best with `rain=off`; see [design.md](design.md#casting-slots-and-placing)). |
+| `cubes` | `a`, `b`, `c` | `a` | The lab only, with `egg=cubes`: which variant of the study (`a` ice-white with amber signals; `b` finer, in sakura colours, with waves; `c` great cubes of warm light that glow inside). |
 | `dpr` | a number, such as `1` or `1.5` | `2` | The highest pixel ratio drawn. A screen with a higher ratio is drawn at this one. |
 | `#tune` | (a hash, not a parameter) | | Opens the settings panel: `#tune` the viewer page's, `lab.html#tune` the lab's. |
 

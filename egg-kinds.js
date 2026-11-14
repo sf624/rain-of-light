@@ -6,9 +6,10 @@
 
 import { registerEgg } from './eggs.js';
 import { BAKED } from './config.js';
+import { cubesParams } from './cubes.js';
 
 // The shader's function per egg (eggAt in egg-shaders.js).
-export const EGG = { penrose: 1, clock: 2, fireworks: 3, snow: 4, milky: 5 };
+export const EGG = { penrose: 1, clock: 2, fireworks: 3, snow: 4, milky: 5, cubes: 6 };
 
 // ---------- the baked forms ----------
 // Each baked form (config.js BAKED: the teapot) is an egg held in the form slot.
@@ -233,3 +234,6 @@ registerEgg({
     put(out.v, 6, 9, 30, 0, 0);
   },
 });
+
+// cubes: a study, the room as a lattice of cubes of light (cubes.js); only the lab's pin shows it.
+registerEgg({ name: 'cubes', slot: 'overlay', type: EGG.cubes, secret: false, params: cubesParams });

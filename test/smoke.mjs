@@ -507,6 +507,9 @@ await visit(cdp, base, '?jitter=pitch', false);
 // An easter egg pinned in the lab: its own program is built and draws it.
 await visit(cdp, base, 'lab.html?egg=penrose&t=30', false, false, null,
   { what: 'the penrose egg to draw', js: `window.__lab.eggs().drawn === 1` });
+// The study of a lattice of cubes, pinned in the lab: its own program is built and draws it.
+await visit(cdp, base, 'lab.html?egg=cubes&rain=off&form=none&t=40', false, false, null,
+  { what: 'the cubes study to draw', js: `window.__lab.eggs().drawn === 6` });
 
 // Links and settings saved before Rain and Form chose what plays name a scene: it is read once, at
 // load, as the settings it stands for (config.js: SCENES), filling in those still at auto; the URL's

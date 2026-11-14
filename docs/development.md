@@ -332,6 +332,7 @@ of `POINT_VS` (`eggAt`, added to the forms' light).
 | `fireworks` | shells rise along the strands and burst into spheres of sparks that fall and fade; no sound | rare slot, secret, pin |
 | `tanabata` | the Milky Way rising slantwise over the room, with a dark rift, Vega and Altair on either side | rare slot, secret, pin |
 | `snow` | slow snow in place of the rain, and a tree of light with a garland and a star | 24 and 25 December, secret, pin |
+| `cubes` | a study: the room as a lattice of cubes of light (`cubes.js`; variants `?cubes=a`, `b`, `c`) | pin only |
 
 - **The rare slot** (`show.js: rareOf`; `eggs.js: RARE` is the one place
   to tune it): from 10 minutes on (`after`), the passage's random number

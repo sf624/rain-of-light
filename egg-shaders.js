@@ -10,6 +10,8 @@
 // programs that have none of it. (One program with all of them made the
 // GPU's compiler give up on Windows' D3D.)
 
+import { CUBES_GLSL } from './cubes.js';
+
 // The vertex shader `src` (POINT_VS) with the light of the egg of this type (EGG in egg-kinds.js).
 export const eggShader = (src, type) => src.replace('#version 300 es\n', `#version 300 es\n#define EGGS\n#define EGG_${type}\n`);
 
@@ -289,11 +291,17 @@ vec3 milkyLight(vec3 p, float id, vec4 a) {
 }
 
 #endif
+#ifdef EGG_6
+${CUBES_GLSL}
+#endif
 // The light of the egg that shows at p (id: the LED's). It fades with its
 // weight LED by LED, as a form does.
 vec3 eggAt(vec3 p, float id, inout vec3 thread) {
   vec4 a = uEgg;
   int type = int(a.x + 0.5);
+#ifdef EGG_6
+  if (type == 6) return cubesLight(p, id, a, thread);   // (a study of the lab's, cubes.js: its own fade and thread)
+#endif
   vec3 f = vec3(0.0);
 #ifdef EGG_1
   if (type == 1) f = penroseLight(p, id, a);

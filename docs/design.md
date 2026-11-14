@@ -936,6 +936,40 @@ same (an egg's own slower fades only move the next form's coming a
 little). The lab can pin an egg (`egg=teapot`, in its Easter egg select);
 no setting names it (see Easter eggs in [development.md](development.md)).
 
+**A study: the room as a lattice of cubes** (`cubes.js`; only the lab's
+pin shows it, `lab.html?egg=cubes`, and the show never casts it). Lines of
+light run along the room's three axes and meet at nodes, with the eye
+inside: a crystal of stacked cubes that the mirrors carry on. It is an
+egg of the overlay slot with no secret and no rare slot, so it lays its
+light over whatever the lab plays, and its code is in its programs only
+(`EGG_6`).
+
+- **On the LEDs.** A cube's edge is a whole number of strand gaps across
+  and of LED gaps up (4.5 by 3.75 units, rounded per lattice: 17 by 14
+  gaps on the desktop's, 10 by 8 on the phone's). A vertical line is a
+  whole strand, a horizontal one a row of LEDs, one per strand. The
+  strands are jittered, so a row of LEDs zigzags by up to half a gap: in
+  `snap` mode each LED on a line steps onto its place on the regular grid
+  as the lattice reaches it (`cubesPlace`, at most half a gap), and back as
+  it goes; the other LEDs stay. The lines are then straight.
+- **Light.** Each line is one LED thick. Its light per unit of length is
+  the same on any lattice, and fades with distance from the eye over 8
+  units, so near lines stand out and far ones are a haze of fine lines.
+  The vertical lines have half the light (whole strands lit overpower).
+  The lines cast no light rays (`CubesCalm`): only the nodes and the
+  signals' heads glint.
+- **Life, a function of time.** The lattice grows from a seed node along
+  its lines (a front that spreads by the lattice's own distance) over 20 s,
+  holds, and goes out edge by edge over 12 s, every 90 s. Signals (24)
+  run along the lines on seeded walks of six legs, turning at the nodes;
+  slow waves of brightness and a drifting field of two colours pass
+  through it; now and then a cube's edges light up; the whole breathes on
+  two periods that never fall into step.
+- **Variants** (`?cubes=`): `a` (the default) ice-white lines with amber
+  signals; `b` a finer lattice (3 units) in sakura colours with deep
+  waves and no signals; `c` great cubes (6 by 5) of warm light with bright
+  nodes, whole verticals, and lit cubes that glow inside.
+
 Among rain, a sky form glows up to 1.8 times brighter (`STORM_GAIN`), to
 hold its own. The layer has its own height, thickness and brightness each time. It
 is brighter and wavier when it has the room to itself.
@@ -1293,6 +1327,7 @@ GitHub link shows.
 | `fields.js` | The baked forms' fields: the 3D texture, fetching a field when its form draws near, `able`. |
 | `figures.js` | The figures of the solid and the knot: names, corners and edges, curves, sizes and heights (one per life). |
 | `planets.js` | The planet: its rings' extent and lowest light, and the shader's `planetLight`. |
+| `cubes.js` | A study of the lab's: the room as a lattice of cubes of light (`?egg=cubes`), its uniforms and its shader chunk. |
 | `director.js` | Seeded tracks (weather, colour, density, camera), the colour story's mood, the shared `hash`. |
 | `direction.js` | The change of the rain's direction: weights and gates per direction. |
 | `audio.js` | The generative music: pad, bells, rain, form voices, reverb. |

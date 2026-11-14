@@ -717,6 +717,9 @@ void main() {
   float seed = aData.w;
   float u = aData.y;
   vec3 pos = vec3(aData.x, (0.5 - u) * uHeight, aData.z);
+#ifdef EGG_6
+  pos = cubesPlace(pos);   // (the study's LEDs on its lines step onto a regular grid: cubes.js)
+#endif
   float h = hash(seed + 5.0);
   float spatial = (pos.x + pos.z) * 0.012;           // bands lean a little across the field
   // Mirror images: the LED's light, seen where its image is (in the walls, the
@@ -794,6 +797,9 @@ void main() {
   // The light that casts rays: all of the LED's light but the rain's trails
   // and the LEDs' light at rest (a drop's head, a form, a wave, a twinkle).
   vec3 glint = c;
+#ifdef EGG_6
+  glint -= CubesCalm * uLight.x;   // (the study's lines cast no rays: cubes.js)
+#endif
   vec3 wireCol = (thread + flare * ring) * uLight.y;
   float wireRest = uRest * 1.5 * near * uLight.y, wireWave = ring * 1.2 * uLight.y;
   float wireRain = uRainGain * 0.2 / uRainK[1].y;     // a wire's light does not grow with its LEDs' light

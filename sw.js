@@ -12,6 +12,7 @@ const CORE = [
   'main.js', 'config.js', 'shaders.js', 'lattice.js', 'gl.js', 'show.js', 'forms.js', 'figures.js', 'director.js', 'direction.js',
   'fields.js', 'controls.js', 'clock.js', 'keys.js', 'hud.js', 'audio.js', 'sway.js', 'tuner.js', 'wakelock.js', 'rotate.js',
   'eggs.js', 'egg-kinds.js', 'egg-shaders.js', 'planets.js',
+  'cubes.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png',
   'icons/apple-touch-icon.png',
 ];
