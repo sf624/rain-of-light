@@ -15,7 +15,7 @@ You stand in a dark room full of hanging strands of tiny LEDs, over a floor
 of black glass. Light falls down the strands like rain. Now and then the rain
 stops, and a large form of light gathers among the same LEDs: an orb, a
 spiral, a ring or a veil, one of two forms of mathematics (a
-solid, a knot), or a celestial body (the ringed planets Saturn, Uranus). A low sea of light (the layer) glows near
+solid, a knot), or a celestial body (the ringed planets Saturn, Uranus, or a black hole). A low sea of light (the layer) glows near
 the floor. The colours drift slowly together, and calm music follows what is
 shown. A click sends a wave of light through the room and rings a bell.
 
@@ -517,6 +517,8 @@ the form's first colour to its second:
 - `bakedLight`: a baked form (see Baked forms below), a shape's skin.
 - `planetLight` (in `planets.js`, see below): a celestial body that is a
   ringed planet, Saturn or Uranus.
+- `holeLight` (in `blackhole.js`, see below): the celestial body that is a
+  black hole.
 
 Each is a field: a function of the LED's position relative to the
 form's centre, size and turn. Where the form is moves in `forms.js` (see
@@ -556,25 +558,85 @@ it. Each comes and goes where it floats, in a way of its own
 the ring turns its face to the room out of a line and back into one, the
 veil unrolls from one end and lifts away upward, the solid's edges are
 drawn out from its corners and back, and the knot
-is drawn once round and undone (a link: all its rings at once). The orb has no move of its own: it grows from 0.75 of its size as
+is drawn once round and undone (a link: all its rings at once). The black
+hole gathers as a wide, faint spiral of matter that winds in until the
+disc has formed, while its heart goes dark, and then its jets grow out of
+it; it goes: the jets first, then the disc drains into the heart, the ring
+at the heart's edge shrinks to a point and goes out, and the darkness
+closes last. The orb has no move of its own: it grows from 0.75 of its size as
 its weight rises, and shrinks back as it falls (`forms.js: GROW`, `FADING`).
 
 **Colour.** The light is the form's first colour mixed towards its second,
 then towards `WHITE_HOT` by the white-hot share. Sky forms give 1.25 times
-their own light (`FORM_BODY`). A celestial body has four colours of its own; a planet's are its
-ball's two in the slot's first and second, its rings' two in a third and
-a fourth (`uFormG`, `uFormH`); `planetLight` mixes its LED's colour itself.
+their own light (`FORM_BODY`). A celestial body has four colours of its
+own, in the slot's first and second and in a third and a fourth
+(`uFormG`, `uFormH`), and its light function gives its LED's colour
+itself: a planet's are its ball's two and its rings' two, the black
+hole's its disc's two and its jets' (`config.js: BODIES`).
 
 **The celestial body.** The celestial body (`celestial`, shown as
 "celestial body") is a form whose variants are bodies of the sky
-(`config.js: BODIES`): each time it comes it is Saturn or Uranus, ringed
-planets. A body has its own four colours in place of palettes, a size, a
-spin and its rings. It is the form's figure, picked and pinned like the
-solid's (`variants`; `?form=celestial&celestial=saturn`). The HUD's forms
-row shows the body also where a form shows its palette. A planet's light
-is `planets.js: planetLight`. Old links and saved settings that name the
-planet (`form=planet`, `planet=saturn`) are read as the celestial body
-(`config.js: RENAMED`, `tuner.js: loadSettings`).
+(`config.js: BODIES`): each time it comes it is one of them, Saturn,
+Uranus (ringed planets) or a black hole. A body is of a kind (`kind`:
+`planet` or `hole`) and has its own four colours in place of palettes,
+the room's tint and the layer's palettes under it, and the voice it sings
+with. It is the form's figure, picked and pinned like the solid's
+(`variants`; `?form=celestial&celestial=saturn`). The HUD's forms row
+shows the body also where a form shows its palette. Old links and saved
+settings that name the planet (`form=planet`, `planet=saturn`) are read
+as the celestial body (`config.js: RENAMED`, `tuner.js: loadSettings`).
+
+- *Its own programs* (`celestial.js`). A body's code is in the points'
+  shader only while a body shows, and there in place of the other sky
+  forms' (while it shows, none of them does): `main.js` then draws the
+  whole frame (the LEDs, their wires, the images in the floor and the
+  walls) with a pair of programs of its kind's own (`bodyShader`), built
+  as an egg's are (`builtProgs`). The rest of the time the LEDs are drawn
+  by programs that hold none of the bodies' code: after the preprocessor
+  they are main's programs as they were before any body came, so rain
+  and the other forms cost what they did. SwiftShader runs a shader the
+  slower the more code it holds, even code that does not run (with the
+  planet's code in every frame, rain alone took 10% longer and the orb
+  15%), and a GPU does too, less (another kind's code in the planets'
+  programs made Saturn's frame 4% slower on an RTX 3090). So each kind
+  has a pair of programs that holds only its own code: a body pays for
+  no other, however many kinds the group holds.
+- *When they are built.* Building a pair stalls the page's frames while
+  the GPU compiles the whole points' shader (measured in Chrome on an RTX
+  3090 under WSL: 0.3 to 0.6 s of compiling a pair, the frames stalled
+  0.7 to 1.4 s; on SwiftShader 40 to 60 ms of compiling, the page's
+  script stalled up to 1.6 s). The casting is a function of time, so the
+  body to come is known well ahead: a kind's pair is sent 30 s before one
+  of its bodies first comes (`show.js: bodiesNear`, `BODY_AHEAD`), never
+  in the page's first 3 s (`main.js: BODY_AFTER`), which are the first
+  picture's, and only for the kinds that come: a viewer who leaves before
+  the black hole comes never builds its programs. Each pair is built once
+  a visit. A body that shows at once (held, or seeked to in the lab)
+  starts its pair as it shows: the plain programs draw until it is done,
+  so for its first frames (about 0.5 s here) the room shows without it,
+  and then it shows whole (it fades in over seconds, so this is seldom
+  seen).
+- *The interface.* Each kind's code gives three functions named after it
+  (`planetFar`, `planetBody`, `planetShade`; `holeFar` ...), and
+  `BODY_GLSL` makes from them, in each kind's own block (`#ifdef
+  BODY_PLANET` ...), the three that the shared shader calls only in the
+  bodies' programs (`#ifdef CELESTIAL`): `bodyFar` (how far an LED is
+  from the body as its reach counts), `bodyLight` (its light and colour,
+  and the share of it that casts rays and that its wire shows: `BodyRay`,
+  `BodyThread`) and `bodyShade` (what is left of any light behind it: 1
+  but for the black hole). A new kind is a module with its GLSL, one
+  entry in `celestial.js: KINDS`, its move in `forms.js: KIND_MOVES`, and
+  its bodies in `BODIES`.
+- *Casting.* It comes as often as its weight, 0.8, gives (as much as the
+  solid and the knot together); its bodies come in rounds like a solid's
+  figures: each round has every body once, in a shuffled order, never the
+  same twice running. It has no palette, so it takes no part in the
+  colour story; the layer under it takes the body's `under` palettes.
+  A planet sings with the orb's voice, the black hole with its own (the
+  body's `voice`).
+
+**A ringed planet** (`planets.js`, kind `planet`): Saturn or Uranus, each
+with a size, a spin and its rings; its light is `planetLight`.
 
 - *The ball as the eye sees it.* Every LED inside the ball shows the place
   on the near surface that lies behind it on the line of sight from the
@@ -638,26 +700,112 @@ planet (`form=planet`, `planet=saturn`) are read as the celestial body
 - *Height.* It rests on the layer of light like every form (see **How
   high a form floats** below), on its lowest light: the ball, or its rings'
   lowest edge at their lean (`planets.js: planetLow`).
-- *Casting.* It comes as often as the solid and the knot (weight 0.4).
-  Its bodies come in rounds like a solid's figures, so with two they
-  take turns, never the same twice running. It has no palette, so it takes no part in the colour story;
-  the layer under it takes the body's `under` palettes. Its voice is
-  the orb's (`audio.js: VOICE_OF`).
-- *Cost.* Its code is in the points' shader only while a body shows
-  (`celestial.js: bodyShader`), and there in place of the other sky
-  forms' (while it shows, none of them does): `main.js` then draws with
-  a pair of programs of its own, built as an egg's are (`builtProgs`,
-  started 3 s after the page; see Start-up). SwiftShader runs a shader the
-  slower the more code it holds, even code that does not run: with the
-  planet's code in every frame, rain alone took 10% longer and the orb
-  15%. What is the same for all its LEDs (the axis, the sun) is worked
-  out in JavaScript, and the rings' profile is read from the texture.
-  Measured (A/B interleaved, medians of 5 to 7 runs): on SwiftShader
-  (960 x 540, and 390 x 844 at dpr 2) rain and the orb take as long as
-  without the planet (within the noise, about 5%), and a planet about
+- *Cost.* What is the same for all its LEDs (the axis, the sun) is
+  worked out in JavaScript, and the rings' profile is read from the
+  texture. Measured (A/B interleaved, medians of 5 to 7 runs): on
+  SwiftShader (960 x 540, and 390 x 844 at dpr 2) a planet takes about
   22% less than the orb; on the RTX 3090 (GPU timer, 1920 x 1080, 1700
-  thousand LEDs, wall mirrors) a planet takes 0.2 to 0.4% more than the
-  orb.
+  thousand LEDs, wall mirrors) 0.2 to 0.4% more than the orb.
+
+**The black hole** (`blackhole.js`, kind `hole`; its light is
+`holeLight`) is drawn as the well-known pictures of a quasar show one: a
+thin disc of orange light, tilted both ways (open to the eye and rolled
+aside), round a dark heart, its near side crossing below the
+heart; the disc's far side lifted over the heart and, thinner, under
+it, as gravity bends its light (the lens); a thin photon ring at the
+heart's edge; and two jets along the disc's axis, one coming towards
+the eye on one diagonal, the other going away on the other.
+
+- Its axis stands in the room (`forms.js: blackhole`; the form's `tilt`
+  from the vertical, towards the way `yaw`). Each frame it is set from
+  the eye of the show's own camera move (`path` in `main.js`: the eye
+  before a drag turns or raises the view; `sight` in `show.js`: how far
+  that eye looks up at the form, and from which way): it leans towards
+  that eye by how far the eye looks up and by an opening that sways
+  slowly between 0.16 and 0.26 rad (`blackhole.js: BH.open`), and it is
+  rolled aside by 0.68 to 0.84 rad (`BH.roll`), to the eye's left or right, each time
+  its own way. So the show's camera, from any side and height, sees the
+  disc from a little above, aslant, its upper jet coming towards it and
+  its lower jet going away. A drag does not move it: the viewer looks
+  round it (turned 90 degrees, the disc is nearly edge-on and both
+  arches stand over and under the heart; turned 180, it is seen from
+  below, the jets swapped). A roll this large is what the lattice
+  needs: a jet less than about 40 degrees from the vertical lights each
+  strand it crosses along a long stretch, and reads as a vertical column
+  whatever its slope.
+- The disc is a sheet about one LED thick (0.6 of the LEDs' spacing
+  along a strand each side, at most 0.3: `HOLE_SHEET`): a sheet crosses
+  every strand under it, so even a sparse lattice draws it as a field of
+  points.
+- Its matter turns about the heart and falls into it: inward at a steady
+  pace in log radius (`HOLE_FALL`), and turning the faster the nearer it
+  is (`HOLE_SPIN` at the inner rim, as r^-1.5 farther out). Each piece
+  then follows a fixed spiral path: its angle less the turn it still has
+  to make on its way in (`path`). What moves with the matter keeps its
+  path and the time it reaches the rim (`rim`), so the disc is drawn in
+  those two numbers (`holeMatter`): streaks, arms along the paths broken
+  into strokes, and now and then a knot, a lump at one path and one
+  time. They run in with the matter, and keep their place in the disc
+  as the eye goes round it (the angle is counted from a way fixed in the
+  disc, `turn`). Its light and heat rise towards the inner rim (deep
+  orange-red, orange, pale yellow, near white at the rim). The side that
+  comes towards the eye (its left as the eye sees it) is brighter, as
+  light beamed by matter moving towards the eye is. Thin wisps trail off
+  the outer edge.
+- The lens is drawn, not computed: the LEDs stay where they are. It is
+  an image that faces the eye, thick along the line of sight
+  (`HOLE_DEEP`, 1.6 units each side), so that LEDs at many depths draw
+  it as a continuous arc, and it is laid out by the disc as the eye
+  itself sees it: along the disc's line across the line of sight and
+  towards its far side. Each ring of the disc's far side shows as an
+  arch over the heart: the inner rim's hugs the heart (`HOLE_ARC`), the
+  outer edge's is wide and joins the disc at its two ends. The matter on
+  the arch is the disc's own, at the same radius and angle, so its
+  streaks run over the top with it; it fades towards the outer edge, so
+  the arch is brightest near the heart. On the other side of the heart a
+  thinner, dimmer arch shows the disc's inner rim again (`HOLE_UNDER`);
+  seen edge-on, it is as high as the first, as in the famous pictures.
+  An LED finds its arch by bisection (6 steps).
+- The photon ring, a thin bright ring, hugs the edge of the shadow as
+  the eye sees it.
+- The jets (`HOLE_JET`, `HOLE_CONE`): two cones of pale blue-white along
+  the axis, from just outside the heart, 0.25 units wide at the base
+  (at least an LED gap) and widening by 0.06 per unit, fading with
+  distance, with knots that run outwards (one every 3 units, 2.2 units
+  a second). The one that comes towards the eye passes in front of the
+  heart and runs through LEDs nearer the eye, so its points and its
+  knots grow as they come; it fades over 2.6 units and is gone by 7. The
+  one that goes away is half as bright (as a jet beamed away is dimmer),
+  runs through farther, denser LEDs, is hidden by the heart at its base,
+  and dims by half where the disc lies in front of it (where the line of
+  sight to it crosses the disc between its rims); it fades over 2.6
+  units and is gone by 5, before the layer of light (the form rests on
+  it, see How high a form floats).
+- Its rays: only its hottest light casts them, and none that would run
+  across the heart (`HoleRay`). Its wires take a small share of its
+  light (a disc is not its strands).
+- Its reach counts its jets: an LED is near it within its disc's sphere,
+  or near its axis along the jets, within 1.2 units and more as they
+  widen (`holeReach`); the rain gives way by the same measure.
+- *Its shadow.* Light here only adds, so the black hole's heart is dark by
+  absence: every LED whose line of sight from the eye passes through the
+  hole's sphere gives no light, whatever it shows (rest, twinkle, drops,
+  rain, the layer, the waves, the hole's own disc behind it), and its wire
+  neither (`blackhole.js: holeShadow`, `hideBy`, through `bodyShade`). It
+  is one test of a ray against a sphere per LED, behind a uniform that is
+  0 when no black hole shows (`uHoleDark`; `uHole`: the centre and radius,
+  from `show.js`). The edge is soft over about 0.6 of an LED gap at the
+  hole's distance, so it is crisp and round. An image in the floor or a
+  wall is tested against the hole itself and against the hole's image
+  there, where its line of sight runs on past the mirror. LEDs in front of
+  the hole still shine: the strands hang in front of it, and so does the
+  near side of the hole's own disc, which crosses in front of the heart,
+  and its near jet. The disc and the jets stand in the room, so the floor
+  shows them as a mirror does; the lens and the photon ring are placed for
+  the eye itself, so the floor shows them from the eye's side: the arch
+  over the heart under it, and the ring a little off the shadow's edge. (A
+  corner image, seen through two wall mirrors, is not tested against the
+  hole's image in the mirror between.)
 
 **The layer** gives way where a sky form already lights the LED, so the two
 never add up to a white flare. It is dark within 4.5 units of the eye and
@@ -803,17 +951,19 @@ another, from hashes of the seed and the passage's number:
   gathers on it or runs off it.
 - Otherwise the new form is never one of the last two. Each of the others
   is as likely as its weight (`config.js: FORMS`: 1 for the orb, spiral,
-  ring and veil, 0.4 for the solid, the knot and the celestial body)
-  times the square of how many forms have come since it last did. Over an
-  hour a form comes about 36 times: each of the first four about 5.5 times, the
-  solid, the knot and the celestial body about 4.2 times (`tools/story-stats.mjs`).
+  ring and veil, 0.4 for the solid and the knot, 0.8 for the celestial
+  body) times the square of how many forms have come since it last did.
+  Over an hour a form comes about 36 times: each of the first four about
+  5.4 times, the solid and the knot about 4, the celestial body about 5
+  (`tools/story-stats.mjs`).
 - A form with figures (the solid, the knot; the celestial bodies) is each time one of them for
   its whole life (`show.js: figureOf`). They come in
   rounds: each round has every figure once, in an order shuffled from the
   passage's hash, and never begins with the figure the last round ended
   on. So no figure comes twice running, and each comes about as often as
-  the others (the knot's about 1.4 times an hour each, the solid's,
-  Saturn's and Uranus's about 2.1). An egg that takes a form's place uses
+  the others (the knot's about 1.4 times an hour each, the solid's about
+  2, the celestial bodies about 1.7: a fourth body would bring each to
+  about 1.3). An egg that takes a form's place uses
   none of its figures (in a celestial body's place, which has no palettes, it
   takes the orb's). The lab can pin one (`solid=`, `knot=`, `celestial=`;
   `show.js: variantOf`).
@@ -876,7 +1026,7 @@ Where a form is comes from `forms.js: motion`, as a function of its age, of
 its weight (the orb's size, see `GROW`) and of how far it has gone on its
 way out. Each form has a life of its own
 (`forms.js: orb`, `spiral`, `ring`, `veil`, `solid`,
-`knot`). For example, the orb drifts and breathes; the ring tumbles like a
+`knot`; a celestial body's by its kind, `planet`, `blackhole`). For example, the orb drifts and breathes; the ring tumbles like a
 coin turning in the air, about a slanting diameter, once round in 80 s
 (`TURN`), so it shows its face and then its edge, a slanting line. Edge-on,
 its light is piled up along the line of sight, and it gives half as much
@@ -921,7 +1071,18 @@ rings' slab adds nothing: its LEDs below their plane show the rings where
 their lines of sight cross it, so the eye sees them on the plane. The thin forms add the half thickness
 of their line (`ROD`, `THREAD`) or of a corner's point (`CORNER`). The
 veil, which is no rigid shape, states its own depth: its hem's lowest fold
-and the glow below it; a baked form, its base and its skin (the teapot, an
+and the glow below it; the black hole, the lowest point of its disc's
+edge as its axis leans (from the vertical by `tilt`), where its light
+shows clearly (`BH.rim`), the arch under its heart, and its lower jet
+where it still shows clearly (`BH.down`, along the axis; it fades out
+below that before the band). The disc's edge is the lowest of the three:
+its lowest point lies on the near side, towards the side it rolls to, so
+it touches the band's height nearer the eye than the heart is, and the
+eye, which stands lower, sees it a little over the band. The jet counts
+before the jets have grown and after they have gone, so the form stays
+where it is as they come and go. As the disc gathers from wide, its edge
+is lower, and the form rests higher (about 0.85 units, settling over
+20 s); as it drains, it stays where it is; a baked form, its base and its skin (the teapot, an
 easter egg held in the form slot, is drawn as a form and rests the same way).
 The clock, which faces the eye, keeps its lowest dots `CLEAR` over the same
 top of the band (`show.js: topOf`, see `egg-kinds.js: panel`). How far each
@@ -1063,8 +1224,11 @@ The layers:
   weight, panned to where it is seen (`mixVoices`): the orb a warm low hum,
   the spiral a slow figure of notes (scheduled in `tick`), the ring a glassy tone, the veil a soft air, the solid a chord
   of three pure fifths, the knot two tones that beat at different paces,
+  the black hole a low, slow drone (the chord's root and its fifth, each a
+  pair that beats very slowly, swelling late, and a faint high fifth
+  three octaves over that comes later still, as its jets grow),
   and a baked form the ring's glassy tone, softer, with the chord's third
-  over it, on D. The voice is the form's, whichever figure it shows. The celestial body sings with the orb's voice (`VOICE_OF`).
+  over it, on D. The voice is the form's, whichever figure it shows; a celestial body sings with the voice its body names (`config.js: BODIES`, `voice`): a planet with the orb's, the black hole with its own.
   The veil also gets a little high noise (`AIRY`).
 - **Pale drops.** In a still room a high, soft note falls now and then.
 - **Reverb.** A 6 s convolution reverb (`impulse`), then a compressor.
@@ -1234,8 +1398,10 @@ the programs). So:
   shader's log.
 - **A program built while the show runs waits for nothing.** An easter
   egg's programs, and the celestial bodies', are built by the same `program`
-  (`main.js: builtProgs`): an egg's the first time it shows, the bodies'
-  3 s after the page (or as it first comes, if that is sooner). `ready()`
+  (`main.js: builtProgs`): an egg's the first time it shows, a kind of
+  celestial body's 30 s before one of its bodies first comes, but not in
+  the page's first 3 s (or as one first shows, if that is sooner; see
+  Forms of light). `ready()`
   asks the GPU, without waiting, whether the build is done
   (`KHR_parallel_shader_compile`; without it, one frame later), and the
   plain programs draw until it is. Their first use, and so any error,
@@ -1296,7 +1462,8 @@ GitHub link shows.
 | `forms.js` | How each form moves through its life: centre, size, turn, tilt, its own measures, reach. |
 | `fields.js` | The baked forms' fields: the 3D texture, fetching a field when its form draws near, `able`. |
 | `figures.js` | The figures of the solid and the knot: names, corners and edges, curves, sizes and heights (one per life). |
-| `celestial.js` | The celestial bodies: the programs they show with (`bodyShader`). |
+| `celestial.js` | The celestial bodies: their kinds, and the programs they show with (`bodyShader`, `BODY_GLSL`). |
+| `blackhole.js` | The black hole: its measures (`BH`) and the shader's `holeLight` and its shadow. |
 | `planets.js` | The ringed planets: their rings' extent and lowest light, and the shader's `planetLight`. |
 | `director.js` | Seeded tracks (weather, colour, density, camera), the colour story's mood, the shared `hash`. |
 | `direction.js` | The change of the rain's direction: weights and gates per direction. |
@@ -1329,10 +1496,14 @@ flowchart TD
   main --> rotate["rotate.js"]
   tuner --> rotate
   audio --> sway
-  shaders --> planets["planets.js"]
-  main --> celestial["celestial.js"]
-  main --> planets
+  shaders --> celestial["celestial.js"]
+  main --> celestial
+  main --> planets["planets.js"]
+  celestial --> planets
+  celestial --> blackhole["blackhole.js"]
+  celestial --> config
   forms --> planets
+  forms --> blackhole
   planets --> config
   planets --> gl
   show --> config
@@ -1363,8 +1534,8 @@ Details and commands are in [development.md](development.md).
   the viewer page's Reset clears), rain alone in the lab and no rain
   (with the same click, keys and Reset), rain that never ends with a form
   through it, a seeded time with and without the story, four of the forms
-  held, a celestial body held (named in the lab, and by a name it does not
-  have), and `?jitter=pitch`; that a `scene=` in a link or in saved
+  held, a celestial body held (Saturn and the black hole in the lab, each
+  drawn by its kind's own programs, and by a name it does not have), and `?jitter=pitch`; that a `scene=` in a link or in saved
   settings is read as Rain, Form and Layer; and that `form=planet` and
   `planet=` are read as the celestial body. It then renders the sound: a held orb must be
   audible, a still room at least 3 dB quieter, and neither may clip. The

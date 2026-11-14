@@ -495,8 +495,13 @@ await visit(cdp, base, 'lab.html?rain=off&egg=teapot&seed=2&t=40', false, false,
   { what: 'the teapot egg to show', js: `window.__lab.eggs().on.startsWith('teapot ')` });
 await visit(cdp, base, 'lab.html?rain=off&form=teapot&seed=2&t=40', false, false, null,
   { what: 'form=teapot to fall back to auto', js: `window.__lab.setting('form') === 'auto'` });
-// A celestial body held in the lab, and by a body name it does not have (which falls back to auto).
-await visit(cdp, base, 'lab.html?rain=off&form=celestial&celestial=saturn&seed=2&t=40', false);
+// A celestial body held in the lab, drawn by its kind's own programs (celestial.js: Saturn by the
+// planets', the black hole by its own, and only those built), and by a body name it does not have
+// (which falls back to auto).
+await visit(cdp, base, 'lab.html?rain=off&form=celestial&celestial=saturn&seed=2&t=40', false, false, null,
+  { what: 'Saturn to draw with the planets\' programs', js: `window.__lab.bodies().drawn === 'planet'` });
+await visit(cdp, base, 'lab.html?rain=off&form=celestial&celestial=blackhole&seed=2&t=40', false, false, null,
+  { what: 'the black hole to draw with its own programs', js: `window.__lab.bodies().drawn === 'hole' && window.__lab.bodies().built.join() === 'hole'` });
 await visit(cdp, base, 'lab.html?rain=off&form=celestial&celestial=earth&seed=3&t=40', false, false, null,
   { what: 'celestial=earth to fall back to auto', js: `window.__lab.setting('celestial') === 'auto'` });
 // A solid by a name it no longer has (the star): back to auto, and a solid shows.

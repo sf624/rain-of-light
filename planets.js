@@ -90,7 +90,7 @@ export function planetFrame(P, centre, eye, open, roll, phase, turn) {
   return { n, sun, t: add(scale(t0, Math.cos(turn)), scale(cross(n, t0), Math.sin(turn))) };
 }
 
-// The rings' profile: per body a row of RINGS_W texels out to RINGS_R
+// The rings' profile: per body (of BODIES, all kinds) a row of RINGS_W texels out to RINGS_R
 // radii, r: how dense (0 .. 1), g: the tone (2 .. 3 along the colours, as
 // 0 .. 1). The bands' edges are a quarter of a lattice step soft, and a band
 // narrower than 0.6 of a step is widened to that (for the default lattice
@@ -100,6 +100,7 @@ const hashOf = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; retu
 const smoothstep = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const noise1 = (x, o) => { const i = Math.floor(x), t = smoothstep(0, 1, x - i); return hashOf(i + o) * (1 - t) + hashOf(i + o + 1) * t; };
 function profile(P) {
+  if (!P.rings) return new Uint8Array(RINGS_W * 2);   // (a body without rings: an empty row)
   const R = P.size, s = 0.25 * LANE_BAKE / R, m = 0.6 * LANE_BAKE / R, px = new Uint8Array(RINGS_W * 2);
   for (let i = 0; i < RINGS_W; i++) {
     const r = (i + 0.5) / RINGS_W * RINGS_R, fine = 0.6 + 0.35 * noise1(r * 9, 0) + 0.3 * noise1(r * 3, 50);
@@ -134,14 +135,13 @@ export function createRingMap(gl, unit) {
 const f = (x) => (Number.isInteger(x) ? `${x}.0` : `${+x.toFixed(4)}`);
 const URANUS = BODIES.findIndex((P) => P.name === 'uranus');
 
-// The shader's planet (only in the celestial bodies' programs, celestial.js: bodyShader). It needs hash3,
-// uTime, uLane, uEye and the slot's colours from POINT_VS.
+// The shader's planet (only in the celestial bodies' programs, celestial.js:
+// bodyShader). It needs hash3, uTime, uLane and the slot's colours from
+// POINT_VS, and Eye and the third and fourth colours from celestial.js:
+// BODY_GLSL. (uFormG, uFormH: its rings' colours.)
 export const PLANET_GLSL = `
 // ---------- the planet (see planets.js) ----------
 uniform sampler2D uRings;   // the rings' profile (planets.js: createRingMap)
-uniform vec3 uFormG[3];     // a planet's third and fourth colours (its rings')
-uniform vec3 uFormH[3];
-vec3 Eye;                   // where the eye is as this LED's image is seen (main sets it: in a mirror, the eye's image)
 uniform vec3 uFormN[3];     // a planet's axis, its sun, and the way across its axis that its turn is counted from (planetFrame)
 uniform vec3 uFormS[3];
 uniform vec3 uFormT[3];
@@ -226,4 +226,13 @@ vec3 planetLight(vec3 p, vec4 a, vec4 b, vec4 f, int k, out vec3 col) {
   col = ringCol;
   return vec3(light + glint * 10.0, glint * 0.8, 0.0);
 }
+
+// Its part of the celestial bodies' interface (celestial.js: KINDS).
+float planetFar(vec3 rel, vec4 b, vec4 e, vec4 f) { return length(rel); }
+vec3 planetBody(vec3 p, vec4 a, vec4 b, vec4 e, vec4 f, int k, out vec3 col) {
+  BodyRay = 1.0;
+  BodyThread = 0.2;   // (a ball's face is not its strands)
+  return planetLight(p, a, b, f, k, col);
+}
+float planetShade(vec3 seen) { return 1.0; }
 `;

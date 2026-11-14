@@ -5,7 +5,9 @@ through it. Now and then the rain eases off, and a large form of light
 gathers in the room: an orb, a spiral, a ring, or a veil
 like an aurora; or a form of mathematics: a solid (a tetrahedron or a cube)
 or a knot (a Lissajous figure, linked rings, a Möbius band);
-or a celestial body, a ringed planet: Saturn or Uranus.
+or a celestial body: a ringed planet, Saturn or Uranus, or a black hole,
+a dark heart in a tilted disc of orange light, bent over it by its
+gravity, with pale jets coming towards you and going away.
 Sometimes the rain falls through the form. The show moves
 between these on its own, with slow cross-fades. The weather, the colours
 and the direction of the rain change on their own too, and the camera
