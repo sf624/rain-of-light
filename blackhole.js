@@ -59,16 +59,13 @@ float holeNoise(float x) { float i = floor(x), t = fract(x); return mix(hash(i),
 // How much matter a jet carries that left the heart at time tau (the jet's
 // own clock, see holeLight), as far out as far: never at a fixed beat.
 float holeFlow(float tau, float far) {
-  // Clumps of matter, each its own size, spacing and brightness: two
-  // octaves of noise of the time it left (the fine one fades as the matter
-  // travels, so clumps soften and spread), each clump as bright as a slower
-  // noise has it; quiet stretches now and then (mood), and now and then a
-  // stronger outflow (burst).
-  float x = mix(holeNoise(tau * 1.1), holeNoise(tau * 2.7 + 40.0), 0.4 * exp(-far / 4.0));
-  float clump = smoothstep(0.42, 0.92, x);
-  float amp = 0.35 + 1.65 * holeNoise(tau * 0.55 + 17.3);
-  float mood = smoothstep(0.05, 0.45, holeNoise(tau * 0.04 + 80.0)), burst = smoothstep(0.75, 0.95, holeNoise(tau * 0.06 + 120.0));
-  return 0.3 + 2.0 * clump * clump * amp * (0.25 + 0.75 * mood) * (1.0 + 1.2 * burst);
+  // A steady faint beam, and now and then a clump of matter, each its own:
+  // where two octaves of noise of the time it left rise high (the fine one
+  // fades as the matter travels, so clumps soften and spread), each clump
+  // as bright as a slower noise has it, fainter in quiet stretches (mood).
+  float x = mix(holeNoise(tau * 0.9), holeNoise(tau * 2.3 + 40.0), 0.4 * exp(-far / 4.0));
+  float amp = 0.4 + 1.2 * holeNoise(tau * 0.5 + 17.3), mood = smoothstep(0.05, 0.45, holeNoise(tau * 0.04 + 80.0));
+  return 0.55 + 2.6 * pow(smoothstep(0.6, 0.95, x), 1.5) * amp * (0.3 + 0.7 * mood);
 }
 float HoleRay, HoleJet;   // set by holeLight: the share of its light that casts rays, and that is a jet's
 // The disc's axis: up, leaning by b.w towards the way yaw.
