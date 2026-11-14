@@ -14,7 +14,7 @@
 // vertical, eased in show.js): some forms turn a face to the room, and some
 // keep beyond their path as the eye sees it (see BACK).
 
-import { ROOM, EGGS } from './config.js';
+import { ROOM, BAKED } from './config.js';
 import { SOLIDS, KNOTS } from './figures.js';
 
 const FLOOR = -ROOM.height / 2 - ROOM.foot;        // the mirror floor
@@ -145,7 +145,7 @@ function knot(age, w, leave, ph, face, go, v) {
   };
 }
 
-// A baked form (an egg, see EGGS): it sits on the floor, its side to the
+// A baked form (see BAKED): it sits on the floor, its side to the
 // room, and sways slowly about the vertical, so that it shows its profile
 // and, now and then, a little of its front and its back; it never turns
 // round (its outline would read only from the side).
@@ -165,10 +165,10 @@ function baked(egg, age, w, leave, ph, face) {
 }
 
 export const MOTIONS = { orb, spiral, ring, veil, solid, knot,
-  ...Object.fromEntries(EGGS.map((egg) => [egg.name, (age, w, leave, ph, face) => baked(egg, age, w, leave, ph, face)])) };
+  ...Object.fromEntries(BAKED.map((egg) => [egg.name, (age, w, leave, ph, face) => baked(egg, age, w, leave, ph, face)])) };
 // How far beyond its own path each form keeps, as the eye sees it: the loose
 // and the wide ones read from a distance, and none flares right at the eye.
-const BACK = { orb: 2.5, spiral: 2.5, ring: 2.5, veil: 3, solid: 2.5, knot: 3.5, ...Object.fromEntries(EGGS.map((egg) => [egg.name, 3])) };
+const BACK = { orb: 2.5, spiral: 2.5, ring: 2.5, veil: 3, solid: 2.5, knot: 3.5, ...Object.fromEntries(BAKED.map((egg) => [egg.name, 3])) };
 
 // How large the orb (and a baked form) is as it begins to come and as it has gone, of its full size.
 const GROW = 0.75;
@@ -176,7 +176,7 @@ const GROW = 0.75;
 // The forms whose coming and going is their light's fade alone: the orb
 // and the baked forms, which grow with it (GROW). The others have a move of their own (see
 // show.js, SKY_IN).
-export const FADING = new Set(['orb', ...EGGS.map((egg) => egg.name)]);
+export const FADING = new Set(['orb', ...BAKED.map((egg) => egg.name)]);
 
 // The form's place at its age: the defaults filled in. w (0 .. 1) is how
 // much it shows (its weight, see show.js); go: null while it stays, else

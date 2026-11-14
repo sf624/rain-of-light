@@ -23,6 +23,9 @@ import { createClock, rateText } from './clock.js';
 import { createHud } from './hud.js';
 import { keepAwake } from './wakelock.js';
 import { view, createRotation } from './rotate.js';
+import { createEggs } from './eggs.js';
+import { eggShader } from './egg-shaders.js';
+import './egg-kinds.js';
 
 // Errors show on the page (see the inline script in index.html), so a black screen is never silent.
 const showError = window.showError;
@@ -99,17 +102,47 @@ function viewFit() {
 }
 const fovRad = () => viewFit().fov;
 
-const { program, target, freeTarget } = createGL(gl);
+const { program, programLater, target, freeTarget } = createGL(gl);
 
 // ---------- the lattice ----------
-const pointProg = program(POINT_VS, POINT_FS);
-const wireProg = program(POINT_VS, WIRE_FS);
-// The figures' tables (shaders.js: FIGURES), one uniform block for both.
+const plain = { point: program(POINT_VS, POINT_FS), wire: program(POINT_VS, WIRE_FS) };
+// The figures' tables (shaders.js: FIGURES), one uniform block for every program of the LEDs.
 const figureBuffer = gl.createBuffer();
 gl.bindBuffer(gl.UNIFORM_BUFFER, figureBuffer);
 gl.bufferData(gl.UNIFORM_BUFFER, FIGURES, gl.STATIC_DRAW);
 gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, figureBuffer);
-for (const prog of [pointProg, wireProg]) gl.uniformBlockBinding(prog.p, gl.getUniformBlockIndex(prog.p, 'Figures'), 0);
+const figuresBlock = (prog) => gl.uniformBlockBinding(prog.p, gl.getUniformBlockIndex(prog.p, 'Figures'), 0);
+for (const prog of [plain.point, plain.wire]) figuresBlock(prog);
+// The same with the light of the easter egg that shows (egg-shaders.js), built the first time that
+// egg shows, without waiting for the GPU: until they are done (a few frames, as the egg fades in) the
+// plain programs draw. While no egg shows, the LEDs are drawn by programs with no egg in them at all.
+// An egg whose programs cannot be built is dropped (eggs.drop): the show goes on without it.
+const withEggs = new Map();   // the egg's type -> { point, wire }: each gives its program when done
+let eggDrawn = 0;             // the type of the egg drawn by its own programs in the last frame (for the tests)
+function eggProgs(type) {
+  if (gl.isContextLost()) return plain;
+  try {
+    if (!withEggs.has(type)) {
+      const vs = eggShader(POINT_VS, type);
+      withEggs.set(type, { point: programLater(vs, POINT_FS), wire: programLater(vs, WIRE_FS) });
+    }
+    const p = withEggs.get(type);
+    if (!p.done) {
+      const point = p.point(), wire = p.wire();
+      if (!point || !wire) return plain;
+      for (const prog of [point, wire]) { fieldsUnit(prog); figuresBlock(prog); }
+      p.done = { point, wire };
+    }
+    return p.done;
+  } catch (err) {
+    withEggs.delete(type);
+    // (A context that goes fails every build: no fault of the egg's. It is built again if the context stays.)
+    if (gl.isContextLost() || err.lost) return plain;
+    console.warn('easter egg dropped:', err.message);
+    eggs.drop(type);
+    return plain;
+  }
+}
 const downProg = program(QUAD_VS, DOWN_FS);
 const blurProg = program(QUAD_VS, BLUR_FS);
 const compProg = program(QUAD_VS, COMPOSITE_FS);
@@ -117,7 +150,8 @@ const MAX_POINT = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1]; // the larges
 // The baked forms' fields (see fields.js), on a texture unit of their own (0 .. 4: the composite's).
 const FIELD_UNIT = 5;
 const fields = createFields(gl, FIELD_UNIT);
-for (const prog of [pointProg, wireProg]) { gl.useProgram(prog.p); gl.uniform1i(prog.u.uFields, FIELD_UNIT); }
+const fieldsUnit = (prog) => { gl.useProgram(prog.p); gl.uniform1i(prog.u.uFields, FIELD_UNIT); };
+for (const prog of [plain.point, plain.wire]) fieldsUnit(prog);
 
 const lattice = createLattice(gl);
 let count = 0, GRID = 0, ROWS = 0, wireCount = 0, light = null;
@@ -412,6 +446,10 @@ const MAX_T = 86400;     // the lab's last time: 24 h (a seek or ?t= beyond it g
 const clampT = (t) => (Number.isFinite(t) ? Math.min(MAX_T, Math.max(0, t)) : 0);
 const START = lab ? clampT(Number(params.get('t'))) : Number(params.get('t')) || 0;
 let time = START;
+// The easter eggs (eggs.js): a pin in the lab, the secret, or the date and time bring one. A change
+// of pin or a summons is a change of setting (the lab's snapshots go).
+const eggs = createEggs({ lab, params, canvas, start: START, now: () => time, onChange: () => apply('egg'),
+  rare: (t0, t1) => show.rareSpans(t0, t1) });
 // The lab draws every random number of the show from the seed, so that a moment can be
 // made again (see seekTo); the viewer page keeps Math.random.
 const randomFor = (salt) => (lab ? createRandom(SEED + salt) : Math.random);
@@ -579,6 +617,7 @@ const tuner = createTuner({
   settings: S, defaults: DEF, storageKey: STORAGE_KEY,
   onChange: (key) => apply(key),
 });
+if (lab) eggs.labSelect(document.querySelector('.tuner'));   // the lab's pin of an egg (not a setting: never saved)
 let bandShift = 0;
 
 // The rain swells and eases within its weather, with 1/f fluctuation
@@ -617,7 +656,7 @@ function ease(dt) {
 
 // ---------- the show: rain and forms of light, and the mirrors ----------
 // ?seed= gives the show's timeline; else each visit has its own.
-const show = createShow(S, { feet: -HEIGHT / 2, seed: SEED, eggs: fields.able }); // the layer lies just above the strands' feet
+const show = createShow(S, { feet: -HEIGHT / 2, seed: SEED, baked: fields.able }); // the layer lies just above the strands' feet
 // While no rain passage shows, a few pale drops still fall: more in heavier weather,
 // and S.paleDrops times as many (0: none at all; a rain passage still comes in from nothing).
 const sparseShare = () => S.paleDrops * (0.03 + 0.05 * look.rain);
@@ -643,6 +682,7 @@ function placeImages() {
 // neutral pointer, so that a time comes out the same whatever the mouse did).
 let viewM = null, projM = null, lastFit = null;
 function advance(dt, replay = false) {
+  const egg = eggs.at(time);
   camClock += dt * SPEED * (S.orbit / DEFAULTS.orbit); // integrated: a new speed never jumps
   camBlend = Math.min(1, camBlend + dt / CAMERA_BLEND);
   const kb = smooth(camBlend);
@@ -691,13 +731,13 @@ function advance(dt, replay = false) {
 
   direct(time);
   ease(dt);
-  const shown = show.update(time, dt, camera);
+  const shown = show.update(time, dt, camera, egg.show, egg.rare);
+  eggs.settle(shown.egg);
   flowGoal = shown.flow;
   // Breath: light and pad swell as you breathe in and ease as you breathe out.
   const breath = S.breath === 'on' ? breathAt(dt) : 1;
-  return { shown, breath };
+  return { shown, breath, egg };
 }
-
 // ---------- the state at a time: set up, save, bring back, seek ----------
 // The show's timeline and the director's tracks are made from the seed, so they need no state. What
 // carries from frame to frame is listed here: the easings (weather, colours, direction, forms, camera
@@ -841,7 +881,7 @@ function hudSnapshot() {
     seek: { steps: replayed, ms: seekMs, snaps: snaps.size },
     scale: renderScale, adaptive: S.quality !== 'full', canvas: [W, H],
     grid: GRID, rows: ROWS, leds: count,
-    rain: S.rain, form: S.form, layer: S.layer, show: info,
+    rain: S.rain, form: S.form, layer: S.layer, show: info, egg: eggs.info(),
     weather: { name: weather.name, rain: look.rain, fall: look.flowRate },
     density: look.density, rainShare: rainShareNow,
     flow: { down: w0, across: w1, mix: direction.mix, goal: flowOf(flowGoal) },
@@ -856,7 +896,11 @@ function hudSnapshot() {
   };
 }
 // For tests of the lab: the whole state as text, and a seek.
-if (lab) window.__lab = { state: () => JSON.stringify(saveState()), seek: (t) => { pendingSeek = t; }, turn: () => pointer.x };
+// eggs: the egg that shows, its uniforms, and the type of the egg drawn by its own program in the last frame.
+if (lab) {
+  window.__lab = { state: () => JSON.stringify(saveState()), seek: (t) => { pendingSeek = t; }, turn: () => pointer.x, setting: (key) => S[key],
+    eggs: () => ({ on: eggs.info(), ...eggs.uniforms(), drawn: eggDrawn, eye: camera?.eye }) };
+}
 const hud = createHud({ lab, params, bar: clock.bar, snapshot: hudSnapshot });
 
 function frame(now) {
@@ -887,9 +931,9 @@ function frame(now) {
   // Keep the angles within a turn, both by the same whole turns, so that the easing never unwinds.
   const wrap = Math.round(pointer.x / (2 * Math.PI)) * 2 * Math.PI;
   pointer.x -= wrap; pointer.sx -= wrap;
-  const { shown, breath } = advance(dt);
+  const { shown, breath, egg } = advance(dt);
   // A baked form's field loads as it draws near, and the form shows once it is there.
-  fields.frame(show.eggsNear(time), shown, Math.min(0.1, Math.max(0, rawDt)));
+  fields.frame(show.bakedNear(time), shown, Math.min(0.1, Math.max(0, rawDt)));
   if (lab && !job) snapshot();
   const view = viewM, proj = projM, fit = lastFit;
   const rk = shown.rain;                 // how much rain falls now: 0 a still room .. 1 a rain passage
@@ -903,7 +947,8 @@ function frame(now) {
 
   // For the lab's readout (see hudSnapshot): the frame's last state.
   lastShown = shown; lastGlow = glow; lastBreath = S.breath === 'on' ? breath : null;
-  rainShareNow = sparseShare() + (S.rainShare * (1 - 0.35 * shown.storm) - sparseShare()) * rk;
+  rainShareNow = (sparseShare() + (S.rainShare * (1 - 0.35 * shown.storm) - sparseShare()) * rk) * (1 - egg.dry);
+  eggs.frame(time, { camera, fov: fovRad(), SPAN, HEIGHT, FLOOR, lane: [SPAN / (GRID - 1), HEIGHT / ROWS] });
   fallLightNow = rk * (1 - direction.mix);
 
   // Points.
@@ -917,6 +962,9 @@ function frame(now) {
   // Every LED's light casts rays (see POINT_VS: rayK), drawn with the LED into
   // the second buffer. Without float buffers there are none.
   const rays = S.rays === 'off' || !hasFloat ? 0 : Number(S.rays);
+  const eggType = eggs.showing();
+  const { point: pointProg, wire: wireProg } = eggType ? eggProgs(eggType) : plain;
+  eggDrawn = pointProg !== plain.point ? eggType : 0;
   const progs = [pointProg];
   if (wiresOn) progs.push(wireProg);
   const rayScale = H / 1080;   // rays scale with the view like the lattice: their length is set for a 1080 px tall view
@@ -943,8 +991,9 @@ function frame(now) {
   gl.uniform1f(u.uRest, S.rest);
   gl.uniform3f(u.uLight, light.room, light.wire, light.twinkle);
   gl.uniform2fv(u.uRainK, [...light.share, ...light.fall, ...light.side]);
-  gl.uniform1f(u.uRainGain, S.rainGain);
-  gl.uniform1f(u.uTipGain, S.tipGain);
+  const hush = 1 - eggs.hush();   // (an egg may dim the rain's light while it shows)
+  gl.uniform1f(u.uRainGain, S.rainGain * hush);
+  gl.uniform1f(u.uTipGain, S.tipGain * hush);
   gl.uniform1f(u.uTrail, S.trail);
   gl.uniform1f(u.uBandShift, bandShift);
   gl.uniform1f(u.uBandScale, S.bandScale);
@@ -998,6 +1047,7 @@ function frame(now) {
   gl.uniform1f(u.uTwinkle, S.twinkle);
   gl.uniform4fv(u.uCopy, copies);
   gl.uniform1fv(u.uCopyGain, copyGain);
+  if (pointProg !== plain.point) eggs.bind(gl, u);
   }
   // The light itself, then its image in the floor mirror. Wall mirrors draw
   // the lattice again per image, as instances. Every LED, wire and ray adds
@@ -1148,6 +1198,7 @@ let frameId = requestAnimationFrame(frame);
 canvas.addEventListener('webglcontextlost', (e) => {
   e.preventDefault();
   cancelAnimationFrame(frameId);
+  withEggs.clear();   // (an easter egg's programs went with it)
 });
 canvas.addEventListener('webglcontextrestored', () => location.reload());
 

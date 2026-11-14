@@ -39,6 +39,7 @@ reload.
 | `clock.js` | the lab's show clock: pause, step, speed, seek (see below) |
 | `keys.js` | which keys a focused control keeps in the lab (see the clock's keys) |
 | `hud.js` | the lab's readout of the show's state (see below) |
+| `eggs.js`, `egg-kinds.js`, `egg-shaders.js` | the easter eggs: the registry and which egg shows, the eggs, their light (see Easter eggs) |
 | `rotate.js` | the landscape / portrait button |
 | `audio.js` | the music: pad, bells, rain, the forms' voices, reverb |
 | `sway.js` | 1/f fluctuation, used by the music and the rain |
@@ -133,8 +134,9 @@ about 11 s to 3 s. It visits:
 - rain alone (`rain=on&form=none&layer=off`, in the lab) and no rain
   (`rain=off`), both with the click, keys and Reset; rain that never ends
   with a form through it (`rain=on&seed=1&t=60`); a time part-way through the show
-  (with and without the colour story), four of the forms held, and
-  `?jitter=pitch`, and the lab's clock (opened paused, it stands still;
+  (with and without the colour story), four of the forms held,
+  `?jitter=pitch`, two easter eggs pinned (penrose, and the teapot with its
+  field; `form=teapot` falls back to `auto`), and the lab's clock (opened paused, it stands still;
   Space runs and stops it, also with the focus in the panel; the arrows seek
   after a mouse drag on a slider and move a slider the focus came to by Tab;
   and part-way through a form's coming, a change of exposure, twinkle, colour
@@ -312,6 +314,92 @@ lines:
 On a screen narrower than 700 px only the main lines show, and with the
 settings panel open the HUD steps aside.
 
+## Easter eggs
+
+Rare scenes that the page does not announce. `eggs.js` holds the registry
+and decides which egg shows; `egg-kinds.js` registers the eggs and works
+out each one's uniforms per frame; `egg-shaders.js` is their light, a chunk
+of `POINT_VS` (`eggAt`, added to the forms' light).
+
+| Egg | What | Comes |
+| --- | --- | --- |
+| `teapot` | the Utah teapot, a baked form (`config.js: BAKED`) | rare slot, secret, pin |
+| `penrose` | the Penrose tribar: three beams at right angles that close into an impossible triangle, set up anew each frame for where the eye is, so it reads as the impossible figure the whole time; it turns slowly in the plane of the picture; the floor's image is a true reflection, and quietly gives the trick away | rare slot, secret, pin |
+| `clock` | the time of day, HH:MM in 5 x 7 dot glyphs facing the eye (two lines in a tall view) | rare slot, secret, pin |
+| `fireworks` | shells rise along the strands and burst into spheres of sparks that fall and fade; no sound | rare slot, secret, pin |
+| `tanabata` | the Milky Way rising slantwise over the room, with a dark rift, Vega and Altair on either side | rare slot, secret, pin |
+| `snow` | slow snow in place of the rain, and a tree of light with a garland and a star | 24 and 25 December, secret, pin |
+
+- **The rare slot** (`show.js: rareOf`; `eggs.js: RARE` is the one place
+  to tune it): from 10 minutes on (`after`), the passage's random number
+  of each form cast picks the nth egg of the slot when it falls between n
+  and n + 1 times `chance` (1.2%). So each egg comes as often as the
+  teapot did alone, and the teapot on the same passages: each about once
+  in 2.5 hours, all of them about twice an hour (`tools/story-stats.mjs`,
+  50 seeds of 4 hours); the regular forms come about 34 times an hour
+  instead of 36. At least `apart` (3) forms come between two eggs: one drawn
+  sooner waits, and takes the place of the first form cast after them; an
+  egg with a light of its own (all but the teapot) also waits for a passage
+  without rain, where it would hardly show. An egg of the slot is a form to the timeline: it takes the place of the
+  form that was cast (that form counts as seen, and its palette as told,
+  so the other forms keep their frequencies), comes and goes as a form
+  does (the teapot as slowly as the orb), alone in its passage, as the
+  forms are (see One form at a time); the layer stays. It comes from the seed, so
+  the lab's seek finds it again.
+- **The date**: snow on 24 and 25 December (local time). In the lab,
+  `?date=2026-12-24T20:00` sets the wall clock at load.
+- **The secret** (both pages): typing `glint` (no letter of it is a key of
+  the page), or five quick taps (or clicks) in the top right corner of the
+  picture, summons the next egg of the registry at once, for its `hold`
+  seconds.
+- **Pins** (the lab only): `?egg=<name>` shows that egg for as long as the
+  page is open; `?egg=off` no egg at all. The select *Easter egg* at the
+  end of the lab's panel does the same and puts it in the URL; it is not a
+  setting, so it is never saved and the viewer page never sees it. The
+  Form setting lists only the show's forms: a `form=teapot` left in a link
+  or in saved settings falls back to `auto`.
+- **One at a time** (`eggs.js: eggOrder`): a pin shows its egg alone.
+  Otherwise, of the eggs whose time it is, the first in this order shows:
+  the summoned, snow (the date's), the rare slot's. One that comes while a
+  later one shows waits 5 s (`HAND`): the later one fades out first, and
+  comes back once the first has gone, if its time lasts (a rare slot's egg
+  goes and comes back as a form does). One whose time comes while an
+  earlier one shows waits until it has gone.
+- **What an egg does to the show**: a summoned or pinned egg of the form
+  slot (`slot: 'form'`) makes the show's forms give way while it shows (and
+  the layer, with `layer: false`), and the rain goes to what it asks
+  (`rain`: 0 none, not even the pale drops); an overlay (`slot:
+  'overlay'`: the clock, tanabata) lays its light over whatever the show
+  plays and leaves the show alone.
+- **Time**: an egg's weight and age are a function of the show's time:
+  pinned, its age is the show's time; summoned, the time since; by date,
+  the wall clock, which is the clock at page load plus the show's time
+  since; in the rare slot, the timeline's. So the lab's pause, step and
+  seek show every egg as it was. A pin or a summons counts as a change of
+  setting (the snapshots go); a seek back before a summons shows no egg, as
+  with a click's wave. `window.__lab.eggs()` gives the tests the egg that
+  shows and its uniforms.
+- **Registry**: `registerEgg({ name, slot, type, form, rain, layer, hold,
+  hush, params, secret, when, rare })` (the top of `eggs.js`
+  describes the fields). A baked form becomes an egg with one line,
+  `registerEgg({ name: 'teapot', form: 'teapot', rare: true })`: the show
+  holds that form while the egg shows (its field loads first).
+- **Cost**: none while no egg shows: the LEDs and wires are drawn by
+  programs without the eggs' code (`POINT_VS` holds it behind `#ifdef
+  EGGS`, and each egg's function behind `EGG_<type>`). The first time an
+  egg shows, the page builds programs with its function only
+  (`eggShader`), without waiting for them (`gl.js: programLater`; the plain
+  programs draw until they are done), and draws with them while it shows.
+  Each egg skips the LEDs far from it first (the tribar's reach; the glyph
+  panel's slab; a shell's sphere).
+- **When an egg cannot be built**: if its programs fail, the egg is
+  dropped for the rest of the visit (`eggs.drop`) and the show goes on
+  without it. A WebGL context may be lost at any time (a GPU reset; Chrome
+  on WSL loses it once as it starts, while its compositor falls back to
+  software): a build that fails then is no fault of the egg's (an empty
+  log), so it is built again, and the page starts afresh when the context
+  comes back (`webglcontextrestored`).
+
 ## Capturing the page
 
 The capture tools load the page in Chrome on a fake clock: a seeded
@@ -383,12 +471,13 @@ mode and palette comes, how far the mood wanders, how long the picture
 stays in one colour family, how much of the rain flows sideways, how
 often each form comes, how much of the time a form's light shows (and
 wholly), how much of it two forms show at once (0: one form at a time),
-and how often the baked forms come (the eggs: about one every 2.3 hours,
-never in the first 10 minutes). With and without the story.
+and how often each easter egg of the rare slot comes (never in the first
+10 minutes; the first seed and time of each, to watch in the lab). With
+and without the story.
 
 ### Baking a form's field
 
-The baked forms (`EGGS` in `config.js`) draw a shape from a field of
+The baked forms (`BAKED` in `config.js`) draw a shape from a field of
 signed distances, one file each in `fields/` (see "Baked forms" in
 [design.md](design.md)). `tools/bake-field.py` (numpy; Pillow for
 `--preview`) makes one from a closed mesh or a set of Bezier patches.
@@ -411,7 +500,7 @@ python3 -I tools/bake-field.py teapot /path/to/src/teapot.c --preview /tmp/teapo
 It takes about 8 s and writes `fields/<name>.bin` (64,016 bytes). The
 preview shows the solid from the side, from the front and from above, and
 a slice of its distances: check the pose there. A new shape needs an
-entry in `fields.json`, one in `EGGS` (its `field` is its slab in the
+entry in `fields.json`, one in `BAKED` (its `field` is its slab in the
 shader's texture, the next free one), and its terms in the README's
 credits.
 

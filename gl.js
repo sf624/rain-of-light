@@ -16,6 +16,41 @@ export function createGL(gl) {
     gl.attachShader(p, compile(gl.VERTEX_SHADER, vs));
     gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs));
     gl.linkProgram(p);
+    return finish(p);
+  }
+
+  // A program built without waiting for it (KHR_parallel_shader_compile, where the GPU has it): the
+  // function returned gives null until it is done, then the program (or throws, as program does;
+  // an error with `lost` set when the context went while it was built: no fault of the program's).
+  // (A context may be lost at any time: a browser on WSL loses it once as it starts, a GPU resets.)
+  const parallel = gl.getExtension('KHR_parallel_shader_compile');
+  function programLater(vs, fs) {
+    const p = gl.createProgram(), sh = [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]].map(([type, src]) => {
+      const s = gl.createShader(type);
+      gl.shaderSource(s, src);
+      gl.compileShader(s);
+      gl.attachShader(p, s);
+      return { s, src };
+    });
+    gl.linkProgram(p);
+    let done = null, asked = false;
+    return () => {
+      if (done) return done;
+      if (gl.isContextLost()) return null;
+      // (Without the extension, the first answer waits a frame: the driver may build it meanwhile.)
+      if (parallel ? !gl.getProgramParameter(p, parallel.COMPLETION_STATUS_KHR) : !asked) { asked = true; return null; }
+      for (const { s, src } of sh) {
+        if (gl.getShaderParameter(s, gl.COMPILE_STATUS)) continue;
+        const log = gl.getShaderInfoLog(s);
+        // (A failed build with no log: the context is going, and will be lost.)
+        throw Object.assign(new Error(log ? `${log}\n${src}` : 'the context went while the program was built'), { lost: !log });
+      }
+      if (!gl.getProgramParameter(p, gl.LINK_STATUS) && !gl.getProgramInfoLog(p)) throw Object.assign(new Error('the context went while the program was linked'), { lost: true });
+      return (done = finish(p));
+    };
+  }
+
+  function finish(p) {
     if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
     const u = {};
     const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
@@ -54,7 +89,7 @@ export function createGL(gl) {
     gl.deleteFramebuffer(t.fb);
   }
 
-  return { compile, program, target, freeTarget };
+  return { compile, program, programLater, target, freeTarget };
 }
 
 // ---------- vector math (column-major 4x4) ----------

@@ -572,7 +572,8 @@ floor.
 ### Baked forms
 
 A baked form is a shape that no formula draws: the Utah teapot
-(`config.js: EGGS`). It is baked offline into a field: a cube of
+(`config.js: BAKED`), an easter egg (see Easter eggs in
+[development.md](development.md)). It is baked offline into a field: a cube of
 40 x 40 x 40 signed distances to the shape's skin (negative inside), one
 byte each, 64 KB in all (`fields/<name>.bin`; made by
 `tools/bake-field.py`, see [development.md](development.md)). The tool
@@ -614,7 +615,7 @@ top of its shape in its box skip it before reading the field (the
 teapot fills only the lower half of its box).
 
 **Loading.** A field is fetched only when its form is due within 40 s
-(`show.js: eggsNear`), or held. Until it has come, the form does not show;
+(`show.js: bakedNear`), or held. Until it has come, the form does not show;
 once it has, it eases in over 1.5 s if it is already due (after a seek, on
 a slow network). A plain visit fetches no field. Where the 3D texture
 cannot be made, no baked form is ever cast (`fields.js: able`), and a
@@ -784,16 +785,16 @@ its light is piled up along the line of sight, and it gives half as much
 over 5 s), and keep a little beyond their path as the eye sees them
 (`forms.js: BACK`).
 
-**The baked forms come rarely.** From 10 minutes on (`EGG.after`), each
-form cast is replaced by a baked one with a chance of 1.2% (`EGG.chance`),
-from the passage's random number (`show.js: eggOf`; with more than one,
-each would be as likely). That is about one every 2.3 hours (`tools/story-stats.mjs`
-over 50 seeds of 4 hours). Everything else runs as if the replaced form had
-come: it counts as seen, and its palette as told, so the other forms keep
-their frequencies and the rest of the timeline is the same (the egg's
-own slower fades only move the next form's coming a little). The lab can
-hold it (`form=teapot`, also in its Form setting); the viewer page's
-panel does not offer it.
+**The easter eggs come rarely.** From 10 minutes on, each form cast may
+be replaced by an easter egg of the rare slot (the teapot, the tribar, the
+clock, the fireworks, the Milky Way), each with a chance of 1.2%, from the
+passage's random number (`show.js: rareOf`; `eggs.js: RARE`), with at
+least three forms between two eggs. Everything else runs as if the
+replaced form had come: it counts as seen, and its palette as told, so the
+other forms keep their frequencies and the rest of the timeline is the
+same (an egg's own slower fades only move the next form's coming a
+little). The lab can pin an egg (`egg=teapot`, in its Easter egg select);
+no setting names it (see Easter eggs in [development.md](development.md)).
 
 Among rain, a sky form glows up to 1.8 times brighter (`STORM_GAIN`), to
 hold its own. The layer has its own height, thickness and brightness each time. It

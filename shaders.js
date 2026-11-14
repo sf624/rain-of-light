@@ -3,6 +3,7 @@
 
 import { FIELD } from './fields.js';
 import { SOLIDS, KNOTS, MOBIUS_RULINGS } from './figures.js';
+import { EGG_GLSL } from './egg-shaders.js';
 
 // The falling time wraps at this many flow units (see drop() in POINT_VS).
 export const FLOW_WRAP = 1000;
@@ -694,6 +695,9 @@ vec3 formsAt(vec3 p, float id, float v, out vec3 thread, out float around) {
   return c;
 }
 
+#ifdef EGGS
+${EGG_GLSL}
+#endif
 void main() {
   float seed = aData.w;
   float u = aData.y;
@@ -757,6 +761,9 @@ void main() {
   vec3 thread;
   float around;
   vec3 form = formsAt(pos, id, u, thread, around);
+#ifdef EGGS
+  if (uEgg.y > 0.0) form += eggAt(pos, id, thread);   // an easter egg (egg-shaders.js)
+#endif
   float fm = max(form.r, max(form.g, form.b));
   vec3 flare = form * min(1.0, 1.0 / max(fm, 1e-3));
   float inForm = clamp(fm, 0.0, 1.0);                // drops in a form take its colour
