@@ -3,7 +3,9 @@
 // objects; this file only lays it out. Hidden, it costs one boolean test per
 // frame; on the viewer page there is none (createHud returns a stub).
 // Toggled by the HUD button in the clock bar, the `h` key or ?hud=1 (?hud=0
-// forces it off); the choice is kept in this browser.
+// forces it off); the choice is kept in this browser. ?hud=perf shows only
+// the rows of the sound and the timing (perf.js), on a phone too; the copy
+// button beside the HUD button copies every row as text.
 
 import { isTyping } from './keys.js';
 
@@ -14,6 +16,10 @@ const f2 = (v) => v.toFixed(2);
 const pct = (v) => `${Math.round(v * 100)}%`;
 const rgb = (c) => `rgb(${c.map((v) => Math.round(Math.min(1, Math.max(0, v)) * 255)).join(',')})`;
 const sec = (s) => (s < 100 ? `${s.toFixed(1)}s` : `${Math.round(s)}s`);
+const msOf = (s) => (typeof s === 'number' ? `${(s * 1000).toFixed(1)}ms` : '?');
+const ms1 = (v) => (v === Infinity ? '-' : `${v.toFixed(1)}`);
+// A log of perf.js: n and worst in the last 10 s, and since the page loaded.
+const logText = (l) => `${l.n} (worst ${Math.round(l.worst)}ms), all ${l.all} (worst ${Math.round(l.allWorst)}ms)`;
 
 // The rows, top to bottom. core: kept on a narrow screen (see style.css).
 // text(s) gives the row's value; colors(s) the swatches after it.
@@ -46,29 +52,77 @@ const ROWS = [
   ['glow', 'glow', false, (s) => `${s.light.bloom > 0 ? `glow ${f2(s.light.bloom)}` : 'glow off'}  haze ${s.light.haze > 0 ? f2(s.light.haze) : 'off'}  burn ${s.light.burn > 0 ? f2(s.light.burn) : 'off'}  rays ${s.light.rays}  float buffers ${s.light.float ? 'yes' : 'no'}`],
   ['camera', 'camera', false, (s) => `${s.camera.moves}  eye ${s.camera.eye.map((v) => v.toFixed(1)).join(' ')}${Math.abs(s.camera.turn) >= 0.5 ? `  turn ${Math.round(s.camera.turn)}°` : ''}`],
   ['ripples', 'ripples', false, (s) => `${s.ripples} alive`],
+  // The sound and the timing (perf.js): with ?hud=perf the only rows beside time, frame and show.
+  // switches: what ran, every switch in effect (perf.js), then the settings that change the picture's load (main.js).
+  ['switches', 'switches', 'perf', (s) => [...s.perf.switches, ...s.loadSwitches].join('  ') || 'none'],
+  ['sound', 'sound', 'perf', (s) => {
+    const a = s.perf.sound;
+    return a ? `${a.state}  ${a.rate} Hz  base ${msOf(a.base)}  out ${msOf(a.out)}  hint ${a.hint}` : 'not started (a tap or a key starts it)';
+  }],
+  ['voices', 'voices', 'perf', (s) => {
+    const v = s.perf.voices;
+    return v ? `${v.notes} notes, about ${v.nodes} nodes in them` : '-';
+  }],
+  ['sched', 'sched', 'perf', (s) => {
+    const a = s.perf.sound;
+    return a ? `begun now (under 10ms ahead): ${a.now.n}, all ${a.now.all}  least lead ${ms1(a.minLead)}ms  timer late: ${logText(a.tick)}` : '-';
+  }],
+  ['render', 'render', 'perf', (s) => {
+    const a = s.perf.sound;
+    if (!a) return '-';
+    const p = a.playback, c = a.capacity, sl = a.slip;
+    return [
+      p ? `underruns ${p.underruns} (${msOf(p.underrunS)})  latency avg ${msOf(p.avgLatency)} max ${msOf(p.maxLatency)}` : 'no playbackStats',
+      c ? `load ${pct(c.average)} peak ${pct(c.peak)} underrun ${pct(c.underrun)}` : 'no renderCapacity',
+      sl ? `clock slip 10s ${sl.recent.toFixed(0)}ms, all ${sl.total.toFixed(0)}ms` : 'no clock slip',
+      `clock stood still ${a.stalls}x${a.stalls ? ` (longest ${Math.round(a.stallMax)}ms, last at ${a.stallLast})` : ''}`,
+    ].join('  ');
+  }],
+  ['timing', 'timing', 'perf', (s) => {
+    const p = s.perf;
+    const cpu = p.cpu ? `cpu ${p.cpu.avg.toFixed(1)}/${p.cpu.max.toFixed(1)}ms` : 'cpu -';
+    const gpu = p.gpu ? `gpu ${p.gpu.avg.toFixed(1)}/${p.gpu.max.toFixed(1)}ms` : `gpu ${p.gpuNote || '-'}`;
+    return `device dpr ${p.dpr}  ${cpu}  ${gpu}  long frames ${logText(p.frames)}${p.tasks ? `  long tasks ${logText(p.tasks)}` : ''}`;
+  }],
+  ['events', 'events', 'perf', (s) => (s.perf.events.length ? s.perf.events.slice(-3).join('  |  ') : 'none')],
+  ['guard', 'guard', 'perf', (s) => {
+    const g = s.perf.guard;
+    return g ? `level ${g.level} (fps cap ${g.fps || 'none'}, scale cap ${g.scale}${g.mirrorWires ? '' : ', no wires in the floor'}${g.mirror ? '' : ', no floor image'})${g.why ? `  last: ${g.why}` : ''}` : 'off (?guard=1)';
+  }],
 ];
+const PERF_ROWS = ['time', 'perf', 'show'];   // shown with ?hud=perf, besides the rows marked 'perf'
 
 export function createHud({ lab, params, bar, snapshot }) {
   if (!lab || !bar) return { frame() {} };
 
   let on = false;
   try { on = localStorage.getItem(KEY) === '1'; } catch { /* no storage: off */ }
-  if (params.has('hud')) on = params.get('hud') === '1';
+  if (params.has('hud')) on = params.get('hud') === '1' || params.get('hud') === 'perf';
+  const perfOnly = params.get('hud') === 'perf';
 
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'clock-hud';
   btn.title = 'Readout of the show\'s state (h)';
   btn.textContent = 'HUD';
-  bar.append(btn);
+  // Copy every row as text, to paste the numbers somewhere (from a phone too).
+  const copy = document.createElement('button');
+  copy.type = 'button';
+  copy.className = 'clock-hud-copy';
+  copy.title = 'Copy the readout as text';
+  copy.textContent = 'copy';
+  bar.append(btn, copy);
 
   const root = document.createElement('div');
-  root.className = 'hud';
+  root.className = perfOnly ? 'hud perf-only' : 'hud';
   root.hidden = true;
   root.setAttribute('aria-hidden', 'true');
   const rows = ROWS.map(([id, label, core, text, colors]) => {
     const row = document.createElement('div');
-    row.className = core ? 'hud-row' : 'hud-row more';
+    // With ?hud=perf: only its rows, all of them on a narrow screen too.
+    const shown = !perfOnly || core === 'perf' || PERF_ROWS.includes(id);
+    row.className = perfOnly ? 'hud-row' : core === true ? 'hud-row' : 'hud-row more';
+    row.hidden = !shown;
     const k = document.createElement('span');
     k.className = 'hud-k';
     k.textContent = label;
@@ -77,15 +131,45 @@ export function createHud({ lab, params, bar, snapshot }) {
     sw.className = 'hud-sw';
     row.append(k, v, sw);
     root.append(row);
-    return { id, text, colors, v, sw, shown: '', tint: '' };
+    return { id, label, text, colors, v, sw, shown: '', tint: '' };
   });
   document.body.append(root);
+  let last = null;   // the last snapshot shown
+  let copiedTimer = 0;
+  copy.addEventListener('click', () => {
+    if (!last) return;
+    const lines = [`${new Date().toISOString()}  ${location.href}`, navigator.userAgent,
+      `screen ${screen.width}x${screen.height} dpr ${devicePixelRatio} window ${innerWidth}x${innerHeight}`,
+      ...rows.map((r) => `${r.label}: ${r.text(last)}`),
+      'event log:', ...last.perf.events];
+    const text = lines.join('\n');
+    // The label says so for a moment (a class alone is hard to see on a phone).
+    const done = () => {
+      copy.classList.add('copied');
+      copy.textContent = 'copied';
+      clearTimeout(copiedTimer);
+      copiedTimer = setTimeout(() => { copy.classList.remove('copied'); copy.textContent = 'copy'; }, 1200);
+    };
+    // The clipboard (a secure page), else a text area to copy by hand.
+    navigator.clipboard?.writeText(text).then(done, () => byHand(text)) ?? byHand(text);
+  });
+  function byHand(text) {
+    const area = document.createElement('textarea');
+    area.className = 'hud-copy';
+    area.value = text;
+    area.readOnly = true;
+    area.addEventListener('blur', () => area.remove());
+    document.body.append(area);
+    area.focus();
+    area.select();
+  }
 
   let frames = 0, since = 0, fps = 0, ms = 0;   // frames drawn since the last sample, and since when (rAF time)
   const draw = () => {
-    const s = snapshot();
+    const s = last = snapshot();
     s.fps = fps; s.ms = ms;
     for (const r of rows) {
+      if (r.v.parentNode.hidden) continue;
       const t = r.text(s);
       if (t !== r.shown) { r.v.textContent = t; r.shown = t; }
       if (r.colors) {
@@ -107,6 +191,7 @@ export function createHud({ lab, params, bar, snapshot }) {
     root.hidden = !on;
     btn.setAttribute('aria-pressed', String(on));
     btn.classList.toggle('active', on);
+    copy.hidden = !on;
     if (on) { frames = 0; since = 0; draw(); }
     if (save) try { localStorage.setItem(KEY, on ? '1' : '0'); } catch { /* not saved */ }
   }

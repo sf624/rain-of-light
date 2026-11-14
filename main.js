@@ -21,6 +21,7 @@ import { createLattice, fillLattice, latticeLight } from './lattice.js';
 import { createControls } from './controls.js';
 import { createClock, rateText } from './clock.js';
 import { createHud } from './hud.js';
+import { perf } from './perf.js';
 import { keepAwake } from './wakelock.js';
 import { view, createRotation } from './rotate.js';
 import { createEggs } from './eggs.js';
@@ -52,7 +53,8 @@ const BOTH = [gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1], FIRST = [gl.COLOR_ATT
 // ---------- fixed settings (also ?dpr=1.5) ----------
 const params = new URLSearchParams(location.search);
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const MAX_DPR = Number(params.get('dpr')) || 2;
+const DPR_CAP = 2;   // the largest device pixel ratio drawn, unless ?dpr= sets another
+const MAX_DPR = Number(params.get('dpr')) || DPR_CAP;
 const SEED = params.has('seed') && Number.isFinite(Number(params.get('seed'))) ? Number(params.get('seed')) : Math.random() * 1000;
 const SPEED = reducedMotion ? 0.4 : 1.0;
 
@@ -159,6 +161,9 @@ function buildLattice() {
   light = latticeLight(GRID, ROWS, SPAN, HEIGHT);
 }
 buildLattice();
+// Are the wires drawn, and the floor's image? (Settings; ?guard=1 may also leave the floor's out, see draw.)
+const wiresDrawn = () => S.wire > 0 && wireCount > 0;
+const floorDrawn = () => S.mirror > 0;
 const pointVao = lattice.pointVao;
 const emptyVao = gl.createVertexArray();
 
@@ -180,8 +185,8 @@ const lastIdx = () => {
 };
 
 function resize() {
-  const dpr = baseRatio() * SCALES[scaleIdx];
-  renderScale = SCALES[scaleIdx];
+  renderScale = perf.scale(SCALES[scaleIdx]);   // (or a fixed ?scale=, or capped by ?guard=1)
+  const dpr = baseRatio() * renderScale;
   const w = Math.max(1, Math.round(canvas.clientWidth * dpr));
   const h = Math.max(1, Math.round(canvas.clientHeight * dpr));
   if (w === W && h === H) return;
@@ -244,7 +249,7 @@ function setStep(i) {
 }
 
 function adapt(rawDt, now) {
-  if (S.quality === 'full') {
+  if (S.quality === 'full' || perf.fixedScale) {
     if (scaleIdx !== 0) setStep(0);
     probing = judgeDown = false;
     return;
@@ -871,6 +876,16 @@ let checked = false;
 // times a second); the frame keeps only the last frame's few derived values.
 let lastShown = null, lastGlow = 1, lastBreath = null, rainShareNow = 0, fallLightNow = 0;
 const RIPPLE_LIFE = 7;   // seconds a wave lives (POINT_VS)
+// The settings that change the picture's load, where they differ from the defaults (the readout's switches row, after perf.js's).
+function loadSwitches() {
+  const on = [];
+  if (MAX_DPR !== DPR_CAP) on.push(`dpr ${MAX_DPR}`);
+  if (!wiresDrawn()) on.push('wires off');
+  else if (S.wire !== DEF.wire) on.push(`wire ${S.wire}`);
+  if (!floorDrawn()) on.push('floor image off');
+  if (S.leds !== DEF.leds) on.push(`leds ${count}`);
+  return on;
+}
 function hudSnapshot() {
   const info = show.info(time);
   const lookNow = looks[sideNow < 0.5 ? 0 : 1], goalNow = goals[sideNow < 0.5 ? 0 : 1];
@@ -893,6 +908,7 @@ function hudSnapshot() {
     },
     camera: { moves, eye: camera ? camera.eye : [0, 0, 0], turn: pointer.sx * 180 / Math.PI },
     ripples: ripples.reduce((n, v, i) => (i % 4 === 3 && time - v >= 0 && time - v < RIPPLE_LIFE ? n + 1 : n), 0),
+    perf: perf.read(), loadSwitches: loadSwitches(),
   };
 }
 // For tests of the lab: the whole state as text, and a seek.
@@ -904,11 +920,14 @@ if (lab) {
 const hud = createHud({ lab, params, bar: clock.bar, snapshot: hudSnapshot });
 
 function frame(now) {
+  // A frame rate cap (?fps=, ?guard=1) skips this frame.
+  if (perf.skip(now)) { frameId = requestAnimationFrame(frame); return; }
+  perf.begin(now, gl);
   const rawDt = (now - last) / 1000;
   // rAF time may precede `last`. The lab's clock may stand the show still or run it faster.
   let dt = clock.tick(Math.min(0.05, Math.max(0, rawDt)));
   last = now;
-  if (!clock.paused) adapt(rawDt, now);   // a paused picture keeps its render scale
+  if (!clock.paused) adapt(perf.adaptDt(rawDt), now);   // a paused picture keeps its render scale
   if (pendingSeek !== null) { startSeek(pendingSeek); pendingSeek = null; }
   let note = '';
   if (job) {
@@ -958,7 +977,7 @@ function frame(now) {
   gl.clearColor(0, 0, 0, 1);
   gl.clear(gl.COLOR_BUFFER_BIT);
   // The LEDs and their wires share one vertex shader, so both get the same uniforms.
-  const wiresOn = S.wire > 0 && wireCount > 0;
+  const wiresOn = wiresDrawn();
   // Every LED's light casts rays (see POINT_VS: rayK), drawn with the LED into
   // the second buffer. Without float buffers there are none.
   const rays = S.rays === 'off' || !hasFloat ? 0 : Number(S.rays);
@@ -1054,13 +1073,14 @@ function frame(now) {
   // its light, near or far: the strands are fine threads, and nothing near
   // the eye stands dark in front of a form.
   const images = S.walls >= 1 ? 9 : 1;
-  const passes = S.mirror > 0 ? [0, S.mirror] : [0];
+  const passes = floorDrawn() && perf.mirror ? [0, S.mirror] : [0];   // (?guard=1 may leave the floor's image out)
   gl.bindVertexArray(pointVao);
   gl.disable(gl.DEPTH_TEST);
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.ONE, gl.ONE);
   for (const mirror of passes) {
     for (const prog of progs) {
+      if (mirror && prog === wireProg && !perf.mirrorWires) continue;   // (and its wires)
       gl.useProgram(prog.p);
       gl.uniform3f(prog.u.uMirror, FLOOR, mirror, MIRROR_FADE);
       // The rays are a glint in the eye, not light in the room: the images in
@@ -1189,6 +1209,7 @@ function frame(now) {
     if (err !== gl.NO_ERROR) showError(`WebGL error 0x${err.toString(16)} (float buffers: ${hasFloat})`);
   }
 
+  perf.end(gl);
   frameId = requestAnimationFrame(frame);
 }
 

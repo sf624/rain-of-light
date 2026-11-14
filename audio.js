@@ -22,6 +22,7 @@
 
 import { createSway } from './sway.js';
 import { BAKED } from './config.js';
+import { PERF, soundLog } from './perf.js';
 
 const mtof = (m) => 440 * 2 ** ((m - 69) / 12);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -72,8 +73,41 @@ export function createAudio({ settings }) {
   let chordTimer = 0;
   let arpAt = 0, arpStep = 0, arpPan = 0, dropAt = 0;
 
+  // The notes sounding, for the readout and ?voices=: [end, nodes] each.
+  let sounding = [];
+  function live() {
+    const t = ctx.currentTime;
+    if (sounding.length && sounding[0][0] <= t) sounding = sounding.filter(([end]) => end > t);
+    return sounding.length;
+  }
+  // May a note begin at `at` (?voices= caps them)? Then count it until `end`.
+  function begin(at, end, nodes) {
+    if (PERF.voices && live() >= PERF.voices) return false;
+    soundLog.scheduled(at, ctx.currentTime);
+    sounding.push([end, nodes]);
+    sounding.sort((a, b) => a[0] - b[0]);
+    return true;
+  }
+  soundLog.voices = () => (ctx ? { notes: live(), nodes: sounding.reduce((n, [, k]) => n + k, 0) } : null);
+
   function build() {
-    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    // The browser's default latency and rate, unless ?latency= or ?hz= ask for others.
+    const options = {};
+    if (PERF.latency !== null) options.latencyHint = PERF.latency;
+    if (PERF.sampleRate) options.sampleRate = PERF.sampleRate;
+    ctx = new (window.AudioContext || window.webkitAudioContext)(options);
+    soundLog.context(ctx);
+    // A context that the system suspended or interrupted (a call, another
+    // app's sound, a locked screen) may not come back by itself: while the
+    // sound is on, ask again when the page shows, when the state changes, and
+    // at the next touch or key.
+    const revive = () => {
+      if (on && !document.hidden && ctx.state !== 'running' && ctx.state !== 'closed') ctx.resume().catch(() => {});
+    };
+    ctx.addEventListener('statechange', revive);
+    document.addEventListener('visibilitychange', revive);
+    addEventListener('pointerdown', revive, true);
+    addEventListener('keydown', revive, true);
     master = ctx.createGain();
     master.gain.value = 0;
     const comp = ctx.createDynamicsCompressor();
@@ -87,11 +121,13 @@ export function createAudio({ settings }) {
     // Everything goes to the bus (dry) and, through a send, to the reverb.
     bus = ctx.createGain();
     bus.connect(master);
-    verb = ctx.createConvolver();
-    verb.buffer = impulse(6);
-    const wet = ctx.createGain();
-    wet.gain.value = 0.9;
-    verb.connect(wet).connect(master);
+    if (PERF.reverb > 0) {   // (?reverb=off: none, the sends lead nowhere)
+      verb = ctx.createConvolver();
+      verb.buffer = impulse(PERF.reverb);
+      const wet = ctx.createGain();
+      wet.gain.value = 0.9;
+      verb.connect(wet).connect(master);
+    }
 
     clickBuf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.08), ctx.sampleRate);
     const cd = clickBuf.getChannelData(0);
@@ -147,7 +183,7 @@ export function createAudio({ settings }) {
   function send(level) {
     const g = ctx.createGain();
     g.gain.value = level;
-    g.connect(verb);
+    if (verb) g.connect(verb);
     return g;
   }
 
@@ -192,6 +228,7 @@ export function createAudio({ settings }) {
   // through a low-pass, faded in over `attack` and out after `hold`.
   function sustain(m, layers, { t, hold, attack = 7, release = 10, peak, cutoff, pan, dest, follow = true }) {
     const top = t + Math.max(attack, hold), end = top + release + 0.1;
+    if (!begin(t, end, 3 + 2 * layers.length)) return;
     const out = ctx.createGain();
     out.gain.setValueAtTime(0, t);
     out.gain.linearRampToValueAtTime(peak, t + attack);
@@ -201,7 +238,10 @@ export function createAudio({ settings }) {
     filter.type = 'lowpass';
     filter.frequency.value = cutoff;
     filter.Q.value = 0.7;
-    if (follow) bright.connect(filter.frequency);
+    if (follow) {
+      if (PERF.krate) filter.frequency.automationRate = 'k-rate';
+      bright.connect(filter.frequency);
+    }
     const p = ctx.createStereoPanner();
     p.pan.value = pan;
     filter.connect(out).connect(p).connect(dest);
@@ -229,7 +269,7 @@ export function createAudio({ settings }) {
   // Under it, the root an octave down swells with the breath; and each form
   // that shows adds its voice.
   function padChord(notes, hold) {
-    const t = ctx.currentTime;
+    const t = ctx.currentTime + PERF.ahead;
     const level = 0.048 * settings.music;
     const dest = fadeTo(padBus);
     for (const [i, m] of notes.entries()) {
@@ -294,6 +334,7 @@ export function createAudio({ settings }) {
   // spiral's figure and the still room's drops.
   function ping(m, at, { peak, decay, pan, dest, verbSend = 1 }) {
     const f = mtof(m);
+    if (!begin(at, at + decay + 0.05, verbSend ? 7 : 6)) return;
     const g = ctx.createGain();
     g.gain.setValueAtTime(0, at);
     g.gain.linearRampToValueAtTime(peak, at + 0.012);
@@ -322,6 +363,7 @@ export function createAudio({ settings }) {
   // little ahead (a hidden tab runs this only once a second).
   function tick() {
     if (!on) return;
+    if (tickDue) soundLog.tick(performance.now() - tickDue);
     const t = ctx.currentTime;
     const F = formsNow(), R = heard.falling, still = stillness();
     const breathe = swellOf(heard.breath);
@@ -331,7 +373,7 @@ export function createAudio({ settings }) {
     // The spiral: the chord's notes an octave up, climbing and turning back,
     // turning from one side to the other.
     if (heard.w.spiral > 0.02 && settings.formSound > 0 && chord >= 0) {
-      if (arpAt < t) arpAt = t + 0.05;
+      if (arpAt < t) arpAt = t + Math.max(0.05, PERF.ahead);
       while (arpAt < ahead) {
         const notes = CHORDS[chord];
         const path = [0, 1, 2, 3, 4, 3, 2, 1];
@@ -351,8 +393,10 @@ export function createAudio({ settings }) {
         dropAt += rand(2.5, 7) / still;
       }
     } else dropAt = 0;
+    tickDue = performance.now() + TICK * 1000;
     later(tick, TICK * 1000);
   }
+  let tickDue = 0;
 
   // The low tone's level with the breath: its rise, made deeper.
   const swellOf = (k) => clamp((k - 0.6) / 0.4, 0, 1) ** 2;
@@ -363,6 +407,7 @@ export function createAudio({ settings }) {
     clearTimeout(chordTimer);
     timers = timers.filter((x) => x !== chordTimer);
     const t = ctx.currentTime;
+
     // A chord that comes early lets the one before go soon, while it swells
     // (so the two together stay about as loud as one).
     if (why !== 'time') for (const g of now.fades) g.gain.setTargetAtTime(0, t + 3, 3);
@@ -375,7 +420,15 @@ export function createAudio({ settings }) {
     const hold = rand(14, 20);
     now = { at: t, hold, why, fades: [] };
     padChord(CHORDS[chord], hold);
-    chordTimer = later(() => nextChord(), (hold - 2) * 1000); // the next one swells as this one fades
+    chordTimer = later(chordDue, (hold - 2) * 1000); // the next one swells as this one fades
+  }
+  // The chord's time is up. But a sound that stands still (the context
+  // suspended or interrupted while the page's timers run on) gets no new
+  // chord until it runs again: else the chords would pile up at one moment
+  // of its time and all swell at once when it comes back.
+  function chordDue() {
+    if (ctx.currentTime - now.at < (now.hold - 2) / 2) chordTimer = later(chordDue, 1000);
+    else nextChord();
   }
 
   // A form begins to show: its chord blooms (unless one just did), or its
@@ -383,7 +436,7 @@ export function createAudio({ settings }) {
   function arrive(name) {
     const t = ctx.currentTime;
     if (t - now.at > SETTLE || now.why === 'leave') nextChord(FORM_CHORD[name], 'arrive');
-    else formLayer(name, CHORDS[chord], t, Math.max(4, now.at + now.hold - t));
+    else formLayer(name, CHORDS[chord], t + PERF.ahead, Math.max(4, now.at + now.hold - t));
   }
 
   // A form begins to go and none other comes: the harmony goes home.
@@ -422,7 +475,8 @@ export function createAudio({ settings }) {
   ];
   function bell(pan = rand(-0.7, 0.7), strength = 1) {
     if (!on || settings.chimes <= 0) return;
-    const t = ctx.currentTime;
+    const t = ctx.currentTime + PERF.ahead;
+    if (!begin(t, t + PARTIALS[0][2] + 0.1, PARTIALS.length * 7 + 5)) return;
     const step = (bellPitch(1) + 1) / 2 * (BELLS.length - 1);
     const f = mtof(BELLS[Math.round(step)]);
     const peak = 0.06 * settings.chimes * strength;
@@ -488,6 +542,7 @@ export function createAudio({ settings }) {
     mixPad();
     mixVoices();
     nextChord();
+    tickDue = 0;
     tick();
   }
 
