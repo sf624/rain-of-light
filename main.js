@@ -9,7 +9,7 @@ import { createAudio } from './audio.js';
 import { createSway, createRandom } from './sway.js';
 import {
   PALETTES, WEATHER, FLOWS, COLOR_MODES, SETS, SKY, CAMERAS,
-  DEFAULTS, STORAGE_KEY, SCHEMA, ROOM, SCENES, RENAMED, FORMS,
+  DEFAULTS, STORAGE_KEY, SCHEMA, ROOM, SCENES, RENAMED,
 } from './config.js';
 import { createShow } from './show.js';
 import { createDirector, hash } from './director.js';
@@ -150,11 +150,14 @@ const eggProgs = (type) => builtProgs(withEggs, type, () => eggShader(POINT_VS, 
   console.warn('easter egg dropped:', err.message);
   eggs.drop(type);
 });
-// The celestial bodies' (they are started a few seconds in, so that they are done when one first comes).
-const withBody = new Map();
-const CELESTIAL_TYPE = FORMS.find((f) => f.name === 'celestial').type;
-const bodyProgs = () => builtProgs(withBody, 'celestial', () => bodyShader(POINT_VS), (err) => console.warn('the celestial bodies cannot show:', err.message));
-setTimeout(bodyProgs, 3000);
+// The celestial bodies', one pair per kind of body (celestial.js), started
+// as one of its bodies is about to come (show.js: bodiesNear), but not in
+// the page's first seconds (BODY_AFTER, ms), which are the first picture's;
+// a body that shows at once (held, or seeked to) starts its own as it shows.
+const withBody = new Map();   // kind -> { point, wire, done }
+const BODY_AFTER = 3000;
+let bodyDrawn = null;         // the kind of the body drawn by its own programs in the last frame (for the tests)
+const bodyProgs = (kind) => builtProgs(withBody, kind, () => bodyShader(POINT_VS, kind), (err) => console.warn(`the celestial bodies of kind ${kind} cannot show:`, err.message));
 
 const lattice = createLattice(gl);
 let count = 0, GRID = 0, ROWS = 0, wireCount = 0, light = null;
@@ -728,6 +731,7 @@ function advance(dt, replay = false) {
   const px = replay ? 0 : pointer.sx, py = replay ? 0 : pointer.sy;
   const yaw = px, cy = Math.cos(yaw), sy = Math.sin(yaw);
   const turn = (v) => [v[0] * cy + v[2] * sy, v[1], -v[0] * sy + v[2] * cy];
+  const path = [...eye];                           // (the eye of the show's own move: a black hole faces it, see show.js)
   eye = turn(eye);
   eye[1] -= py * 2.0;
   dir = turn(dir);
@@ -739,7 +743,7 @@ function advance(dt, replay = false) {
   projM = perspective(fovRad(), aspect, 0.1, 60);
   const f = norm(sub(at, eye));
   const r = norm(cross(f, [0, 1, 0]));
-  camera = { eye, f, r, u: cross(r, f), aspect, tall: fit.tall };
+  camera = { eye, f, r, u: cross(r, f), aspect, tall: fit.tall, path };
 
   // A wave now and then, somewhere in the field.
   if (S.ripples > 0 && time > nextAuto) {
@@ -921,7 +925,8 @@ function hudSnapshot() {
 // eggs: the egg that shows, its uniforms, and the type of the egg drawn by its own program in the last frame.
 if (lab) {
   window.__lab = { state: () => JSON.stringify(saveState()), seek: (t) => { pendingSeek = t; }, turn: () => pointer.x, setting: (key) => S[key],
-    eggs: () => ({ on: eggs.info(), ...eggs.uniforms(), drawn: eggDrawn, eye: camera?.eye }), summon: (name) => eggs.summon(name) };
+    eggs: () => ({ on: eggs.info(), ...eggs.uniforms(), drawn: eggDrawn, eye: camera?.eye }), summon: (name) => eggs.summon(name),
+    bodies: () => ({ drawn: bodyDrawn, built: [...withBody.keys()] }) };
 }
 const hud = createHud({ lab, params, bar: clock.bar, snapshot: hudSnapshot });
 
@@ -956,6 +961,7 @@ function frame(now) {
   const { shown, breath, egg } = advance(dt);
   // A baked form's field loads as it draws near, and the form shows once it is there.
   fields.frame(show.bakedNear(time), shown, Math.min(0.1, Math.max(0, rawDt)));
+  if (now >= BODY_AFTER) for (const kind of show.bodiesNear(time)) bodyProgs(kind);
   if (lab && !job) snapshot();
   const view = viewM, proj = projM, fit = lastFit;
   const rk = shown.rain;                 // how much rain falls now: 0 a still room .. 1 a rain passage
@@ -986,9 +992,9 @@ function frame(now) {
   const rays = S.rays === 'off' || !hasFloat ? 0 : Number(S.rays);
   const eggType = eggs.showing();
   // (While a celestial body shows, no egg does: an egg takes a form's place.)
-  const bodyShows = [0, 1, 2].some((k) => shown.A[k * 4] === CELESTIAL_TYPE && shown.A[k * 4 + 1] >= 0.001);
-  const { point: pointProg, wire: wireProg } = eggType ? eggProgs(eggType) : bodyShows ? bodyProgs() : plain;
-  eggDrawn = pointProg !== plain.point ? eggType : 0;
+  const { point: pointProg, wire: wireProg } = eggType ? eggProgs(eggType) : shown.body ? bodyProgs(shown.body) : plain;
+  eggDrawn = pointProg !== plain.point && eggType ? eggType : 0;
+  bodyDrawn = pointProg !== plain.point && !eggType ? shown.body : null;
   const progs = [pointProg];
   if (wiresOn) progs.push(wireProg);
   const rayScale = H / 1080;   // rays scale with the view like the lattice: their length is set for a 1080 px tall view
@@ -1073,6 +1079,9 @@ function frame(now) {
   gl.uniform3fv(u.uFormS, shown.S);
   gl.uniform3fv(u.uFormT, shown.T);
   gl.uniform3fv(u.uTint, shown.tint);
+  // A black hole's shadow: the light behind it, as the eye sees it, goes out (holeShade in blackhole.js).
+  gl.uniform4fv(u.uHole, shown.hole);
+  gl.uniform1f(u.uHoleDark, shown.holeDark);
   gl.uniform1f(u.uTwinkle, S.twinkle);
   gl.uniform4fv(u.uCopy, copies);
   gl.uniform1fv(u.uCopyGain, copyGain);

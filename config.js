@@ -78,8 +78,12 @@ export const CAMERAS = [
 ];
 
 // The celestial bodies (the form celestial's variants, see celestial.js):
-// one of them each time it comes. The ringed planets (see planets.js), per
-// body: size (the ball's radius); upright (its axis near the
+// one of them each time it comes. Each has a kind (the bodies of a kind
+// share their code, see celestial.js), colours of its own (four: see each
+// kind), room (the room's tint while it shows), under (the layer's palettes
+// under it) and voice (whose voice it sings with, see audio.js); label:
+// its name as shown, if not its name.
+// The ringed planets (kind planet, see planets.js), per body: size (the ball's radius); upright (its axis near the
 // vertical, its rings seen a little from above) or on its side (its rings
 // standing); open ([least, most]: how far its rings open to the eye, rad
 // from edge-on, slowly to and fro); roll (how far their ellipse leans to
@@ -88,23 +92,28 @@ export const CAMERAS = [
 // (its bands, each [from, to, density, tone]: in radii, as the real
 // planet's; tone from its third colour to its fourth, 2 .. 3), stretch
 // (how many times wider they spread out from the first band's inner edge
-// than the real ones); colors (four: the ball's two, then the rings' two,
-// see planetLight in planets.js); room (the room's tint
-// while it shows); under (the layer's palettes under it).
+// than the real ones); colors (the ball's two, then the rings' two, see
+// planetLight in planets.js).
+// The black hole (kind hole, see blackhole.js): colors, its disc's deep
+// orange-red and pale yellow (white-hot at its inner rim), then its jets'
+// pale blue-white (the third; the fourth is the same).
 const TAU = Math.PI * 2;
 export const BODIES = [
   // Saturn: C ring faint and dusky, B ring bright cream (brightest outward),
   // the dark Cassini division, A ring greyer with the Encke gap, and the thin F ring.
-  { name: 'saturn', size: 2.3, upright: true, open: [0.3, 0.44], roll: 0.16, spin: TAU / 45, phase: 0.65,
+  { name: 'saturn', kind: 'planet', voice: 'orb', size: 2.3, upright: true, open: [0.3, 0.44], roll: 0.16, spin: TAU / 45, phase: 0.65,
     rings: [[1.24, 1.43, 0.14, 3.0], [1.43, 1.53, 0.24, 2.9], [1.53, 1.72, 0.7, 2.1], [1.72, 1.95, 1.0, 1.9],
       [2.06, 2.19, 0.5, 2.7], [2.225, 2.27, 0.42, 2.75], [2.32, 2.34, 0.4, 2.4]], stretch: 1.45,
     colors: [[1.0, 0.85, 0.56], [0.78, 0.55, 0.3], [1.0, 0.92, 0.74], [0.6, 0.56, 0.52]], room: [0.95, 0.75, 0.42],
     under: ['deep sea', 'sakura'] },
   // Uranus: lying on its side, a few thin rings standing round it, the outer (epsilon) the brightest.
-  { name: 'uranus', size: 1.6, upright: false, open: [0.62, 0.85], roll: 0.14, spin: TAU / 50, phase: 0.55,
+  { name: 'uranus', kind: 'planet', voice: 'orb', size: 1.6, upright: false, open: [0.62, 0.85], roll: 0.14, spin: TAU / 50, phase: 0.55,
     rings: [[1.64, 1.66, 0.55, 2.6], [1.75, 1.79, 0.65, 2.5], [1.86, 1.9, 0.7, 2.4], [1.99, 2.02, 1.0, 2.0]], stretch: 1.5,
     colors: [[0.5, 0.92, 0.96], [0.3, 0.72, 0.9], [0.92, 0.98, 1.0], [0.55, 0.68, 0.8]], room: [0.35, 0.75, 0.95],
     under: ['sakura', 'amber'] },
+  { name: 'blackhole', label: 'black hole', kind: 'hole', voice: 'blackhole',
+    colors: [[1.0, 0.36, 0.05], [1.0, 0.76, 0.34], [0.62, 0.8, 1.0], [0.62, 0.8, 1.0]], room: [0.14, 0.2, 0.62],
+    under: ['deep sea', 'aurora'] },
 ];
 
 // Forms of light. Sky forms come one at a time (two while one turns into the
@@ -123,7 +132,9 @@ export const FORMS = [
   { name: 'solid',     type: 5, weight: 0.4, palettes: ['ice', 'amber', 'aurora', 'sakura'], variants: SOLIDS.map((x) => x.name) },
   { name: 'knot',      type: 6, weight: 0.4, palettes: ['aurora', 'amber', 'sakura', 'deep sea'], variants: KNOTS.map((x) => x.name) },
   // A celestial body: each of its bodies (BODIES) has colours of its own, so it has no palettes.
-  { name: 'celestial', type: 8, weight: 0.4, label: 'celestial body', palettes: [], variants: BODIES.map((x) => x.name),
+  // (Its weight is for all its bodies: each comes about as often as its share of it.)
+  { name: 'celestial', type: 8, weight: 0.8, label: 'celestial body', palettes: [],
+    variants: BODIES.map((x) => x.name), variantLabels: BODIES.map((x) => x.label ?? x.name),
     whichHint: 'auto: each time a celestial body comes, another of them / or always this one' },
 ];
 // The layer's surface lies height over the strands' feet, its bright band
@@ -205,6 +216,7 @@ export const SCHEMA = [
       labels: ['auto', ...FORMS.map((f) => f.label ?? f.name), 'none'],
       hint: 'auto: forms of light come and go with the show / or hold one form (none: no form)' },
     ...FORMS.filter((f) => f.variants).map((f) => ({ key: f.name, label: `Which ${f.label ?? f.name}`, options: ['auto', ...f.variants],
+      labels: f.variantLabels && ['auto', ...f.variantLabels],
       hint: f.whichHint ?? `auto: each time the ${f.name} comes, another of its figures / or always this one` })),
     { key: 'layer', label: 'Layer of light', options: ['auto', 'on', 'off'] },
     { key: 'mirror', label: 'Floor mirror (0: off)', min: 0, max: 1, step: 0.05 },
@@ -313,6 +325,6 @@ export const SCHEMA = [
     { key: 'chimes', label: 'Bells', min: 0, max: 1, step: 0.05, viewer: 7 },
     { key: 'rainSound', label: 'Rain', min: 0, max: 1, step: 0.05, viewer: 8 },
     { key: 'formSound', label: 'Forms', min: 0, max: 1, step: 0.05, viewer: 9,
-      hint: 'The voice each form of light brings: the orb a low hum, the spiral a turning figure, the ring a glassy tone, the veil a soft air, the solid a chord of pure fifths, the knot two beating tones' },
+      hint: 'The voice each form of light brings: the orb a low hum, the spiral a turning figure, the ring a glassy tone, the veil a soft air, the solid a chord of pure fifths, the knot two beating tones, the black hole a low, slow drone and, as its jets grow, a faint high tone' },
   ] },
 ];

@@ -45,9 +45,10 @@
       {"q": "form=knot&knot=hopf", "label": "knot=hopf"},
       {"q": "form=knot&knot=mobius", "label": "knot=mobius"}
     ] },
-    { "name": "celestial", "cols": 2, "base": "rain=off&layer=off&t=45", "pre": 100, "cells": [
+    { "name": "celestial", "cols": 3, "base": "rain=off&layer=off&t=45", "pre": 100, "cells": [
       {"q": "form=celestial&celestial=saturn", "label": "celestial=saturn"},
-      {"q": "form=celestial&celestial=uranus", "label": "celestial=uranus"}
+      {"q": "form=celestial&celestial=uranus", "label": "celestial=uranus"},
+      {"q": "form=celestial&celestial=blackhole", "label": "celestial=blackhole"}
     ] },
     { "name": "layer", "cols": 3, "base": "rain=off&t=30", "cells": [
       {"q": "form=orb&layer=off", "label": "form=orb&layer=off"},

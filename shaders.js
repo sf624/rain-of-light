@@ -4,7 +4,7 @@
 import { FIELD } from './fields.js';
 import { SOLIDS, KNOTS, MOBIUS_RULINGS } from './figures.js';
 import { EGG_GLSL } from './egg-shaders.js';
-import { PLANET_GLSL } from './planets.js';
+import { BODY_GLSL } from './celestial.js';
 
 // The falling time wraps at this many flow units (see drop() in POINT_VS).
 export const FLOW_WRAP = 1000;
@@ -636,7 +636,7 @@ vec3 bakedLight(vec3 p, vec4 a, vec4 b, float yaw, vec4 f) {
 }
 
 #ifdef CELESTIAL
-${PLANET_GLSL}
+${BODY_GLSL}
 #endif
 
 // The light of the forms at p (v: 0 at the top .. 1 at the floor). Each comes
@@ -645,12 +645,20 @@ ${PLANET_GLSL}
 // below it: its light lifts off as points, the high ones rising fastest.
 // thread: the share of that light the strand's wire shows; around: how near
 // p is to a sky form (1 within its reach, 0 well away): rain gives way there.
+// (With a celestial body, FormRay: the share of that light that casts rays,
+// see main: all of it, but of a body only its own share, BodyRay.)
+#ifdef CELESTIAL
+vec3 FormRay;
+#endif
 const vec2 LAYER_NEAR = vec2(4.5, 11.0);   // the layer is dark nearer the eye than x, full from y on
 const float FORM_BODY = 1.25;              // the sky forms' light, over what their own functions give
 vec3 formsAt(vec3 p, float id, float v, out vec3 thread, out float around) {
   vec3 c = vec3(0.0);
   thread = vec3(0.0);
   around = 0.0;
+#ifdef CELESTIAL
+  FormRay = vec3(0.0);
+#endif
   // Only as far as the last slot that shows a form: some GPUs (SwiftShader)
   // run a loop's body for every LED, those that skip it masked, as long as
   // any goes on; so where no form shows, none of the forms' code runs.
@@ -669,7 +677,11 @@ vec3 formsAt(vec3 p, float id, float v, out vec3 thread, out float around) {
       // (each LED fades out as its turn comes, over a second or so, never at once)
       keep = (1.0 - e.w * 0.7) * clamp((hash(id + float(k) * 5.3 + 0.9) - e.w * 0.6) / 0.08 + 1.0, 0.0, 1.0);
     }
+#ifdef CELESTIAL
+    float far = int(a.x + 0.5) == 8 ? bodyFar(q - b.xyz, b, e, ff) : length(q - b.xyz);
+#else
     float far = length(q - b.xyz);
+#endif
     if (k < 2) around = max(around, a.y * (1.0 - smoothstep(ff.w * 0.8, ff.w * 2.2, far)));
     if (far > ff.w) continue;                        // too far from it for any of its light
     int type = int(a.x + 0.5);
@@ -678,7 +690,7 @@ vec3 formsAt(vec3 p, float id, float v, out vec3 thread, out float around) {
     // While a celestial body shows, no other sky form does (one comes only once the
     // other has gone): its programs hold only it and the layer (celestial.js: bodyShader).
 #ifdef CELESTIAL
-    if (type == 8) f = planetLight(q, a, b, ff, k, own);
+    if (type == 8) f = bodyLight(q, a, b, e, ff, k, own);
 #else
     if (type == 0) f = orbLight(q, a, b);
     else if (type == 1) f = spiralLight(q, a, b, e.z, ff);
@@ -705,7 +717,12 @@ vec3 formsAt(vec3 p, float id, float v, out vec3 thread, out float around) {
     vec3 base = type == 8 ? own : mix(uFormC[k], uFormD[k], f.z);
     vec3 light = mix(base, WHITE_HOT, clamp(f.y, 0.0, 1.0)) * f.x * on * keep;
     c += light;
+#ifdef CELESTIAL
+    FormRay += type == 8 ? light * BodyRay : light;
+    thread += light * (type == 8 ? BodyThread : type == 2 || type == 3 || type >= 5 ? 0.5 : 1.0);   // (see bodyLight)
+#else
     thread += light * (type == 8 ? 0.2 : type == 2 || type == 3 || type >= 5 ? 0.5 : 1.0);   // a hoop or a line is not its strands; a planet's face is not either
+#endif
   }
   return c;
 }
@@ -793,7 +810,11 @@ void main() {
   vec3 c = (form + flare * 2.5 * ring) * uLight.x;
   // The light that casts rays: all of the LED's light but the rain's trails
   // and the LEDs' light at rest (a drop's head, a form, a wave, a twinkle).
+#ifdef CELESTIAL
+  vec3 glint = c - (form - FormRay) * uLight.x;
+#else
   vec3 glint = c;
+#endif
   vec3 wireCol = (thread + flare * ring) * uLight.y;
   float wireRest = uRest * 1.5 * near * uLight.y, wireWave = ring * 1.2 * uLight.y;
   float wireRain = uRainGain * 0.2 / uRainK[1].y;     // a wire's light does not grow with its LEDs' light
@@ -888,6 +909,9 @@ void main() {
   // Each mirror dims its image a little; the floor's image fades with the height above it.
   float g = uCopyGain[gl_InstanceID] * fog;
   if (uMirror.y > 0.0) g *= uMirror.y * exp(-(pos.y - uMirror.x) / uMirror.z);
+#ifdef CELESTIAL
+  g *= bodyShade(seen);   // (a black hole hides what lies behind it, its own disc too)
+#endif
   c *= g;
   glint *= g;
   wireCol *= g;

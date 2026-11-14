@@ -64,6 +64,10 @@ const EASE = 2.5;                             // s: a change of the Rain setting
 // follows the timeline's fades as they are (none is as steep), and a change
 // of setting fades a form in or out over BLEND seconds, down to 0 exactly.
 const BLEND = 4;
+// A black hole's shadow fades with the form's weight below this.
+const HOLE_FADE = 0.35;
+// How long before a celestial body comes its kind's programs are built (s; see bodiesNear).
+const BODY_AHEAD = 30;
 
 // The timelines: the whole show, and the show without rain (Rain off; Rain on
 // pins the rain of the whole show, see wanted).
@@ -93,6 +97,7 @@ const timelineFor = (rain) => (rain === 'off' ? 'dry' : 'all');
 const rareOf = (T, r) => (T >= RARE.after ? rareEggs()[Math.floor(hash(r * 67 + 9) / RARE.chance)] ?? null : null);
 // The palettes an egg takes in a celestial body's place (it has none of its own): the orb's.
 const ORB = FORMS.find((f) => f.name === 'orb');
+const CELESTIAL = FORMS.find((f) => f.name === 'celestial');
 const isRare = (form) => !!form.egg || BAKED.includes(form);
 const eggOfForm = (form) => form.egg ?? rareEggs().find((e) => e.form === form.name);
 
@@ -257,17 +262,19 @@ function createTimeline(seed, pool, name, mood, baked) {
   }
   // When the next passage begins (after t).
   const upcoming = (t) => { extend(t); return list.find((p) => p.start > t)?.start ?? next; };
-  // The eggs of the rare slot that show between t0 and t1: { form, from, to } (from its coming to its going).
-  function rareSpans(t0, t1) {
+  // The sky forms' episodes that `keep` picks and that show between t0 and t1: { e, form, from, to } (from its coming to its going).
+  function spans(t0, t1, keep) {
     extend(t1 + 40);
     const out = [];
     for (const p of list) {
       const e = p.sky;
-      if (e && isRare(e.form) && e.inAt <= t1 && e.outAt + e.outFade >= t0 && !out.some((x) => x.e === e)) out.push({ e, form: e.form, from: e.inAt, to: e.outAt + e.outFade });
+      if (e && keep(e) && e.inAt <= t1 && e.outAt + e.outFade >= t0 && !out.some((x) => x.e === e)) out.push({ e, form: e.form, from: e.inAt, to: e.outAt + e.outFade });
     }
     return out;
   }
-  return { at, passage, flowAt, upcoming, rareSpans };
+  // The eggs of the rare slot that show between t0 and t1.
+  const rareSpans = (t0, t1) => spans(t0, t1, (e) => isRare(e.form));
+  return { at, passage, flowAt, upcoming, spans, rareSpans };
 }
 
 // baked: whether the baked forms can show (see fields.js; the tools count them).
@@ -292,7 +299,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
     return pin >= 0 ? pin : e.v || 0;
   };
   // A celestial body (its own colours, see config.js: BODIES), else undefined.
-  const bodyOf = (e) => (e.form.name === 'celestial' ? BODIES[variantOf(e)] : undefined);
+  const bodyOf = (e) => (e.form === CELESTIAL ? BODIES[variantOf(e)] : undefined);
 
   // What the settings ask for at t: the rain, and the episodes with their weights.
   // egg: an easter egg in the form slot (see eggs.js): { w, age, form, rain, layer }; rare: how
@@ -349,7 +356,8 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
     return nameOf(e, under, palAt(under, hash(e.r * 29 + above.r * 31), m));
   };
   // Its colours: the first two, the room's colour with it, and the third and
-  // fourth (a planet's own rings' colours, see planetLight in planets.js; for the others their second again).
+  // fourth (a celestial body's own: a planet's rings', see planetLight in planets.js, a black hole's
+  // jets', see holeLight in blackhole.js; for the others their second again).
   const colorsOf = (e, above) => {
     const P = bodyOf(e);
     if (P) return [P.colors[0], P.colors[1], P.room, P.colors[2], P.colors[3]];
@@ -369,6 +377,12 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
   const C = new Float32Array(SLOTS * 3), D = new Float32Array(SLOTS * 3);
   const G = new Float32Array(SLOTS * 3), H = new Float32Array(SLOTS * 3);
   const N = new Float32Array(SLOTS * 3), Sun = new Float32Array(SLOTS * 3), T = new Float32Array(SLOTS * 3);   // a planet's frame (planets.js: planetFrame)
+  // The celestial body that shows most (the programs draw its kind, see main.js), if any.
+  let body = null, bodyW = 0;
+  // A black hole's shadow (see forms.js: blackhole, and holeShade in blackhole.js):
+  // its centre and radius, and how dark it is (0: none, and the shader skips it).
+  const HOLE = new Float32Array(4);
+  let holeDark = 0;
   const E = new Float32Array(SLOTS * 4), F = new Float32Array(SLOTS * 4);
   const tint = [...ROOM_TINT];
 
@@ -407,8 +421,13 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
         const turn = s.face === undefined ? 1 : 1 - Math.exp(-dt / 5);
         const d = goal - (s.face ?? goal);
         s.face = (s.face ?? goal) + (d - Math.round(d / (2 * Math.PI)) * 2 * Math.PI) * turn;
-        m = motion(form.name, age, w, go, r, s.face, ground, variantOf(e), eye);
+        // (and how the show's own camera sees it, at once, whatever a drag does: a black hole stands its disc for it)
+        const [cx, cy, cz] = m.centre, [px, py, pz] = view.path ?? eye;
+        const sight = { rise: Math.atan2(cy - py, Math.hypot(cx - px, cz - pz)), az: Math.atan2(cx - px, cz - pz) };
+        m = motion(form.name, age, w, go, r, s.face, ground, variantOf(e), eye, sight);
       }
+      const b = bodyOf(e);
+      if (b && w >= 0.001 && (!body || w > bodyW)) { body = b; bodyW = w; }
     }
     A.set([form.type, w, m.size, m.turn], k * 4);
     B.set([...m.centre, m.tilt], k * 4);
@@ -425,9 +444,15 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
     F.set([...m.f, m.bound], k * 4);
     const fr = m.frame || { n: [0, 1, 0], sun: [0, 0, 1], t: [1, 0, 0] };
     N.set(fr.n, k * 3); Sun.set(fr.sun, k * 3); T.set(fr.t, k * 3);
+    // A form with a shadow: it darkens as the form's own move has it, and
+    // fades with the form's weight (a change of setting), never at once.
+    if (m.hole !== undefined) {
+      const dark = (m.dark ?? 1) * smooth(Math.min(1, w / HOLE_FADE));
+      if (dark > holeDark) { HOLE.set([...m.centre, m.hole]); holeDark = dark; }
+    }
   }
 
-  // view: the camera ({ eye }): the forms turn towards the eye.
+  // view: the camera ({ eye, path }; path: the eye of the show's own move, before a drag): the forms turn towards the eye.
   // egg, rare: what the easter eggs ask (see wanted and eggs.js).
   let eggHeld = null;                         // the baked form an easter egg holds now (its name), if any
   function update(t, dt, view, egg = null, rare = 1) {
@@ -475,6 +500,8 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
     for (const s of sky) if (s.slot !== undefined && !slots[s.slot]) slots[s.slot] = s;
     for (const s of sky) if (!slots.includes(s)) { s.slot = slots[0] ? 1 : 0; slots[s.slot] = s; }
     A.fill(0);
+    holeDark = 0;
+    body = null;
     let sum = 0;
     const mixed = [0, 0, 0];
     const forms = [];
@@ -490,7 +517,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
       if (n === 2) place(n, { ...s, w: s.w * (1 - 0.2 * rainNow) * (1 - 0.2 * skyNow), alone: (1 - rainNow) * (1 - skyNow) }, 0, view, dt);
       else {
         place(n, s, rainNow, view, dt, want.flow.toward ? 0 : 1);
-        forms.push({ name: s.x.e.form.name, w: s.w, out: s.x.out, at: [B[n * 4], B[n * 4 + 1], B[n * 4 + 2]] });
+        forms.push({ name: s.x.e.form.name, voice: bodyOf(s.x.e)?.voice ?? s.x.e.form.name, w: s.w, out: s.x.out, at: [B[n * 4], B[n * 4 + 1], B[n * 4 + 2]] });
       }
       // (Under a form the layer's colour is its ground, not the room's.)
       const share = n === 2 ? s.w * (1 - skyNow) : s.w;
@@ -508,7 +535,8 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
     // layer: the layer of light, how much it shows and the top of its band as seen (topOf, the
     // height the forms rest on; for the eggs, see egg-kinds.js).
     const layer = slots[2] && slots[2].w > 0.001 ? { w: slots[2].w, top: topOf(slots[2].x.e.r) } : null;
-    return { rain: rainNow, storm: rainNow * skyNow, A, B, C, D, G, H, N, S: Sun, T, E, F, tint, forms, flow: want.flow, egg: eggNow, layer };
+    return { rain: rainNow, storm: rainNow * skyNow, A, B, C, D, G, H, N, S: Sun, T, E, F, tint, forms, flow: want.flow, egg: eggNow, layer,
+      body: body?.kind ?? null, hole: HOLE, holeDark };
   }
 
   // The colour key: every form, shown now or later, takes its next palette.
@@ -562,11 +590,18 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
     const tl = castBy();
     return tl ? [...new Set(tl.rareSpans(t, t + ahead).filter((x) => BAKED.includes(x.form)).map((x) => x.form.name))] : [];
   }
+  // The kinds of the celestial bodies about to show, or showing, at t (within `ahead` seconds):
+  // one held, or the timeline's (their programs are built first, see main.js: bodyProgs).
+  function bodiesNear(t, ahead = BODY_AHEAD) {
+    const tl = castBy();
+    const es = tl ? tl.spans(t, t + ahead, (e) => e.form === CELESTIAL).map((x) => x.e) : S.form === CELESTIAL.name ? [holdOf(CELESTIAL)] : [];
+    return [...new Set(es.map((e) => bodyOf(e).kind))];
+  }
   // The eggs of the rare slot the timeline has between t0 and t1 (see eggs.js): { egg, from, to }.
   const rareSpans = (t0, t1) => castBy()?.rareSpans(t0, t1).map((x) => ({ egg: eggOfForm(x.form), from: x.from, to: x.to })) ?? [];
 
   // The rain's direction at t, as the show has it (for the start: update returns it too).
   const flow = (t) => wanted(t).flow;
 
-  return { update, recolor, cast, flow, info, save, load, reset, bakedNear, rareSpans };
+  return { update, recolor, cast, flow, info, save, load, reset, bakedNear, bodiesNear, rareSpans };
 }
