@@ -14,8 +14,8 @@ testing and capturing, see [development.md](development.md).
 You stand in a dark room full of hanging strands of tiny LEDs, over a floor
 of black glass. Light falls down the strands like rain. Now and then the rain
 stops, and a large form of light gathers among the same LEDs: an orb, a
-spiral, a ring or a veil, or one of two forms of mathematics (a
-solid, a knot). A low sea of light (the layer) glows near
+spiral, a ring or a veil, one of two forms of mathematics (a
+solid, a knot), or a ringed planet (Saturn, Uranus). A low sea of light (the layer) glows near
 the floor. The colours drift slowly together, and calm music follows what is
 shown. A click sends a wave of light through the room and rings a bell.
 
@@ -463,7 +463,7 @@ look that no strand shows.
 
 ### Forms of light
 
-![The six forms alone: orb, spiral, ring, veil, solid and knot](img/forms.jpg)
+![The seven forms alone: orb, spiral, ring, veil, solid, knot and planet](img/forms.jpg)
 
 `shaders.js: formsAt` adds the light of up to three forms: two sky forms
 (the one that shows, and the next, which waits until it has gone) and the layer. For each it calls a function that
@@ -515,6 +515,8 @@ the form's first colour to its second:
 - `layerLight`: the layer of light, a sea near the floor in slow waves, its
   points glinting.
 - `bakedLight`: a baked form (see Baked forms below), a shape's skin.
+- `planetLight` (in `planets.js`, see below): a planet, Saturn or Uranus,
+  with its rings.
 
 Each is a field: a function of the LED's position relative to the
 form's centre, size and turn. Where the form is moves in `forms.js` (see
@@ -559,7 +561,99 @@ its weight rises, and shrinks back as it falls (`forms.js: GROW`, `FADING`).
 
 **Colour.** The light is the form's first colour mixed towards its second,
 then towards `WHITE_HOT` by the white-hot share. Sky forms give 1.25 times
-their own light (`FORM_BODY`).
+their own light (`FORM_BODY`). A planet has four colours of its own: its
+ball's two in the slot's first and second, its rings' two in a third and
+a fourth (`uFormG`, `uFormH`); `planetLight` mixes its LED's colour itself.
+
+**The planet.** The planet is a form with variants (`config.js:
+PLANETS`): each time it comes it is Saturn or Uranus. A variant has its
+own four colours in place of palettes, a size, a spin and its rings. It
+is the planet's figure, picked and pinned like the solid's (`variants`;
+`?form=planet&planet=saturn`). The HUD's forms row shows the variant also
+where a form shows its palette. Its light is `planets.js: planetLight`.
+
+- *The ball as the eye sees it.* Every LED inside the ball shows the place
+  on the near surface that lies behind it on the line of sight from the
+  eye (`Eye`: in a mirror, the eye's image). So all the ball's LEDs show
+  the near face, and each gives its share: as many LEDs show a place as
+  lie along the chord through it, so the face is as bright at the rim as
+  in the middle (a shell of LEDs alone would show the face with one LED
+  per strand gap, and the far side would show through it). Saturn has
+  pale zones and tan belts whose edges wave, so they drift as it turns;
+  Uranus is pale cyan, a little deeper to its poles.
+- *The rings.* Each variant's rings are a list of bands (`rings`: from,
+  to, density, tone, in radii as the real planet's), spread out from the
+  innermost edge by `stretch` (Saturn's 1.45 times: wider than the real
+  rings, so they are the star of the form). `planets.js:
+  createRingMap` bakes them into a texture (unit 6), a row per variant:
+  density and tone along the radius; broad bands get ringlets (a smooth
+  noise along the radius), and a band narrower than the lattice is
+  widened to 0.6 of a strand gap, so a thin ring (Uranus's, Saturn's F
+  ring) still lights (for the default lattice of the screen: a phone's
+  is coarser).
+- *The slab.* The rings are a slab of LEDs about their plane. Each LED in
+  it shows the place where its line of sight crosses the plane, so the
+  bands and gaps stay sharp on a coarse lattice. The slab is `SLAB` (5)
+  steps of the lattice thick, along the lattice's axis that crosses the
+  plane most steeply, its edges each one step soft. Along any line of
+  LEDs across it, the weights then add up to exactly `SLAB` wherever the
+  plane lies between the LEDs, so every strand that crosses the rings
+  gives them the same light: they read as continuous bands, with no
+  dotted arcs and no moiré as they turn. An LED's light also goes with
+  how steeply its line of sight crosses the plane (where it slants, more
+  LEDs show the same place), so the rings are as bright however open.
+- *Light and shadow.* The sun lights the planet from the eye's side,
+  turned round by the phase angle (`f[1]`: 0 full .. pi new), a little
+  beyond the rings' plane from the eye (`planets.js: SUN`, 0.17 rad). So the rings'
+  shadow falls on the face of the ball the eye sees, as a dark band just
+  beyond them, and the eye sees the rings' face away from the sun (lit
+  through them, at 0.85 of their light). The ball's shadow falls across
+  the rings behind it, beside the ball. Rings behind the ball are hidden;
+  rings in front of it hide some of it and show over it, brighter there
+  (the ball's LEDs show them too). A few ring LEDs, more where the rings
+  are dense, glint now and then like ice: bright enough for rays, which
+  the rest of the rings are not.
+- *Facing the eye* (`forms.js: planet`). The rings turn their face to the
+  eye: each frame, `planets.js: planetFrame` works out their axis and the
+  sun from where the eye is (the same for the images in the mirrors), so
+  that they open to it by `open` (between the variant's two, slowly to
+  and fro over 75 s), whatever the camera does: never edge-on. They
+  reach the shader as `uFormN`, `uFormS` and `uFormT` (a way across the
+  axis, turning with the ball). Saturn stands upright,
+  its rings seen a little from above as in the familiar pictures: since
+  the eye looks up at it, its rings lean their top towards the eye, at
+  most `LEAN` (0.7 rad; where the eye looks up more steeply than that
+  allows, they open less). Uranus lies on its side, its rings standing.
+  The rings' ellipse leans a little to and fro (`roll`), and the ball
+  turns about the axis. (Seen from below, with the rings nearly level,
+  Saturn needed less height, but it read as a hat more than as Saturn.)
+- *Coming and going.* It comes as a thin crescent that waxes towards its
+  phase as the sun comes round from behind it (22 s), while its rings
+  spread out from the ball (`f[2]`, 18 s): they arrive with it. It goes
+  the same way back.
+- *Height.* It rests on the layer of light like every form (see **How
+  high a form floats** below), on its lowest light: the ball, or its rings'
+  lowest edge at their lean (`planets.js: planetLow`).
+- *Casting.* It comes as often as the solid and the knot (weight 0.4).
+  Its variants come in rounds like a solid's figures, so with two they
+  take turns, never the same twice running. It has no palette, so it takes no part in the colour story;
+  the layer under it takes the variant's `under` palettes. Its voice is
+  the orb's (`audio.js: VOICE_OF`).
+- *Cost.* Its code is in the points' shader only while a planet shows
+  (`planets.js: planetShader`), and there in place of the other sky
+  forms' (while it shows, none of them does): `main.js` then draws with
+  a pair of programs of its own, built as an egg's are (`builtProgs`,
+  started 3 s after the page; see Start-up). SwiftShader runs a shader the
+  slower the more code it holds, even code that does not run: with the
+  planet's code in every frame, rain alone took 10% longer and the orb
+  15%. What is the same for all its LEDs (the axis, the sun) is worked
+  out in JavaScript, and the rings' profile is read from the texture.
+  Measured (A/B interleaved, medians of 5 to 7 runs): on SwiftShader
+  (960 x 540, and 390 x 844 at dpr 2) rain and the orb take as long as
+  without the planet (within the noise, about 5%), and a planet about
+  22% less than the orb; on the RTX 3090 (GPU timer, 1920 x 1080, 1700
+  thousand LEDs, wall mirrors) a planet takes 0.2 to 0.4% more than the
+  orb.
 
 **The layer** gives way where a sky form already lights the LED, so the two
 never add up to a white flare. It is dark within 4.5 units of the eye and
@@ -705,18 +799,20 @@ another, from hashes of the seed and the passage's number:
   gathers on it or runs off it.
 - Otherwise the new form is never one of the last two. Each of the others
   is as likely as its weight (`config.js: FORMS`: 1 for the orb, spiral,
-  ring and veil, 0.4 for the solid and knot)
+  ring and veil, 0.4 for the solid, the knot and the planet)
   times the square of how many forms have come since it last did. Over an
-  hour a form comes about 36 times: each of the first four about 6.5 times, the
-  solid and the knot about 5 times (`tools/story-stats.mjs`).
-- A form with figures (the solid, the knot) is each time one of them for
+  hour a form comes about 36 times: each of the first four about 5.5 times, the
+  solid, the knot and the planet about 4.2 times (`tools/story-stats.mjs`).
+- A form with figures (the solid, the knot; the planet's variants) is each time one of them for
   its whole life (`show.js: figureOf`). They come in
   rounds: each round has every figure once, in an order shuffled from the
   passage's hash, and never begins with the figure the last round ended
   on. So no figure comes twice running, and each comes about as often as
-  the others (about 1.7 times an hour). An egg that takes a
-  form's place uses none of its figures. The lab can pin one
-  (`solid=`, `knot=`; `show.js: variantOf`).
+  the others (the solid's and the knot's about 1.4 times an hour each,
+  Saturn and Uranus about 2.1). An egg that takes a form's place uses
+  none of its figures (in the planet's place, which has no palettes, it
+  takes the orb's). The lab can pin one (`solid=`, `knot=`, `planet=`;
+  `show.js: variantOf`).
 
 The Rain setting chooses the timeline (`show.js: POOLS`, `timelineFor`):
 `auto` and `on` play the whole show's (`all`, every passage); `off` plays
@@ -810,7 +906,15 @@ rim upright and floats a little as it lies more level (half of its rim's
 rise), so it rolls a little as it tumbles and never floats far over the
 layer. The spinning knots (the Hopf link, the Moebius band) rest on their
 lowest point in their pose (`lowestSpun`, from the points round their rings
-or along the band's edge), so they rise and fall a little as they spin. The thin forms add the half thickness
+or along the band's edge), so they rise and fall a little as they spin. The
+planet rests on its ball, or on its rings' lowest edge as far as they lean
+towards the eye (`planets.js: planetLow`: `LEAN` with the roll). The eye on
+the floor looks up at it, so they lean about that far most of the time; a
+lean taken from each frame would make the planet rise and fall as the eye
+moves or the view is dragged up and down, so it is fixed (where they lean
+less, as when the eye rises, the planet floats a little over the band). The
+rings' slab adds nothing: its LEDs below their plane show the rings where
+their lines of sight cross it, so the eye sees them on the plane. The thin forms add the half thickness
 of their line (`ROD`, `THREAD`) or of a corner's point (`CORNER`). The
 veil, which is no rigid shape, states its own depth: its hem's lowest fold
 and the glow below it; a baked form, its base and its skin (the teapot, an
@@ -956,7 +1060,7 @@ The layers:
   the spiral a slow figure of notes (scheduled in `tick`), the ring a glassy tone, the veil a soft air, the solid a chord
   of three pure fifths, the knot two tones that beat at different paces,
   and a baked form the ring's glassy tone, softer, with the chord's third
-  over it, on D. The voice is the form's, whichever figure it shows.
+  over it, on D. The voice is the form's, whichever figure it shows. The planet sings with the orb's voice (`VOICE_OF`).
   The veil also gets a little high noise (`AIRY`).
 - **Pale drops.** In a still room a high, soft note falls now and then.
 - **Reverb.** A 6 s convolution reverb (`impulse`), then a compressor.
@@ -1125,14 +1229,18 @@ the programs). So:
   made, before the first frame: a build that failed throws then, with the
   shader's log.
 - **A program built while the show runs waits for nothing.** An easter
-  egg's programs are built the first time the egg shows, by the same
-  `program`; `ready()` asks the GPU, without waiting, whether the build is
-  done (`KHR_parallel_shader_compile`; without it, one frame later), and
-  the plain programs draw until it is. Their first use, and so any error,
-  comes then.
+  egg's programs, and the planet's, are built by the same `program`
+  (`main.js: builtProgs`): an egg's the first time it shows, the planet's
+  3 s after the page (or as it first comes, if that is sooner). `ready()`
+  asks the GPU, without waiting, whether the build is done
+  (`KHR_parallel_shader_compile`; without it, one frame later), and the
+  plain programs draw until it is. Their first use, and so any error,
+  comes then: an egg that cannot be built is dropped, a planet that cannot
+  be built does not show, each with a warning in the console, and the show
+  goes on.
 - **A shader shared by two programs compiles once.** The LEDs and the wires
   share `POINT_VS`, the largest shader by far, and every program of the
-  LEDs (an egg's too) shares their fragment shaders; `gl.js` keeps one
+  LEDs (an egg's and the planet's too) shares their fragment shaders; `gl.js` keeps one
   shader object per source for the life of the context, so a program built
   later attaches the same one. A shader whose compile failed leaves the
   cache. A lost context takes them all with it, and the page loads afresh
@@ -1184,6 +1292,7 @@ GitHub link shows.
 | `forms.js` | How each form moves through its life: centre, size, turn, tilt, its own measures, reach. |
 | `fields.js` | The baked forms' fields: the 3D texture, fetching a field when its form draws near, `able`. |
 | `figures.js` | The figures of the solid and the knot: names, corners and edges, curves, sizes and heights (one per life). |
+| `planets.js` | The planet: its rings' extent and lowest light, and the shader's `planetLight`. |
 | `director.js` | Seeded tracks (weather, colour, density, camera), the colour story's mood, the shared `hash`. |
 | `direction.js` | The change of the rain's direction: weights and gates per direction. |
 | `audio.js` | The generative music: pad, bells, rain, form voices, reverb. |
@@ -1215,6 +1324,11 @@ flowchart TD
   main --> rotate["rotate.js"]
   tuner --> rotate
   audio --> sway
+  shaders --> planets["planets.js"]
+  main --> planets
+  forms --> planets
+  planets --> config
+  planets --> gl
   show --> config
   show --> director
   show --> forms["forms.js"]
@@ -1243,7 +1357,8 @@ Details and commands are in [development.md](development.md).
   the viewer page's Reset clears), rain alone in the lab and no rain
   (with the same click, keys and Reset), rain that never ends with a form
   through it, a seeded time with and without the story, four of the forms
-  held, and `?jitter=pitch`; and that a `scene=` in a link or in saved
+  held, the planet held (named in the lab, and by a name it does not
+  have), and `?jitter=pitch`; and that a `scene=` in a link or in saved
   settings is read as Rain, Form and Layer. It then renders the sound: a held orb must be
   audible, a still room at least 3 dB quieter, and neither may clip. The
   `test` workflow runs it on every pull request and push to main.

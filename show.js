@@ -5,7 +5,7 @@
 // another (the rain, the form, the layer), so there is never a cut. The
 // timeline is made from hashes of one seed: a time (?t=) gives its picture.
 
-import { PALETTES, PALE, FORMS, LAYER, PASSAGES, BAKED } from './config.js';
+import { PALETTES, PALE, FORMS, LAYER, PASSAGES, BAKED, PLANETS } from './config.js';
 import { RARE, rareEggs } from './eggs.js';
 import './egg-kinds.js';                   // (the eggs: those of the rare slot are cast here)
 import { hash, weighted, createMood, leaning, leanTo, hueOf, apart, KIN } from './director.js';
@@ -91,6 +91,8 @@ const timelineFor = (rain) => (rain === 'off' ? 'dry' : 'all');
 // the replaced form's palette (it has colours of its own: the palette only
 // goes on the colour story).
 const rareOf = (T, r) => (T >= RARE.after ? rareEggs()[Math.floor(hash(r * 67 + 9) / RARE.chance)] ?? null : null);
+// The palettes an egg takes in the planet's place (it has none of its own): the orb's.
+const ORB = FORMS.find((f) => f.name === 'orb');
 const isRare = (form) => !!form.egg || BAKED.includes(form);
 const eggOfForm = (form) => form.egg ?? rareEggs().find((e) => e.form === form.name);
 
@@ -152,9 +154,10 @@ function createTimeline(seed, pool, name, mood, baked) {
     // (A sky form's palette also tires, see TIRE; the layer's does not.)
     const x = hash(r * 53 + 2), m = leaning(true, hash(r * 53 + 4), mood, start);
     const sky = form !== LAYER;
-    const pick = palAt(names, x, m, sky ? tiredAt(start) : undefined);
-    if (sky) told.unshift({ start, hue: hueNamed(names[pick]) });
-    return { id: `${name}-${++n}`, form, r, start, pal: palAt(names, x), told: pick,
+    // (A form with no palettes, the planet, has colours of its own: it tells no hue.)
+    const pick = names.length ? palAt(names, x, m, sky ? tiredAt(start) : undefined) : 0;
+    if (sky && names.length) told.unshift({ start, hue: hueNamed(names[pick]) });
+    return { id: `${name}-${++n}`, form, r, start, pal: names.length ? palAt(names, x) : 0, told: pick,
       inAt, inFade: how.fade, outAt: Infinity, outFade: 1 };
   };
   const close = (e, T, how) => { if (e) { e.outAt = T + how.at; e.outFade = how.fade; } };
@@ -191,7 +194,7 @@ function createTimeline(seed, pool, name, mood, baked) {
         if (e && !e.form && kind.rain) { waiting = e; e = null; }   // (an egg with a light of its own waits for a passage without rain)
         if (e && e === waiting) waiting = null;
         // (as a form: a baked one, where there are fields; else the form comes)
-        egg = !e ? null : e.form ? (baked ? BAKED.find((f) => f.name === e.form) : null) : { name: e.name, egg: e, type: 0, palettes: form.palettes };
+        egg = !e ? null : e.form ? (baked ? BAKED.find((f) => f.name === e.form) : null) : { name: e.name, egg: e, type: 0, palettes: form.palettes.length ? form.palettes : ORB.palettes };
         since = egg ? 0 : since + 1;
       }
       const as = egg || form;
@@ -288,6 +291,8 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
     const pin = e.form.variants?.indexOf(S[e.form.name]) ?? -1;
     return pin >= 0 ? pin : e.v || 0;
   };
+  // A planet's variant (its own colours, see config.js: PLANETS), else undefined.
+  const planetOf = (e) => (e.form.name === 'planet' ? PLANETS[variantOf(e)] : undefined);
 
   // What the settings ask for at t: the rain, and the episodes with their weights.
   // egg: an easter egg in the form slot (see eggs.js): { w, age, form, rain, layer }; rare: how
@@ -332,18 +337,22 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
   const story = () => S.story === 'on';
   // An episode's palette, by name: one of its form's (the colour key moves on from it).
   const nameOf = (e, names, pal) => names[(pal + shift) % names.length];
-  const paletteOf = (e) => nameOf(e, e.form.palettes, story() ? e.told : e.pal);
+  const paletteOf = (e) => planetOf(e)?.name ?? nameOf(e, e.form.palettes, story() ? e.told : e.pal);
   // The palette an episode shows in (above: the form's episode over a layer, if any).
   // The layer answers the form above it with a colour that sets it off:
   // with the story, of those the one nearer the mood as the form came.
   const shownIn = (e, above) => {
-    const under = e.form === LAYER && above && UNDER[paletteOf(above)];
+    const under = e.form === LAYER && above && (planetOf(above)?.under ?? UNDER[paletteOf(above)]);
     if (!under) return paletteOf(e);
     if (!story()) return nameOf(e, under, e.pal);
     const m = leaning(true, hash(e.r * 31 + above.r * 29), mood, above.start);
     return nameOf(e, under, palAt(under, hash(e.r * 29 + above.r * 31), m));
   };
+  // Its colours: the first two, the room's colour with it, and the third and
+  // fourth (a planet's own rings' colours, see planetLight in planets.js; for the others their second again).
   const colorsOf = (e, above) => {
+    const P = planetOf(e);
+    if (P) return [P.colors[0], P.colors[1], P.room, P.colors[2], P.colors[3]];
     const name = shownIn(e, above);
     const of = paletteNamed;
     const p = of(name);
@@ -352,12 +361,14 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
     const q = PALE.includes(name) ? of(UNDER[name][0]) : p;
     const room = q.a.map((v, i) => (v + q.b[i]) / 2);
     // An orb is pale at its heart and deepens to its rim; the others start deep.
-    return e.form.name === 'orb' ? [p.b, p.a, room] : [p.a, p.b, room];
+    return e.form.name === 'orb' ? [p.b, p.a, room, p.a, p.a] : [p.a, p.b, room, p.b, p.b];
   };
 
   const SLOTS = 3;                            // two sky forms (the one that shows, and the next, waiting for it to go) and the layer
   const A = new Float32Array(SLOTS * 4), B = new Float32Array(SLOTS * 4);
   const C = new Float32Array(SLOTS * 3), D = new Float32Array(SLOTS * 3);
+  const G = new Float32Array(SLOTS * 3), H = new Float32Array(SLOTS * 3);
+  const N = new Float32Array(SLOTS * 3), Sun = new Float32Array(SLOTS * 3), T = new Float32Array(SLOTS * 3);   // a planet's frame (planets.js: planetFrame)
   const E = new Float32Array(SLOTS * 4), F = new Float32Array(SLOTS * 4);
   const tint = [...ROOM_TINT];
 
@@ -396,7 +407,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
         const turn = s.face === undefined ? 1 : 1 - Math.exp(-dt / 5);
         const d = goal - (s.face ?? goal);
         s.face = (s.face ?? goal) + (d - Math.round(d / (2 * Math.PI)) * 2 * Math.PI) * turn;
-        m = motion(form.name, age, w, go, r, s.face, ground, variantOf(e));
+        m = motion(form.name, age, w, go, r, s.face, ground, variantOf(e), eye);
       }
     }
     A.set([form.type, w, m.size, m.turn], k * 4);
@@ -405,11 +416,15 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
     const gain = form === LAYER ? 1 : 1 + STORM_GAIN * sweep;
     C.set(col[0].map((v) => v * gain), k * 3);
     D.set(col[1].map((v) => v * gain), k * 3);
+    G.set(col[3].map((v) => v * gain), k * 3);
+    H.set(col[4].map((v) => v * gain), k * 3);
     // While rain falls, a form comes from the top down and goes from the top
     // down, as if rain gathered into it or it ran off as rain; else LED by LED
     // (also beside sideways rain, which falls from nowhere: down 0).
     E.set([sweep * down, out ? -1 : 1, m.yaw, m.dissolve], k * 4);
     F.set([...m.f, m.bound], k * 4);
+    const fr = m.frame || { n: [0, 1, 0], sun: [0, 0, 1], t: [1, 0, 0] };
+    N.set(fr.n, k * 3); Sun.set(fr.sun, k * 3); T.set(fr.t, k * 3);
   }
 
   // view: the camera ({ eye }): the forms turn towards the eye.
@@ -493,7 +508,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
     // layer: the layer of light, how much it shows and the top of its band as seen (topOf, the
     // height the forms rest on; for the eggs, see egg-kinds.js).
     const layer = slots[2] && slots[2].w > 0.001 ? { w: slots[2].w, top: topOf(slots[2].x.e.r) } : null;
-    return { rain: rainNow, storm: rainNow * skyNow, A, B, C, D, E, F, tint, forms, flow: want.flow, egg: eggNow, layer };
+    return { rain: rainNow, storm: rainNow * skyNow, A, B, C, D, G, H, N, S: Sun, T, E, F, tint, forms, flow: want.flow, egg: eggNow, layer };
   }
 
   // The colour key: every form, shown now or later, takes its next palette.
@@ -529,7 +544,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
     const top = [...shown.values()].filter((s) => s.x.e.form !== LAYER).sort((a, b) => b.w - a.w)[0]?.x.e;
     const items = [...shown.values()].sort((a, b) => b.w - a.w).map((s) => ({
       form: s.x.e.form.name, figure: s.x.e.form.variants?.[variantOf(s.x.e)], w: s.w, age: s.x.age, out: s.x.out, held: s.x.e.id.startsWith('held-'),
-      palette: shownIn(s.x.e, top), colors: [s.col[0], s.col[1]],
+      palette: shownIn(s.x.e, top), colors: planetOf(s.x.e) ? [s.col[0], s.col[1], s.col[3], s.col[4]] : [s.col[0], s.col[1]],
     }));
     const rain = rainNow ?? 0, sky = items.some((i) => i.form !== LAYER.name && i.w > 0.5);
     const playing = rain > 0.5 ? (sky ? 'storm' : 'rain') : sky ? 'form' : 'still';

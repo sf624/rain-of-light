@@ -45,6 +45,8 @@ const BELLS = [62, 64, 66, 69, 71, 74, 76, 78, 81]; // D major pentatonic
 const BAKED_VOICES = BAKED.map((e) => e.name);
 const FORM_CHORD = { orb: 2, spiral: 3, ring: 1, veil: 4, solid: 3, knot: 2, ...Object.fromEntries(BAKED_VOICES.map((n) => [n, HOME])) };
 const VOICES = Object.keys(FORM_CHORD);
+// The forms that sing with another's voice: the planet with the orb's (a ball of light, as it is).
+const VOICE_OF = { planet: 'orb' };
 const AIRY = { veil: 0.007 };                            // the forms with the air of the noise, and how much
 const SETTLE = 6;    // s: a chord a form brought is not changed again sooner
 
@@ -536,10 +538,11 @@ export function createAudio({ settings }) {
       for (const name of VOICES) heard.w[name] = 0;
       const going = new Set();
       for (const f of list) {
-        if (!(f.name in heard.w)) continue;
-        heard.w[f.name] = Math.max(heard.w[f.name], f.w);
-        heard.pan[f.name] = clamp(f.pan || 0, -0.8, 0.8);
-        if (f.out) going.add(f.name);
+        const name = VOICE_OF[f.name] || f.name;
+        if (!(name in heard.w)) continue;
+        heard.w[name] = Math.max(heard.w[name], f.w);
+        heard.pan[name] = clamp(f.pan || 0, -0.8, 0.8);
+        if (f.out) going.add(name);
       }
       if (!ctx || !on) return;
       // Arrivals first: a form that turns into another does not go home first.

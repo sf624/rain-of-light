@@ -7,7 +7,7 @@
 // and how often each figure of the solid and the knot comes.
 //   node tools/story-stats.mjs [seeds=50] [hours=1]
 globalThis.innerWidth = globalThis.innerHeight = 1000;
-const { COLOR_MODES, PALETTES, SETS, FORMS } = await import('../config.js');
+const { COLOR_MODES, PALETTES, SETS, FORMS, PLANETS } = await import('../config.js');
 const { createDirector, hueOf, apart, KIN } = await import('../director.js');
 const { createShow } = await import('../show.js');
 const { rareEggs } = await import('../eggs.js');
@@ -21,7 +21,8 @@ const hueOfAll = (cs) => {
   for (const c of cs) { const [h, s] = hueOf(c); x += s * Math.cos(h * Math.PI / 180); y += s * Math.sin(h * Math.PI / 180); }
   return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 };
-const pal = (n) => PALETTES.find((p) => p.name === n);
+// (A planet's palette is its variant's name: its first colour.)
+const pal = (n) => PALETTES.find((p) => p.name === n) || { a: PLANETS.find((p) => p.name === n)?.colors[0] };
 const ONE_PALETTE = ['mono', 'comet', 'accent'];
 // The passages of rain alone: falling, and sideways.
 const RAIN_ALONE = ['rain', 'drift'];

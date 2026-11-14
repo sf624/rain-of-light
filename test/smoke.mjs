@@ -495,6 +495,10 @@ await visit(cdp, base, 'lab.html?rain=off&egg=teapot&seed=2&t=40', false, false,
   { what: 'the teapot egg to show', js: `window.__lab.eggs().on.startsWith('teapot ')` });
 await visit(cdp, base, 'lab.html?rain=off&form=teapot&seed=2&t=40', false, false, null,
   { what: 'form=teapot to fall back to auto', js: `window.__lab.setting('form') === 'auto'` });
+// The planet held in the lab, and by a planet name it does not have (which falls back to auto).
+await visit(cdp, base, 'lab.html?rain=off&form=planet&planet=saturn&seed=2&t=40', false);
+await visit(cdp, base, 'lab.html?rain=off&form=planet&planet=earth&seed=3&t=40', false, false, null,
+  { what: 'planet=earth to fall back to auto', js: `window.__lab.setting('planet') === 'auto'` });
 // LEDs spaced per strand: some LEDs are never lit, and the wires skip them.
 await visit(cdp, base, '?jitter=pitch', false);
 // An easter egg pinned in the lab: its own program is built and draws it.
