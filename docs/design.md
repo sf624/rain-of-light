@@ -662,30 +662,48 @@ two tails, its light `comet.js: cometLight`, which `planetLight` hands its
 LEDs to. Its measures are the variant's `comet` (one place for the shader,
 its lowest light and its reach).
 
-- *The head.* A ball of LEDs (`window` times the coma's radius), each
-  showing the coma by how near its line of sight passes the heart (as the
-  planet's ball shows its face): a soft green-cyan glow with a small
-  white-hot heart (`core`), which alone of the comet casts rays. It
-  breathes a little (a slow noise of the time).
-- *The tails.* Both point away from its sun: a narrow, straight, blue ion
-  tail exactly away from it, and a broad, pale gold dust tail that fans
-  out and bends towards the side it lags on. Each is a tube of LEDs about
-  its middle line, wider than the tail: each LED shows the tail by how
-  near its line of sight passes that line (`cometNear`: the nearest place
-  between the two lines, one step along the dust tail's bend), and gives
-  its share, as many LEDs showing the same place as lie along the line of
-  sight's chord through the tube. So a tail is a continuous stroke,
-  however the lattice lies, never a fence of dotted columns (a thin sheet
-  facing the eye did that: strands run along it, and each lies in it or
-  not). The tails are longest and brightest near the sun and fade to
-  nothing at their ends.
+- *The head.* A small, star-like head: a ball of LEDs (`window` times the
+  coma's radius), each showing the coma by how near its line of sight
+  passes the heart (as the planet's ball shows its face): a tight
+  white-hot heart (`core`, `heart`) in a modest green-cyan coma. The heart
+  alone of the comet is white-hot. It breathes a little (a slow noise of
+  the time). The tails, not the head, make the comet: the head is about
+  a thirtieth of the ion tail's length (its coma's width).
+- *The tails.* Both point away from its sun. The ion tail is long and
+  straight, exactly away from it: a narrow fan of five fine blue
+  streamers (`rays`) that spread a little as they go out, over a soft
+  glow along its middle near the head. It is brightest near the head and
+  fades smoothly to nothing. The dust tail is a broad, pale gold fan,
+  shorter, that leans and bends towards the side it lags on (`dust`: lean
+  and bend), so that a dark gap parts it from the ion tail. Both fade out
+  before the room's walls and top (`edge`), so a tail never ends in a cut
+  where the lattice does.
+- *Each LED's share.* Each tail is a tube of LEDs about its middle line,
+  wider than the tail: each LED shows the tail by how near its line of
+  sight passes that line (`cometNear`: the nearest place between the two
+  lines, from the dust tail's leaning line one step along its bend), and
+  gives its share of what that line of sight sees. The LEDs along it in
+  the tube share it alike over the middle half of its chord through the
+  tube, and less towards the tube's wall (`cometShare`): so how many LEDs
+  lie in the tube along it does not show as a pattern. So a tail is a
+  continuous stroke, however the lattice lies, never a fence of dotted
+  columns (a thin sheet facing the eye did that: strands run along it,
+  and each lies in it or not). A window that gave the LEDs near the
+  nearest place most of the light was tried: it lit the strands at the
+  tail's own depth and left the others dark, a fence again. The tails are
+  longest and brightest near the sun.
 - *Streaming.* What a tail shows at a place depends on when the matter
   there left the head (the ion tail's matter speeds up as it goes, the
-  dust's drifts out slowly): clumps and wisps from a value noise of that
-  time, so they come in every size and spacing and never repeat. The ion
-  tail's middle line is shaken aside where it leaves the head, by another
-  noise of that time, and the shake is carried out, growing: faint kinks
-  stream down it. A few dust LEDs glint now and then.
+  dust's drifts out slowly): an aperiodic function (value noise) of that
+  time, so nothing comes at a beat. Each streamer of the ion tail comes in
+  knots that brighten and fade and wanders a little across the fan; the
+  tail's middle line is shaken aside where it leaves the head, and the
+  shake is carried out, growing (kinks). Now and then (`cut`: a noise of
+  that time over a threshold, about once a minute, two or three
+  seconds long) the matter that left the head is missing: the ion tail
+  breaks off at the head, the old tail sails away down it, and a new one
+  grows behind it. The dust tail has striae, bands across it from the
+  dust of one moment (`striae`), and a few dust LEDs glint now and then.
 - *Its way* (`forms.js: comet`). It crosses the room on a gentle arc as
   the eye sees it, coming nearer: `motion` places it across the view and
   away from the eye (`across`), in the frame of the way from the eye to
@@ -712,17 +730,24 @@ its lowest light and its reach).
   so that a drag looks round it, the eye would often look along its tails:
   a short, bright blob with a tail going up.)
 - *Height.* Its lowest light is its coma, or its dust tail's lower edge
-  where that bends below the head (`comet.js: cometLow`); at its way's
+  where that lies below the head (`comet.js: cometLow`); at its way's
   lowest place (the end of its way) that rests on the layer's band, and it
-  comes in a little over it (`arc`).
+  comes in a little over it (`arc`). Its tails rise from the head, and its
+  dust tail leans down only to about level, so for most of its life its
+  coma is its lowest light; once its tails are full, its dust tail's
+  lower edge is.
+- *Its reach.* Its light reaches as far as its tails (`cometReach`, about
+  43 units once they are full), so the rain and the resting LEDs give way
+  to it over the whole room: in a storm the rain away from it is about two
+  thirds as bright as in a storm with the orb.
 - *Cost.* Its code is in the planet's programs (`planetShader`), so
-  scenes without a planet are as before (rain, the orb, Saturn and Uranus
-  draw the same pictures, bit for bit on SwiftShader). Those programs hold
-  it whichever planet shows: measured (GPU timer, RTX 3090, 1920 x 1080,
-  1700 thousand LEDs, six interleaved rounds, medians), Saturn takes 4%
-  longer with it (2.19 against 2.11 ms a frame), and the comet 6% longer
-  than the orb (2.22 against 2.09 ms); the planet's programs take about a
-  third longer to build (about 250 against 185 ms, in the background).
+  scenes without a planet do not hold it (rain and the orb draw the same
+  pictures, bit for bit on SwiftShader, and so do Saturn and Uranus).
+  Those programs hold it whichever planet shows: measured (GPU timer, RTX
+  3090, 1920 x 1080, 1700 thousand LEDs, interleaved rounds, medians),
+  Saturn takes 11% longer with it (2.36 against 2.13 ms a frame; without
+  the ion tail's streamers, 2.20), and the comet 18% longer than the orb
+  (2.49 against 2.11 ms), 19% in a storm (2.69 ms).
 
 **The layer** gives way where a sky form already lights the LED, so the two
 never add up to a white flare. It is dark within 4.5 units of the eye and

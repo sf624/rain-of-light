@@ -110,11 +110,18 @@ export const PLANETS = [
   // radius), window (how far out the head's LEDs reach, of it), clear (where
   // the coma still shows clearly, of it), heart and coma (how bright),
   // core (the heart's radius, of the coma's); ion [length, half width at
-  // the head, its growth per unit, how bright], ionFlow [speed out of the
-  // head, its gain per second], kink (how far the wind shakes it, per unit
-  // out); dust [length, half width at
-  // the head, its growth per unit, bend, how bright], dustFlow (its speed),
-  // dustClear (how far along it still shows clearly, of its length). Its
+  // the head, its glow's growth per unit, how bright, how soon it fades
+  // (of its length), where it begins (in coma radii)], ionFlow [speed out
+  // of the head, its gain per second], kink (how far the wind shakes it,
+  // per unit out), rays [each streamer's half width and how far it
+  // wanders (of the fan's half width), the glow about the middle, the
+  // fan's growth per unit], cut [how often it breaks off (per second of
+  // its matter), how rarely (0 .. 1)]; dust [length, half width at the
+  // head, its growth per unit, lean (per unit) and bend (per unit squared)
+  // towards the side it lags on, how bright, where it begins (in coma
+  // radii)], dustFlow (its speed), dustClear (how far along it still shows
+  // clearly, of its length), striae (how deep its bands are); edge (how far
+  // from the room's walls and top its tails fade out). Its
   // way, in the eye's frame (across to the right, up, away), from its place
   // beyond the path: cross (s: how soon it goes most of its way), from and to
   // (across), depth [as it comes, at the end], arc (how far over its lowest
@@ -124,9 +131,9 @@ export const PLANETS = [
   // plane turns from its way round the sun to face the eye).
   { name: 'comet', colors: [[0.85, 1.0, 0.96], [0.45, 0.95, 0.82], [0.35, 0.6, 1.0], [1.0, 0.9, 0.72]], room: [0.4, 0.62, 0.95],
     under: ['amber', 'sakura'],
-    comet: { size: 1.1, window: 2.2, clear: 0.9, heart: 80, core: 0.25, coma: 26,
-      ion: [20, 0.14, 0.02, 45], ionFlow: [1.6, 0.25], kink: 0.06,
-      dust: [15, 0.22, 0.12, 0.05, 110], dustFlow: 0.6, dustClear: 0.7,
+    comet: { size: 0.65, window: 2.4, clear: 0.9, heart: 400, core: 0.15, coma: 30,
+      ion: [42, 0.1, 0.02, 120, 0.4, 3], ionFlow: [1.8, 0.3], kink: 0.05, rays: [0.07, 0.12, 1.2, 0.07], cut: [0.25, 0.75],
+      dust: [24, 0.25, 0.15, 0.4, 0.015, 120, 4], dustFlow: 0.7, dustClear: 0.7, striae: 0.9, edge: 5,
       cross: 45, from: -6, to: 5, depth: [4, -4], arc: 2.5, away: [3, 10, 1.5],
       sun: [26, -13, -6], near: [25, 32], open: 0.6 } },
 ];

@@ -331,15 +331,19 @@ knot. Each time it is one of three, never the same twice in a row:
   the ball as a dark band.
 - **Uranus**: a smaller, pale cyan ball lying on its side, with a few
   thin rings standing round it, the outer one the brightest.
-- **comet**: a small head, a soft green-cyan glow with a white heart, and
-  two tails that point away from its sun (out of the picture): a narrow,
-  straight blue tail, and a broad, pale gold tail that fans out and bends
-  a little away from it. Both stream sideways across the view, rising a
-  little, their far ends going away from you. Matter streams down the
-  tails in wisps and clumps that never repeat; the gold tail sparkles here
-  and there, and the head breathes a little.
+- **comet**: a small, star-like head, a white-hot heart in a soft
+  green-cyan glow, and two long tails that point away from its sun (out
+  of the picture): a long, straight blue tail of fine streamers that
+  spread a little as they go, and a broad, pale gold tail that fans out
+  and bends away from it, a dark gap between the two. Both stream
+  sideways across the view, rising a little, their far ends going away
+  from you, and fade out into the dark. Matter streams down the tails:
+  knots run out along the blue streamers, kinks travel down the tail,
+  the gold tail shows bands and sparkles here and there, and nothing
+  comes at a beat. Now and then the blue tail breaks off at the head and
+  sails away while a new one grows.
 
-![Saturn, a pale gold ball in broad cream and grey rings seen a little from above, the near rings crossing in front of the ball; Uranus, a pale cyan ball with thin rings standing round it; the comet, a green-cyan head with a blue tail and a pale gold tail streaming up and aside](img/planets.jpg)
+![Saturn, a pale gold ball in broad cream and grey rings seen a little from above, the near rings crossing in front of the ball; Uranus, a pale cyan ball with thin rings standing round it; the comet, a small bright head with a long blue tail of fine streamers and a broad pale gold tail streaming up and aside](img/planets.jpg)
 
 Query: `rain=off&layer=off&t=45` with `form=planet&planet=saturn`,
 `planet=uranus` and `planet=comet`.
