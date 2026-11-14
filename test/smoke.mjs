@@ -499,6 +499,9 @@ await visit(cdp, base, 'lab.html?rain=off&form=teapot&seed=2&t=40', false, false
 await visit(cdp, base, 'lab.html?rain=off&form=planet&planet=saturn&seed=2&t=40', false);
 await visit(cdp, base, 'lab.html?rain=off&form=planet&planet=earth&seed=3&t=40', false, false, null,
   { what: 'planet=earth to fall back to auto', js: `window.__lab.setting('planet') === 'auto'` });
+// A solid by a name it no longer has (the star): back to auto, and a solid shows.
+await visit(cdp, base, 'lab.html?rain=off&form=solid&solid=star&seed=2&t=40', false, false, null,
+  { what: 'solid=star to fall back to auto', js: `window.__lab.setting('solid') === 'auto'` });
 // LEDs spaced per strand: some LEDs are never lit, and the wires skip them.
 await visit(cdp, base, '?jitter=pitch', false);
 // An easter egg pinned in the lab: its own program is built and draws it.

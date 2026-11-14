@@ -41,7 +41,6 @@
     { "name": "figures", "cols": 3, "base": "rain=off&layer=off&t=40", "pre": 100, "cells": [
       {"q": "form=solid&solid=tetrahedron", "label": "solid=tetrahedron"},
       {"q": "form=solid&solid=cube", "label": "solid=cube"},
-      {"q": "form=solid&solid=star", "label": "solid=star"},
       {"q": "form=knot&knot=lissajous", "label": "knot=lissajous"},
       {"q": "form=knot&knot=hopf", "label": "knot=hopf"},
       {"q": "form=knot&knot=mobius", "label": "knot=mobius"}

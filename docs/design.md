@@ -477,8 +477,8 @@ the form's first colour to its second:
   arcs that run slowly round it.
 - `veilLight`: a curtain like an aurora, in travelling folds, with a bright
   lower hem and rays rising from it.
-- `solidLight`: the edges of a solid as rods of light: a tetrahedron, a
-  cube or a star of two tetrahedra (`figures.js: SOLIDS`;
+- `solidLight`: the edges of a solid as rods of light: a tetrahedron or a
+  cube (`figures.js: SOLIDS`;
   in the shader `FIG_SOLID`, `FIG_CORNER`, `FIG_EDGE`, made from it). The distance to
   each edge is that from a point to a straight piece of line, worked out
   exactly, 6 or 12 times. An LED nearer the centre than the nearest edge
@@ -808,8 +808,8 @@ another, from hashes of the seed and the passage's number:
   rounds: each round has every figure once, in an order shuffled from the
   passage's hash, and never begins with the figure the last round ended
   on. So no figure comes twice running, and each comes about as often as
-  the others (the solid's and the knot's about 1.4 times an hour each,
-  Saturn and Uranus about 2.1). An egg that takes a form's place uses
+  the others (the knot's about 1.4 times an hour each, the solid's,
+  Saturn's and Uranus's about 2.1). An egg that takes a form's place uses
   none of its figures (in the planet's place, which has no palettes, it
   takes the orb's). The lab can pin one (`solid=`, `knot=`, `planet=`;
   `show.js: variantOf`).
