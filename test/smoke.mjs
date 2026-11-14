@@ -428,10 +428,10 @@ async function visit(cdp, base, query, interact, full = false, fetches = null) {
     if (!(await evalJs(`document.querySelector('.hud').hidden`))) fail(`[${label}] h did not hide the HUD`);
     // A drag wider than the view turns it past the old limit (about 20 degrees).
     const w = await evalJs(`innerWidth`);
-    const at = (type, x) => s('Input.dispatchMouseEvent', { type, x, y: 200, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 });
-    await at('mousePressed', 20);
-    for (let i = 1; i <= 6; i++) await at('mouseMoved', 20 + Math.round(w * 0.2 * i));
-    await at('mouseReleased', 20 + Math.round(w * 1.2));
+    const dragAt = (type, x) => s('Input.dispatchMouseEvent', { type, x, y: 200, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 });
+    await dragAt('mousePressed', 20);
+    for (let i = 1; i <= 6; i++) await dragAt('mouseMoved', 20 + Math.round(w * 0.2 * i));
+    await dragAt('mouseReleased', 20 + Math.round(w * 1.2));
     const turned = await evalJs(`window.__lab.turn()`);
     if (!(Math.abs(turned) > 1)) fail(`[${label}] a drag of 1.2 widths turned the view by only ${turned} rad`);
   } else if (!lab && await evalJs(`!!document.querySelector('.clock')`)) fail(`[${label}] the viewer page has the lab's clock`);
