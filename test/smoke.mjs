@@ -160,8 +160,9 @@ const COUNT_RAF = `(() => { window.__frames = 0; const r = window.requestAnimati
 // software GL draws a frame in a fraction of the time. A visit passes `full` to keep the default lattice.
 const LITE = 'leds=20';
 const liteUrl = (query) => { const [q, hash] = query.split('#'); return `${q}${q.includes('?') ? '&' : '?'}${LITE}${hash === undefined ? '' : `#${hash}`}`; };
-// fetches: a file the page must request (a baked form's field).
-async function visit(cdp, base, query, interact, full = false, fetches = null) {
+// fetches: a file the page must request (a baked form's field); expect: { what, js }: an expression
+// that must come true (polled at the end).
+async function visit(cdp, base, query, interact, full = false, fetches = null, expect = null) {
   const lab = query.startsWith('lab.html');
   const label = query || '(default)';
   const errors = [];
@@ -442,6 +443,7 @@ async function visit(cdp, base, query, interact, full = false, fetches = null) {
   if (f3 <= f2) fail(`[${label}] frame loop stopped (${f2} -> ${f3})`);
   if (await evalJs(`!document.getElementById('fallback').hidden`)) fail(`[${label}] #fallback became visible`);
   if (fetches) await poll(`the page to fetch ${fetches} [${label}]`, () => [...urls.values()].some((u) => u === `${base}${fetches}`), { tick: () => check(`while waiting for ${fetches}`) });
+  if (expect) await poll(`${expect.what} [${label}]`, () => evalJs(expect.js), { tick: () => check(`while waiting for ${expect.what}`) });
   check('at the end');
   console.log(`ok  ${label}: ${f3} frames, ${(share * 100).toFixed(2)}% lit pixels${interact ? ', click and keys fine' : ''}`);
   await cdp.send('Target.closeTarget', { targetId });
@@ -487,10 +489,17 @@ for (const f of ['ring', 'veil', 'solid', 'knot']) await visit(cdp, base, `?rain
 for (const k of ['lissajous', 'hopf']) await visit(cdp, base, `?rain=off&form=knot&knot=${k}&seed=2&t=40`, false);
 // Names that are no option (a form, a figure) fall back to the defaults.
 await visit(cdp, base, '?rain=off&form=cone&solid=sphere&knot=granny&seed=2&t=40', false);
-// A baked form held in the lab: its field is fetched (see fields.js); a plain visit fetches none (see test/site.mjs).
-await visit(cdp, base, 'lab.html?rain=off&form=teapot&seed=2&t=40', false, false, 'fields/teapot.bin');
+// The teapot, an easter egg pinned in the lab: its field is fetched (see fields.js); a plain visit fetches
+// none (see test/site.mjs). It is no Form: form=teapot (a link or a saved setting) falls back to auto.
+await visit(cdp, base, 'lab.html?rain=off&egg=teapot&seed=2&t=40', false, false, 'fields/teapot.bin',
+  { what: 'the teapot egg to show', js: `window.__lab.eggs().on.startsWith('teapot ')` });
+await visit(cdp, base, 'lab.html?rain=off&form=teapot&seed=2&t=40', false, false, null,
+  { what: 'form=teapot to fall back to auto', js: `window.__lab.setting('form') === 'auto'` });
 // LEDs spaced per strand: some LEDs are never lit, and the wires skip them.
 await visit(cdp, base, '?jitter=pitch', false);
+// An easter egg pinned in the lab: its own program is built and draws it.
+await visit(cdp, base, 'lab.html?egg=penrose&t=30', false, false, null,
+  { what: 'the penrose egg to draw', js: `window.__lab.eggs().drawn === 1` });
 
 // Links and settings saved before Rain and Form chose what plays name a scene: it is read once, at
 // load, as the settings it stands for (config.js: SCENES), filling in those still at auto; the URL's

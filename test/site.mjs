@@ -306,10 +306,11 @@ for (const p of previews) {
     console.log(`ok  ${page}: loads ${t.requested.length} files of its own, ${v.sha.slice(0, 7)}, no service worker of its own, nothing cached`);
     await t.close();
   }
-  // A baked form held in the lab: its field comes from the preview's own folder.
+  // A baked form pinned in the lab, as an easter egg (egg=; a commit before the eggs held it as a
+  // form, form=, which later ones let fall back): its field comes from the preview's own folder.
   const field = git('ls-tree', '--name-only', p.sha, 'fields/').split('\n').find((f) => f.endsWith('.bin'));
   if (field) {
-    const name = path.posix.basename(field, '.bin'), page = `pr/${p.n}/lab.html?form=${name}&leds=20`;
+    const name = path.posix.basename(field, '.bin'), page = `pr/${p.n}/lab.html?egg=${name}&form=${name}&leds=20`;
     const t = await open(page);
     await poll(`${page} to fetch ${field}`, () => t.requested.includes(base + `pr/${p.n}/${field}`));
     await sleep(500);

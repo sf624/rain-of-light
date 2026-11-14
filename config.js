@@ -95,15 +95,13 @@ export const FORMS = [
 export const LAYER = { name: 'layer', type: 2, palettes: ['deep sea', 'ice', 'aurora', 'sakura', 'amber'] };
 // The baked forms: shapes baked into fields of distance (fields/*.bin, see
 // fields.js and tools/bake-field.py), drawn as a glowing skin. They are not
-// cast like the forms above: rarely, one of them takes a form's place (see
-// EGG and the casting in show.js), and the viewer's settings never name them.
+// cast like the forms above, and no setting names them: each is an easter
+// egg (egg-kinds.js), which comes rarely in the show (eggs.js: RARE).
 // field: its slab in the shader's field; size: half the side of its box;
 // top: the top of its shape in that box (-1 .. 1, as tools/bake-field.py prints it).
-export const EGGS = [
+export const BAKED = [
   { name: 'teapot', type: 7, field: 0, size: 5.6, top: -0.019, palettes: ['ice', 'candle'] },
 ];
-// after: never before this time (s); chance: of each form that is cast after it.
-export const EGG = { after: 600, chance: 0.012 };
 
 // The room: strands of LEDs over a mirror floor, the same for the whole show.
 export const ROOM = {
@@ -154,15 +152,14 @@ export const DEFAULTS = {
 export const STORAGE_KEY = 'rain-of-light:settings';
 
 // The panel. An item with `viewer: n` is also on the viewer page's small
-// panel (index.html), as its nth control, under `short` if it has one and
-// with `viewerOptions` if it has them; the lab (lab.html) shows every item. A group's `viewerTitle` is its heading
+// panel (index.html), as its nth control, under `short` if it has one; the
+// lab (lab.html) shows every item. A group's `viewerTitle` is its heading
 // there, if it has one ('': none).
 export const SCHEMA = [
   { title: 'Scene', viewerTitle: '', items: [
     { key: 'rain', label: 'Rain', options: ['auto', 'on', 'off'], viewer: 1,
       hint: 'auto: rain comes and goes with the show / on: rain always falls, and the forms come and go through it / off: no rain, the forms of light have the room' },
-    { key: 'form', label: 'Form', options: ['auto', ...FORMS.map((f) => f.name), ...EGGS.map((f) => f.name), 'none'],
-      viewer: 2, viewerOptions: ['auto', ...FORMS.map((f) => f.name), 'none'],
+    { key: 'form', label: 'Form', options: ['auto', ...FORMS.map((f) => f.name), 'none'], viewer: 2,
       hint: 'auto: forms of light come and go with the show / or hold one form (none: no form)' },
     ...FORMS.filter((f) => f.variants).map((f) => ({ key: f.name, label: `Which ${f.name}`, options: ['auto', ...f.variants],
       hint: `auto: each time the ${f.name} comes, another of its figures / or always this one` })),

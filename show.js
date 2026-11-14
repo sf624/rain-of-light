@@ -5,7 +5,9 @@
 // another (the rain, the form, the layer), so there is never a cut. The
 // timeline is made from hashes of one seed: a time (?t=) gives its picture.
 
-import { PALETTES, PALE, FORMS, LAYER, PASSAGES, EGGS, EGG } from './config.js';
+import { PALETTES, PALE, FORMS, LAYER, PASSAGES, BAKED } from './config.js';
+import { RARE, rareEggs } from './eggs.js';
+import './egg-kinds.js';                   // (the eggs: those of the rare slot are cast here)
 import { hash, weighted, createMood, leaning, leanTo, hueOf, apart, KIN } from './director.js';
 import { motion, FADING } from './forms.js';
 import { CHANGE } from './direction.js';
@@ -74,14 +76,25 @@ const POOLS = {
 // Which timeline the Rain setting plays.
 const timelineFor = (rain) => (rain === 'off' ? 'dry' : 'all');
 
-// Rarely a baked form (an egg, see EGGS) takes the place of the form just
-// cast: from EGG.after on, by EGG.chance, one of them (each as likely) by the
-// passage's random number. Everything else goes on as if the form it
-// replaced had come (it counts as seen, and its palette as told), so the
-// other forms come as often as without the eggs.
-const eggOf = (T, r) => (T >= EGG.after && hash(r * 67 + 9) < EGG.chance ? EGGS[Math.floor(hash(r * 71 + 13) * EGGS.length)] : null);
+// The rare slot (eggs.js: RARE): rarely an easter egg takes the place of the
+// form just cast. From RARE.after on, the passage's random number picks the
+// nth egg of the slot (rareEggs) when it falls between n and n + 1 times
+// RARE.chance, so each comes as often (and the first, the teapot, on the
+// same passages as ever). Between two eggs come at least RARE.apart forms:
+// one drawn sooner waits, and takes the place of the first form cast after
+// them; an egg with a light of its own also waits for a passage without rain
+// (among rain it would hardly show). Everything else goes on as if the form it replaced had come (it
+// counts as seen, and its palette as told), so the other forms come as
+// often as without the eggs. An egg of the slot is a form of the show to the
+// timeline: a baked form (BAKED) is drawn as one; any other egg is a form
+// with no light of its own (`egg`: its light is the egg's, see eggs.js), in
+// the replaced form's palette (it has colours of its own: the palette only
+// goes on the colour story).
+const rareOf = (T, r) => (T >= RARE.after ? rareEggs()[Math.floor(hash(r * 67 + 9) / RARE.chance)] ?? null : null);
+const isRare = (form) => !!form.egg || BAKED.includes(form);
+const eggOfForm = (form) => form.egg ?? rareEggs().find((e) => e.form === form.name);
 
-function createTimeline(seed, pool, name, mood, eggs) {
+function createTimeline(seed, pool, name, mood, baked) {
   const list = [];   // passages: { start, kind, sky, layer, r } (sky, layer: episodes or null; r: its random number)
   let next = 0, n = 0;
   const recent = [];  // the forms shown, the latest first
@@ -125,6 +138,7 @@ function createTimeline(seed, pool, name, mood, eggs) {
     return pool.find((p, i) => w[i] > 0);
   };
   let lastSky = null;  // the latest sky episode
+  let since = Infinity, waiting = null;   // forms cast since the last egg; an egg drawn too soon
   // How the light of a form comes, and goes.
   const comes = (form) => (FADING.has(form.name) ? SKY_IN_SLOW : SKY_IN);
   const goes = (form) => (FADING.has(form.name) ? SKY_OUT_SLOW : SKY_OUT);
@@ -168,8 +182,19 @@ function createTimeline(seed, pool, name, mood, eggs) {
       const old = prev?.sky && prev.sky !== sky ? prev.sky : null;
       if (old && form) close(old, T, { at: -SKY_GAP / 2 - goes(old.form).fade, fade: goes(old.form).fade });
       else if (old) close(old, T, kind.rain > prev.kind.rain ? SKY_INTO_RAIN : goes(old.form));
-      // (An egg comes and goes with its own timing; its palette is drawn as the replaced form's, see eggOf.)
-      const egg = form && eggs && eggOf(T, r), as = egg || form;
+      // (An egg comes and goes with its own timing; its palette is drawn as the replaced form's, see rareOf.)
+      let egg = null;
+      if (form) {
+        const drawn = rareOf(T, r);
+        let e = since >= RARE.apart ? drawn || waiting : null;
+        if (since < RARE.apart && drawn) waiting = drawn;
+        if (e && !e.form && kind.rain) { waiting = e; e = null; }   // (an egg with a light of its own waits for a passage without rain)
+        if (e && e === waiting) waiting = null;
+        // (as a form: a baked one, where there are fields; else the form comes)
+        egg = !e ? null : e.form ? (baked ? BAKED.find((f) => f.name === e.form) : null) : { name: e.name, egg: e, type: 0, palettes: form.palettes };
+        since = egg ? 0 : since + 1;
+      }
+      const as = egg || form;
       if (form) sky = lastSky = episode(form, r, T, old ? { at: SKY_GAP / 2, fade: comes(as).fade } : comes(as));
       if (egg) sky.form = egg;
       else if (form) sky.v = figureOf(form, r);   // (an egg uses none of the figures it replaces)
@@ -229,24 +254,24 @@ function createTimeline(seed, pool, name, mood, eggs) {
   }
   // When the next passage begins (after t).
   const upcoming = (t) => { extend(t); return list.find((p) => p.start > t)?.start ?? next; };
-  // The eggs that show from now until `ahead` seconds on (their fields load first, see fields.js).
-  function eggsNear(t, ahead) {
-    extend(t + ahead);
-    const out = new Set();
+  // The eggs of the rare slot that show between t0 and t1: { form, from, to } (from its coming to its going).
+  function rareSpans(t0, t1) {
+    extend(t1 + 40);
+    const out = [];
     for (const p of list) {
       const e = p.sky;
-      if (e && EGGS.includes(e.form) && e.inAt < t + ahead && e.outAt + e.outFade > t) out.add(e.form.name);
+      if (e && isRare(e.form) && e.inAt <= t1 && e.outAt + e.outFade >= t0 && !out.some((x) => x.e === e)) out.push({ e, form: e.form, from: e.inAt, to: e.outAt + e.outFade });
     }
-    return [...out];
+    return out;
   }
-  return { at, passage, flowAt, upcoming, eggsNear };
+  return { at, passage, flowAt, upcoming, rareSpans };
 }
 
-// eggs: whether the baked forms can show (see fields.js; the tools count them).
-export function createShow(S, { feet, seed = Math.random() * 1000, eggs = true }) {
+// baked: whether the baked forms can show (see fields.js; the tools count them).
+export function createShow(S, { feet, seed = Math.random() * 1000, baked = true }) {
   const mood = createMood(seed);              // the colour story's mood at a time (see director.js)
   const timelines = {};
-  const timeline = (name) => (timelines[name] ||= createTimeline(seed, POOLS[name], name, mood, eggs));
+  const timeline = (name) => (timelines[name] ||= createTimeline(seed, POOLS[name], name, mood, baked));
   const held = new Map();                     // form name -> a held episode
   const holdOf = (form) => {
     if (!held.has(form.name)) {
@@ -265,7 +290,9 @@ export function createShow(S, { feet, seed = Math.random() * 1000, eggs = true }
   };
 
   // What the settings ask for at t: the rain, and the episodes with their weights.
-  function wanted(t) {
+  // egg: an easter egg in the form slot (see eggs.js): { w, age, form, rain, layer }; rare: how
+  // much of the timeline's eggs of the rare slot may show (eggs.js: one egg at a time).
+  function wanted(t, egg, rare = 1) {
     const tl = timeline(timelineFor(S.rain));
     const now = tl.at(t);
     const rain = S.rain === 'on' ? 1 : S.rain === 'off' ? 0 : now.rain;
@@ -273,16 +300,28 @@ export function createShow(S, { feet, seed = Math.random() * 1000, eggs = true }
     // that never ends never changes direction (nor does none): it falls,
     // unless the Direction setting says otherwise.
     const flow = S.rain === 'auto' ? tl.flowAt(t) : { toward: 0, angle: 0 };
-    let items = now.items;
+    let items = rare < 1 ? now.items.map((x) => (isRare(x.e.form) ? { ...x, w: x.w * rare } : x)) : now.items;
     if (S.form !== 'auto') {
       items = items.filter((x) => x.e.form === LAYER);
-      const form = FORMS.find((f) => f.name === S.form) || (eggs && EGGS.find((f) => f.name === S.form));
+      const form = FORMS.find((f) => f.name === S.form);
       if (form) items.push({ e: holdOf(form), w: 1, age: t, out: false });
     }
     if (S.layer !== 'auto') {
       items = items.filter((x) => x.e.form !== LAYER);
       if (S.layer === 'on') items.push({ e: holdOf(LAYER), w: 1, age: t, out: false });
     }
+    if (egg) return eggWants(egg, rain, items, flow);
+    return { rain, items, flow };
+  }
+  // While an egg holds the form slot, the forms give way to it (and the layer,
+  // unless it keeps it); an egg that is a form of the show is held there; the
+  // rain goes to what the egg wants.
+  function eggWants(egg, rain, items, flow) {
+    const k = 1 - egg.w;
+    items = items.map((x) => (x.e.form === LAYER && egg.layer ? x : { ...x, w: x.w * k }));
+    const form = egg.form && baked && BAKED.find((f) => f.name === egg.form);
+    if (form) items.push({ e: holdOf(form), w: egg.w, age: egg.age, out: false });
+    if (egg.rain !== null && egg.rain !== undefined) rain += (egg.rain - rain) * egg.w;
     return { rain, items, flow };
   }
 
@@ -359,8 +398,11 @@ export function createShow(S, { feet, seed = Math.random() * 1000, eggs = true }
   }
 
   // view: the camera ({ eye, rise }): the forms turn towards the eye, and float higher in a tall view.
-  function update(t, dt, view) {
-    const want = wanted(t);
+  // egg, rare: what the easter eggs ask (see wanted and eggs.js).
+  let eggHeld = null;                         // the baked form an easter egg holds now (its name), if any
+  function update(t, dt, view, egg = null, rare = 1) {
+    eggHeld = egg?.form ?? null;
+    const want = wanted(t, egg, rare);
     const first = rainNow === null;
     const k = first ? 1 : 1 - Math.exp(-dt / EASE);
     rainNow = first ? want.rain : rainNow + (want.rain - rainNow) * k;
@@ -392,8 +434,10 @@ export function createShow(S, { feet, seed = Math.random() * 1000, eggs = true }
     // Fill the slots: two for the sky forms, one for the layer. A form keeps
     // its slot while it shows (the order its LEDs light in depends on it);
     // if three would show at once (a quick change of setting), the faintest waits.
+    // (An egg of the rare slot with a light of its own takes no slot: eggs.js draws it, see `egg` below.)
     const all = [...shown.values()].sort((a, b) => b.w - a.w);
-    const sky = all.filter((s) => s.x.e.form !== LAYER).slice(0, 2);
+    const sky = all.filter((s) => s.x.e.form !== LAYER && !s.x.e.form.egg).slice(0, 2);
+    const own = all.find((s) => s.x.e.form.egg && s.w > 0);
     const slots = [null, null, all.find((s) => s.x.e.form === LAYER)];
     for (const s of sky) if (s.slot !== undefined && !slots[s.slot]) slots[s.slot] = s;
     for (const s of sky) if (!slots.includes(s)) { s.slot = slots[0] ? 1 : 0; slots[s.slot] = s; }
@@ -402,7 +446,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000, eggs = true }
     const mixed = [0, 0, 0];
     const forms = [];
     // How much of a sky form shows: it is the subject, the rest gives way.
-    const skyNow = Math.min(1, sky.reduce((n, s) => n + s.w, 0));
+    const skyNow = Math.min(1, sky.reduce((n, s) => n + s.w, own?.w ?? 0));
     skyShown = skyNow;
     slots.forEach((s, n) => {
       if (!s || s.w <= 0.001) return;
@@ -426,7 +470,9 @@ export function createShow(S, { feet, seed = Math.random() * 1000, eggs = true }
     // forms: the sky forms that show, for the music (see audio.js forms()).
     // storm: how much rain falls through a form (0 .. 1).
     // flow: which way the rain goes now (see flowAt).
-    return { rain: rainNow, storm: rainNow * skyNow, A, B, C, D, E, F, tint, forms, flow: want.flow };
+    // egg: the egg of the rare slot that shows in a form's place, with its own light ({ egg, w, age }), if any.
+    const eggNow = own ? { egg: own.x.e.form.egg, w: own.w, age: own.x.age } : null;
+    return { rain: rainNow, storm: rainNow * skyNow, A, B, C, D, E, F, tint, forms, flow: want.flow, egg: eggNow };
   }
 
   // The colour key: every form, shown now or later, takes its next palette.
@@ -470,15 +516,21 @@ export function createShow(S, { feet, seed = Math.random() * 1000, eggs = true }
       rain, storm: rain * skyShown, gain: 1 + STORM_GAIN * rain, items };
   }
 
-  // The eggs about to show, or showing, at t (within `ahead` seconds): a held one, or the timeline's.
-  function eggsNear(t, ahead = 40) {
-    if (!eggs) return [];
-    if (S.form !== 'auto') return EGGS.some((f) => f.name === S.form) ? [S.form] : [];
-    return timeline(timelineFor(S.rain)).eggsNear(t, ahead);
+  // The timeline the forms come by now (none: a held form).
+  const castBy = () => (S.form !== 'auto' ? null : timeline(timelineFor(S.rain)));
+  // The baked forms about to show, or showing, at t (within `ahead` seconds): one an easter egg
+  // holds, or the timeline's (their fields load first, see fields.js).
+  function bakedNear(t, ahead = 40) {
+    if (!baked) return [];
+    if (eggHeld) return [eggHeld];
+    const tl = castBy();
+    return tl ? [...new Set(tl.rareSpans(t, t + ahead).filter((x) => BAKED.includes(x.form)).map((x) => x.form.name))] : [];
   }
+  // The eggs of the rare slot the timeline has between t0 and t1 (see eggs.js): { egg, from, to }.
+  const rareSpans = (t0, t1) => castBy()?.rareSpans(t0, t1).map((x) => ({ egg: eggOfForm(x.form), from: x.from, to: x.to })) ?? [];
 
   // The rain's direction at t, as the show has it (for the start: update returns it too).
   const flow = (t) => wanted(t).flow;
 
-  return { update, recolor, cast, flow, info, save, load, reset, eggsNear };
+  return { update, recolor, cast, flow, info, save, load, reset, bakedNear, rareSpans };
 }

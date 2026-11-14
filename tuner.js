@@ -272,12 +272,12 @@ export function createTuner({ schema, lab = false, settings, defaults, storageKe
 }
 
 // The viewer page's panel: the items marked `viewer: n`, in that order, each
-// under its `short` label and with its `viewerOptions` if it has them. A group keeps its heading (its
+// under its `short` label. A group keeps its heading (its
 // `viewerTitle`, if it has one) where it brings more than one item; the
 // others share a section without one.
 export function viewerSchema(schema) {
   const picked = schema.flatMap((group) => group.items.filter((item) => item.viewer)
-    .map((item) => ({ group, item: { ...item, label: item.short ?? item.label, options: item.viewerOptions ?? item.options } })))
+    .map((item) => ({ group, item: { ...item, label: item.short ?? item.label } })))
     .sort((a, b) => a.item.viewer - b.item.viewer);
   const sections = [];
   for (const { group, item } of picked) {

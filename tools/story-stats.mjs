@@ -7,9 +7,11 @@
 // and how often each figure of the solid and the knot comes.
 //   node tools/story-stats.mjs [seeds=50] [hours=1]
 globalThis.innerWidth = globalThis.innerHeight = 1000;
-const { COLOR_MODES, PALETTES, SETS, FORMS, EGGS } = await import('../config.js');
+const { COLOR_MODES, PALETTES, SETS, FORMS } = await import('../config.js');
 const { createDirector, hueOf, apart, KIN } = await import('../director.js');
 const { createShow } = await import('../show.js');
+const { rareEggs } = await import('../eggs.js');
+const EGG_NAMES = rareEggs().map((e) => e.name);   // (the eggs of the rare slot: registered as show.js loads)
 const { createDirection } = await import('../direction.js');
 const { DEFAULTS } = await import('../config.js');
 
@@ -170,6 +172,7 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
   const figures = {}, lastFigure = {};   // per form with figures: how many times each came; and per seed, the latest
   let twice = 0;                      // a figure that came again the next time its form did
   const eggAt = [];                   // when each egg came (s into its seed's show)
+  const firstOf = {};                 // per egg: the first seed and time it came
   for (let seed = 1; seed <= SEEDS; seed++) {
     const show = createShow({ ...DEFAULTS }, { feet: 0, seed });
     const dir = createDirection(show.flow(0).toward);
@@ -191,7 +194,7 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
       if (f) count(stayed, f);
       if (f && f !== form) {
         count(came, f);
-        if (EGGS.some((e) => e.name === f)) eggAt.push(t);
+        if (EGG_NAMES.includes(f)) { eggAt.push(t); firstOf[f] ||= `seed=${seed}&t=${t}`; }
         if (sky.figure) {
           count(figures[f] ||= {}, sky.figure);
           if (lastFigure[f] === sky.figure) twice++;
@@ -214,7 +217,7 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
   out.push('', `Rain: ${pct(all, steps)} of the full rain, over the whole show`,
     '', 'Forms (times each comes in an hour; share of the show it is there)');
   out.push(`  (a form's light shows ${pct(lit, steps)} of the time, wholly ${pct(full, steps)}; two forms at once ${pct(two, steps)})`);
-  for (const f of [...FORMS, ...EGGS]) out.push(`  ${f.name.padEnd(10)} ${((came[f.name] || 0) / hours).toFixed(1).padStart(5)}  ${pct(stayed[f.name] || 0, SEEDS * SPAN)}`);
+  for (const f of [...FORMS, ...rareEggs()]) out.push(`  ${f.name.padEnd(10)} ${((came[f.name] || 0) / hours).toFixed(1).padStart(5)}  ${pct(stayed[f.name] || 0, SEEDS * SPAN)}`);
   const sum = (k) => Object.values(k).reduce((a, b) => a + b, 0);
   out.push(`  ${'all'.padEnd(10)} ${(sum(came) / hours).toFixed(1).padStart(5)}  ${pct(sum(stayed), SEEDS * SPAN)}`);
   out.push('', 'Figures (times each comes in an hour)');
@@ -222,8 +225,10 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
     out.push(`  ${f.name.padEnd(10)} ${f.variants.map((v) => `${v} ${((figures[f.name]?.[v] || 0) / hours).toFixed(1)}`).join(', ')}`);
   }
   out.push(`  the same figure as its form's time before: ${twice}`);
-  const eggs = EGGS.reduce((n, e) => n + (came[e.name] || 0), 0);
-  out.push('', `Eggs (the baked forms): ${eggs} in ${hours} h, one every ${eggs ? (hours / eggs).toFixed(1) : '-'} h;`
-    + ` the earliest at ${eggAt.length ? Math.min(...eggAt) : '-'} s`);
+  const eggs = EGG_NAMES.reduce((n, e) => n + (came[e] || 0), 0);
+  const regular = FORMS.reduce((n, f) => n + (came[f.name] || 0), 0);
+  out.push('', `Eggs (the rare slot's): ${eggs} in ${hours} h, ${(eggs / hours).toFixed(2)} an hour, one every ${eggs ? (hours / eggs).toFixed(1) : '-'} h;`
+    + ` the earliest at ${eggAt.length ? Math.min(...eggAt) : '-'} s; the regular forms ${(regular / hours).toFixed(1)} an hour`);
+  for (const e of EGG_NAMES) out.push(`  ${e.padEnd(10)} ${((came[e] || 0) / hours).toFixed(2).padStart(5)} an hour; first: ${firstOf[e] || '-'}`);
   console.log(out.join('\n'));
 }

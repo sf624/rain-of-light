@@ -26,7 +26,7 @@ const ROWS = [
   ['show', 'show', true, (s) => {
     const w = s.show;
     return `rain ${s.rain} form ${s.form} layer ${s.layer}  ${w.playing}${w.playing === w.passage ? ''
-      : ` (passage ${w.passage})`}, next in ${sec(Math.max(0, w.next))}`;
+      : ` (passage ${w.passage})`}, next in ${sec(Math.max(0, w.next))}${s.egg ? `  egg ${s.egg}` : ''}`;
   }],
   ['rain', 'rain', true, (s) => `${f2(s.show.rain)}  storm ${f2(s.show.storm)} (rain through a form)`],
   ['forms', 'forms', true, (s) => {

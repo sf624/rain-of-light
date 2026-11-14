@@ -21,7 +21,7 @@
 // - The breath: a low tone under the pad swells as the light does.
 
 import { createSway } from './sway.js';
-import { EGGS } from './config.js';
+import { BAKED } from './config.js';
 
 const mtof = (m) => 440 * 2 ** ((m - 69) / 12);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -41,9 +41,9 @@ const BELLS = [62, 64, 66, 69, 71, 74, 76, 78, 81]; // D major pentatonic
 // (warm palettes) the low, warm G; the spiral the open, unresolved A sus2;
 // the veil the soft Em9; the ring the still B minor; the solid
 // the A sus2 (it is made of fifths); the knot the G.
-// The baked forms (EGGS in config.js) bring D, home itself.
-const EGG_VOICES = EGGS.map((e) => e.name);
-const FORM_CHORD = { orb: 2, spiral: 3, ring: 1, veil: 4, solid: 3, knot: 2, ...Object.fromEntries(EGG_VOICES.map((n) => [n, HOME])) };
+// The baked forms (BAKED in config.js) bring D, home itself.
+const BAKED_VOICES = BAKED.map((e) => e.name);
+const FORM_CHORD = { orb: 2, spiral: 3, ring: 1, veil: 4, solid: 3, knot: 2, ...Object.fromEntries(BAKED_VOICES.map((n) => [n, HOME])) };
 const VOICES = Object.keys(FORM_CHORD);
 const AIRY = { veil: 0.007 };                            // the forms with the air of the noise, and how much
 const SETTLE = 6;    // s: a chord a form brought is not changed again sooner
@@ -246,7 +246,7 @@ export function createAudio({ settings }) {
   // tick); the others are held, like the pad.
   function formLayer(name, notes, t, hold) {
     if (name === 'spiral' || settings.formSound <= 0) return;
-    const level = EGG_VOICES.includes(name) ? 0.016 : { orb: 0.035, ring: 0.02, veil: 0.022, solid: 0.022, knot: 0.024 }[name];
+    const level = BAKED_VOICES.includes(name) ? 0.016 : { orb: 0.035, ring: 0.02, veil: 0.022, solid: 0.022, knot: 0.024 }[name];
     const dest = fadeTo(voice[name].g);
     if (name === 'orb') {
       // Warm and low: the root, its fifth and its octave, soft and dark.
@@ -275,7 +275,7 @@ export function createAudio({ settings }) {
         sustain(r + up, [['sine', 0, -1.5, 1], ['sine', 0, 1.5, 1]],
           { t, hold, attack: 8 + i, peak: level * [0.5, 0.36, 0.24][i], cutoff: 4000, pan: (i - 1) * 0.3, dest, follow: false });
       }
-    } else if (EGG_VOICES.includes(name)) {
+    } else if (BAKED_VOICES.includes(name)) {
       // The ring's glassy pairs, the root two octaves up, and the third of
       // the chord over it (D add9: F sharp), softer, swelling later.
       const r = notes[0];
