@@ -9,7 +9,7 @@ import { createAudio } from './audio.js';
 import { createSway, createRandom } from './sway.js';
 import {
   PALETTES, WEATHER, FLOWS, COLOR_MODES, SETS, SKY, CAMERAS,
-  DEFAULTS, STORAGE_KEY, SCHEMA, ROOM, SCENES, FORMS,
+  DEFAULTS, STORAGE_KEY, SCHEMA, ROOM, SCENES, FORMS, LAYER,
 } from './config.js';
 import { createShow } from './show.js';
 import { createDirector, hash } from './director.js';
@@ -85,7 +85,7 @@ for (const item of SCHEMA.flatMap((g) => g.items)) {
 // the eye steps back from the centre (while it stays inside the room), the
 // visible distance with it (by half as much: farther strands than that only
 // crowd the picture, and cost frames). A tall view also has room above and
-// below the horizon: the eye looks level, so a form stands in the upper
+// below the horizon: the eye looks level, so a form stands about the
 // middle with its image in the floor well below it. At 16:9 and wider nothing changes: there
 // the Field of view and Distance settings are what is seen.
 const WIDE = 16 / 9, FOV_MAX = 96, FOV_SHARE = 0.2, BACK_SHARE = 0.35;
@@ -324,6 +324,17 @@ const panOf = (p) => (camera ? dot(sub(p, camera.eye), camera.r) / 6 : 0);
 const rotation = createRotation();
 const sound = createAudio({ settings: S });
 const lab = document.documentElement.dataset.page === 'lab';
+// The lab may try another framing from the URL (development.md: Framing in the lab).
+if (lab) {
+  const num = (k) => (params.has(k) && Number.isFinite(Number(params.get(k))) ? Number(params.get(k)) : null);
+  const pair = (k) => { const v = (params.get(k) || '').split(',').map(Number); return v.length === 2 && v.every(Number.isFinite) ? v : null; };
+  if (num('eye') !== null) ROOM.eye = num('eye');
+  if (num('pitch') !== null) ROOM.pitch = num('pitch');
+  if (pair('sea')) LAYER.height = pair('sea');
+  if (pair('seaThick')) LAYER.thick = pair('seaThick');
+  if (num('formPitch') !== null) ROOM.form.pitch = num('formPitch');
+  if (num('formEye') !== null) ROOM.form.eye = num('formEye');
+}
 const clock = createClock({ lab, params, seed: SEED });
 const controls = createControls({
   sound, S,
@@ -565,6 +576,12 @@ const CAMERA_BLEND = 8; // seconds to turn one move into the next
 const smooth = (x) => x * x * (3 - 2 * x);
 // The camera starts at ?t= too, so a time shows one view.
 let camMode = CAMERAS[0], camClock = time, camBlend = 1;
+// The view framed for a form: while one shows, the eye looks further up and stands a little higher
+// (ROOM.form), as far as it shows. framed (0 .. 1) follows how much a form shows as the show asks
+// (show.skyAt): up about FRAME_UP s behind its coming, and down more slowly behind its going
+// (FRAME_DOWN), so the view stays up over the short gap between two forms.
+const FRAME_UP = 3, FRAME_DOWN = 8;
+let framed = null;
 const camW = CAMERAS.map((c) => (c === camMode ? 1 : 0));
 let camFrom = [...camW];
 let lastDir = [0, 0, -1];
@@ -710,7 +727,10 @@ function advance(dt, replay = false) {
   let eye = [0, 0, 0], dir = [0, 0, 0];
   // The eye stands on the floor, with a little sway.
   const fit = lastFit = viewFit();
-  const ground = FLOOR + ROOM.eye;
+  const sky = show.skyAt(time, egg.show, egg.rare);
+  framed = framed === null ? sky : framed + (sky - framed) * (1 - Math.exp(-dt / (sky > framed ? FRAME_UP : FRAME_DOWN)));
+  const fk = smooth(framed);
+  const ground = FLOOR + ROOM.eye + ROOM.form.eye * fk;
   const bob = ground + Math.sin(time * 0.05) * 0.2;
   CAMERAS.forEach((cam, i) => {
     camW[i] = camFrom[i] + ((cam === camMode ? 1 : 0) - camFrom[i]) * kb;
@@ -731,7 +751,7 @@ function advance(dt, replay = false) {
   eye[1] -= py * 2.0;
   dir = turn(dir);
   eye[1] = Math.max(FLOOR + 0.4, eye[1]);          // above the floor, looking a little up
-  dir = norm([dir[0], dir[1] + fit.pitch, dir[2]]);
+  dir = norm([dir[0], dir[1] + fit.pitch + ROOM.form.pitch * fk, dir[2]]);
   const at = [eye[0] + dir[0], eye[1] + dir[1], eye[2] + dir[2]];
   const aspect = W / H;
   viewM = lookAt(eye, at, [0, 1, 0]);
@@ -783,6 +803,7 @@ function initState(t0) {
   CAMERAS.forEach((c, i) => { camW[i] = c === camMode ? 1 : 0; });
   camFrom = [...camW];
   lastDir = [0, 0, -1];
+  framed = null;
   skyClock = (director.skyStart + time / Math.max(1, S.skyDay)) % 1;
   direct(time, true);
   look = { flow: t0, flowRate: weather.flow, rain: weather.rain, density: [...densityGoal] };
@@ -803,7 +824,7 @@ function saveState() {
   return {
     ...structuredClone({
       time, nextAuto, autoWaves, ripples: [...ripples], rippleIndex, look, bandShift, sway, densityGoal,
-      goals, looks, side, sideNow, flowGoal, flowDir, flowTurns, skyClock, breathPhase, camBlend, camFrom, camW, camClock, lastDir,
+      goals, looks, side, sideNow, flowGoal, flowDir, flowTurns, skyClock, breathPhase, camBlend, camFrom, camW, camClock, lastDir, framed,
       gap: rippleGap.save(), rain: rainSway.save(), direction: direction.save(),
     }),
     show: show.save(), episode: { ...episode }, weather, colorMode, camMode,
@@ -811,7 +832,7 @@ function saveState() {
 }
 function loadState(d) {
   const c = structuredClone({ ...d, show: null, episode: null, weather: null, colorMode: null, camMode: null });
-  ({ time, nextAuto, autoWaves, rippleIndex, look, bandShift, sway, side, sideNow, flowGoal, flowDir, flowTurns, skyClock, breathPhase, camBlend, camFrom, camClock, lastDir } = c);
+  ({ time, nextAuto, autoWaves, rippleIndex, look, bandShift, sway, side, sideNow, flowGoal, flowDir, flowTurns, skyClock, breathPhase, camBlend, camFrom, camClock, lastDir, framed } = c);
   ripples.set(c.ripples);
   densityGoal.splice(0, 2, ...c.densityGoal);
   goals.splice(0, 2, ...c.goals); looks.splice(0, 2, ...c.looks);
@@ -920,7 +941,10 @@ function hudSnapshot() {
 // eggs: the egg that shows, its uniforms, and the type of the egg drawn by its own program in the last frame.
 if (lab) {
   window.__lab = { state: () => JSON.stringify(saveState()), seek: (t) => { pendingSeek = t; }, turn: () => pointer.x, setting: (key) => S[key],
-    eggs: () => ({ on: eggs.info(), ...eggs.uniforms(), drawn: eggDrawn, eye: camera?.eye }), summon: (name) => eggs.summon(name) };
+    eggs: () => ({ on: eggs.info(), ...eggs.uniforms(), drawn: eggDrawn, eye: camera?.eye }), summon: (name) => eggs.summon(name),
+    // the last frame's camera (matrices, eye), the floor, the forms' centres and the layer: to measure the framing
+    view: () => ({ view: [...viewM], proj: [...projM], eye: camera.eye, f: camera.f, floor: FLOOR, feet: -HEIGHT / 2, fov: lastFit.fov, w: W, h: H,
+      forms: lastShown.forms, layer: lastShown.layer && { ...lastShown.layer, y: lastShown.B[9], thick: lastShown.A[10] } }) };
 }
 const hud = createHud({ lab, params, bar: clock.bar, snapshot: hudSnapshot });
 

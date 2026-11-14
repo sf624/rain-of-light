@@ -52,8 +52,12 @@ are not on an exact grid, so no straight dark lines cross the view.
 `config.js: ROOM` sets the room: 36 units wide and deep (`span`), 15 tall
 (`height`), centred on 0. The strands end 0.45 above the mirror floor
 (`foot`). This leaves a thin dark seam between each strand and its image, so
-you can see where the floor is. The eye stands 2.2 above the floor (`eye`)
-and looks a little up (`pitch`).
+you can see where the floor is. The eye stands 3.4 above the floor (`eye`),
+a little over the layer of light, so the layer reads as a sea seen from just
+above its surface, and looks a little up (`pitch`). From 12 units away (the
+setting `radius`), a form stands about the middle of a 16:9 view, the layer
+lies about two thirds down, and the upper part of the form's image in the
+floor shows below it.
 
 `lattice.js: fillLattice` builds the buffers:
 
@@ -155,6 +159,15 @@ angle is kept within one turn) and raises or lowers the eye by at most one
 unit. The view follows with a time constant of 0.5 s of real time, so a paused or
 fast show feels the same. The turn is the viewer's own and not part of the show's state.
 
+While a form shows, the eye may look further up and stand higher, as far as
+the form shows (`config.js: ROOM.form`; both 0 by default, so the view stays
+as it is: the lab tries other numbers, see Framing in the lab in
+[development.md](development.md)). `main.js: framed` follows how much a form
+shows as the show asks it (`show.js: skyAt`, from the time and the
+settings): up about 3 s behind the form's own coming, and down about 8 s
+behind its going, so the view stays up over the short gap between two
+forms. It is part of the show's state, so a seek makes it again.
+
 A view narrower than 16:9 would show too little of the room. So
 `main.js: viewFit` zooms out with the shape of the view. With
 `need = max(1, (16/9) · H / W)`, how many times too narrow the view is:
@@ -167,8 +180,8 @@ A view narrower than 16:9 would show too little of the room. So
 - In a view as tall as a phone's, the eye looks level (`TALL.pitch`).
 
 Example: a phone held upright (9 : 19.5) is 3.85 times too narrow. The field
-of view opens from 76° to about 91°. The eye steps back from 10 to about 16
-units. It sees about 30% farther. It looks level. At 16:9 and wider,
+of view opens from 76° to about 91°. The eye steps back from 12 to 16.5
+units, the most the room allows. It sees about 19% farther. It looks level. At 16:9 and wider,
 nothing changes.
 
 ## 3. One frame, step by step
@@ -889,7 +902,7 @@ plus its crests, which lie one behind another along the eye's way through
 the layer (`show.js: CRESTS`). Each layer has its own height
 (`config.js: LAYER`), so the forms rest on the layer that shows
 (`show.js: ground`): as it comes, goes or is replaced, the height moves
-with the layer's weight, so a form glides a little (at most about 0.8
+with the layer's weight, so a form glides a little (at most about 0.4
 units, over the layer's fade) and never jumps. With no layer, a form rests
 on where a layer in the middle of the range would be (`REST`).
 

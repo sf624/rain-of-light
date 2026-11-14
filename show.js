@@ -552,6 +552,9 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
       rain, storm: rain * skyShown, gain: 1 + STORM_GAIN * rain, items };
   }
 
+  // How much a form shows at t, as the settings and the timeline ask (not eased: see framing in main.js).
+  const skyAt = (t, egg, rare = 1) => Math.min(1, wanted(t, egg, rare).items.reduce((n, x) => n + (x.e.form === LAYER ? 0 : x.w), 0));
+
   // The timeline the forms come by now (none: a held form).
   const castBy = () => (S.form !== 'auto' ? null : timeline(timelineFor(S.rain)));
   // The baked forms about to show, or showing, at t (within `ahead` seconds): one an easter egg
@@ -568,5 +571,5 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
   // The rain's direction at t, as the show has it (for the start: update returns it too).
   const flow = (t) => wanted(t).flow;
 
-  return { update, recolor, cast, flow, info, save, load, reset, bakedNear, rareSpans };
+  return { update, recolor, cast, flow, info, save, load, reset, bakedNear, rareSpans, skyAt };
 }
