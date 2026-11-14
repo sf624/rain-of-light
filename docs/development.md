@@ -317,6 +317,28 @@ lines:
 On a screen narrower than 700 px only the main lines show, and with the
 settings panel open the HUD steps aside.
 
+### Framing in the lab
+
+The lab takes a few URL values that the viewer page and the settings do
+not, to try another framing on the same show (each replaces the number in
+`config.js`; for the camera's distance and field of view, use the settings
+`radius` and `fov`):
+
+- `eye=3.4`: the eye's height over the floor (`ROOM.eye`); `pitch=0.06`:
+  how far it looks up (`ROOM.pitch`).
+- `sea=0.2,0.8`: the range of the layer's height over the strands' feet
+  (`LAYER.height`); `seaThick=0.15,0.35`: of its half thickness
+  (`LAYER.thick`). The forms rest on it as always, and with no layer on its
+  middle (`REST`).
+- `formEye=1`, `formPitch=0.06`: how much higher the eye stands and how
+  much further it looks up while a form shows (`ROOM.form`, see The camera
+  and the narrow-view fit in [design.md](design.md)).
+
+`window.__lab.view()` gives the last frame's camera (its view and
+projection matrices, the eye, the way it looks, the field of view), the
+floor, the forms' centres and the layer's surface, half thickness and top
+of its band as seen: enough to work out where each lies in the picture.
+
 ## Easter eggs
 
 Rare scenes that the page does not announce. `eggs.js` holds the registry

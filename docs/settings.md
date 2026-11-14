@@ -739,14 +739,14 @@ Query: `rain=on&form=none&layer=off&flow=down&color=sky&skyDay=80` at `t=0`, `t=
 | --- | --- | --- | --- | --- |
 | Move | `camera` | `auto`, `orbit`, `walk`, `spin`, `gaze`, `rise` | `orbit` | `orbit`: circle the field. `walk`: wander through it. `spin`: look around from the centre. `gaze`: look up and down. `rise`: drift up and down. `auto`: the moves change on their own, each blending into the next. |
 | Move speed | `orbit` | 0 to 0.2 | `0.025` | How fast the camera moves; `0` stops the move (a slight sway of height remains). |
-| Distance from the centre | `radius` | 0 to 16 | `10` | How far from the centre the eye is, in a view of 16:9 or wider. |
+| Distance from the centre | `radius` | 0 to 16 | `12` | How far from the centre the eye is, in a view of 16:9 or wider. |
 | Field of view (deg) | `fov` | 30 to 110 | `76` | How wide the view is, in a view of 16:9 or wider. |
 
 A view narrower than 16:9 (a narrow window, a phone held upright) zooms out,
 smoothly with its shape: the field of view opens (up to 96 degrees) and the
 eye steps back from the centre. So the room and the forms keep about the
 size they have in landscape. In a tall view the eye looks level, so a form
-stands in the upper middle with its image in the floor below.
+stands about the middle with its whole image in the floor below.
 
 ### Moves
 

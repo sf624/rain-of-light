@@ -127,7 +127,7 @@ export const FORMS = [
 // thick around it (each a range: each time the layer has its own). The forms
 // rest on the top of its band (see ground in show.js).
 export const LAYER = { name: 'layer', type: 2, palettes: ['deep sea', 'ice', 'aurora', 'sakura', 'amber'],
-  height: [0.5, 1.8], thick: [0.2, 0.45] };
+  height: [0.2, 0.8], thick: [0.15, 0.35] };
 // The baked forms: shapes baked into fields of distance (fields/*.bin, see
 // fields.js and tools/bake-field.py), drawn as a glowing skin. They are not
 // cast like the forms above, and no setting names them: each is an easter
@@ -143,8 +143,9 @@ export const ROOM = {
   span: 36,      // width and depth of the lattice
   height: 15,    // its height, centred on 0
   foot: 0.45,    // the strands end this far above the mirror floor
-  eye: 2.2,      // the eye's height above the floor
+  eye: 3.4,      // the eye's height above the floor
   pitch: 0.06,   // and how far it looks up
+  form: { pitch: 0, eye: 0 },   // while a form shows: how much further it looks up, and how much higher it stands (main.js: framed)
 };
 
 // The show moves between passages (see show.js). A passage sets how much
@@ -177,7 +178,7 @@ export const DEFAULTS = {
   color: 'auto', story: 'on', palette: 'auto', rainbow: 'drop', bandSpeed: 0.17, bandScale: 1.0, saturation: 1.0,
   set: 'auto', skyDay: 90,
   flow: 'auto',
-  camera: 'orbit', orbit: 0.025, radius: 10, fov: 76,
+  camera: 'orbit', orbit: 0.025, radius: 12, fov: 76,
   ripples: 14,
   quality: 'auto',
   breath: 'on', breathRate: 6, breathDepth: 0.3,
