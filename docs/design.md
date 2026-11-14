@@ -150,8 +150,10 @@ The eye moves on its own, in one of five moves (`config.js: CAMERAS`;
 `main.js: cameraPose`): orbit, walk, spin, gaze and rise. All run on one
 clock, `camClock`, so a blend of two moves is smooth. A new move blends in
 over `CAMERA_BLEND` (8 s). The default setting is `orbit`; with `auto`, the
-director picks moves. A drag turns the view about the centre and raises or
-lowers the eye.
+director picks moves. A drag turns the view about the centre without limit (90° per view width; the
+angle is kept within one turn) and raises or lowers the eye by at most one
+unit. The view follows with a time constant of 0.5 s of real time, so a paused or
+fast show feels the same. The turn is the viewer's own and not part of the show's state.
 
 A view narrower than 16:9 would show too little of the room. So
 `main.js: viewFit` zooms out with the shape of the view. With
@@ -177,7 +179,7 @@ times higher. At 16:9 and wider, nothing changes.
 1. **Clock.** `dt` is capped at 0.05 s. `main.js: adapt` looks at the frame
    time (see section 8). `main.js: resize` sizes the canvas and the render
    targets.
-2. **Camera.** The moves are blended, the drag is applied, and
+2. **Camera.** The moves are blended, the drag's turn is applied, and
    `viewFit` is applied. This gives the view and projection matrices.
 3. **Automatic ripple.** About every `ripples` seconds, a wave starts at a
    place drawn from the seed.

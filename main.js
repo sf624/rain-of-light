@@ -270,6 +270,11 @@ const controls = createControls({
   onVolume: (v) => { tuner.set('volume', v); tuner.refresh(); },
 });
 
+// The viewer's own turn on top of the camera's move: yaw about the room's centre (radians, unlimited,
+// kept within one turn) and a height offset y (-0.5..0.5). x and y are where the drag asks for; sx and sy
+// are what is shown, eased towards them. Not part of the show's state.
+const TURN_PER_WIDTH = Math.PI / 2;   // a drag across the view's width turns it 90 degrees
+const POINTER_TAU = 0.5;              // s: the view follows a drag with this time constant (real time)
 const pointer = { x: 0, y: 0, sx: 0, sy: 0 };
 let camera = null; // last eye and basis, for picking
 
@@ -290,7 +295,7 @@ const half = (v) => Math.max(-0.5, Math.min(0.5, v));
 // A drag of (dx, dy) screen pixels, in the picture's own directions (it may be turned).
 function dragBy(dx, dy) {
   const d = view.delta(dx, dy);
-  pointer.x = half(pointer.x - d.x / view.w);
+  pointer.x -= d.x / view.w * TURN_PER_WIDTH;
   pointer.y = half(pointer.y - d.y / view.h);
 }
 addEventListener('pointermove', (e) => {
@@ -298,7 +303,7 @@ addEventListener('pointermove', (e) => {
   if (!e.isPrimary) return; // with two fingers the view follows the first
   if (e.pointerType === 'mouse') {
     if (!mouseDrag) return;
-    // The drag pulls the picture along: the view turns the other way.
+    // The drag pulls the picture along: the view turns the other way, round and round as far as it goes.
     dragBy(e.clientX - mouseDrag.x, e.clientY - mouseDrag.y);
     mouseDrag = { x: e.clientX, y: e.clientY };
     return;
@@ -652,7 +657,7 @@ function advance(dt, replay = false) {
   lastDir = dir;
   // The pointer turns the whole view about the centre and raises or lowers the eye.
   const px = replay ? 0 : pointer.sx, py = replay ? 0 : pointer.sy;
-  const yaw = px * 0.7, cy = Math.cos(yaw), sy = Math.sin(yaw);
+  const yaw = px, cy = Math.cos(yaw), sy = Math.sin(yaw);
   const turn = (v) => [v[0] * cy + v[2] * sy, v[1], -v[0] * sy + v[2] * cy];
   eye = turn(eye);
   eye[1] -= py * 2.0;
@@ -839,12 +844,12 @@ function hudSnapshot() {
       room: light.room, wire: light.wire, twinkle: light.twinkle, fall: fallLightNow, stormGain: info.gain,
       bloom: S.bloom, haze: S.haze, burn: S.burn, rays: S.rays, float: hasFloat,
     },
-    camera: { moves, eye: camera ? camera.eye : [0, 0, 0] },
+    camera: { moves, eye: camera ? camera.eye : [0, 0, 0], turn: pointer.sx * 180 / Math.PI },
     ripples: ripples.reduce((n, v, i) => (i % 4 === 3 && time - v >= 0 && time - v < RIPPLE_LIFE ? n + 1 : n), 0),
   };
 }
 // For tests of the lab: the whole state as text, and a seek.
-if (lab) window.__lab = { state: () => JSON.stringify(saveState()), seek: (t) => { pendingSeek = t; } };
+if (lab) window.__lab = { state: () => JSON.stringify(saveState()), seek: (t) => { pendingSeek = t; }, turn: () => pointer.x };
 const hud = createHud({ lab, params, bar: clock.bar, snapshot: hudSnapshot });
 
 function frame(now) {
@@ -868,8 +873,13 @@ function frame(now) {
   resize();
 
   // Camera: the eye follows the pointer a little more each frame.
-  pointer.sx += (pointer.x - pointer.sx) * 0.03;
-  pointer.sy += (pointer.y - pointer.sy) * 0.03;
+  // By the frame's real time, so that it feels the same paused or at any speed.
+  const follow = 1 - Math.exp(-Math.min(0.1, Math.max(0, rawDt)) / POINTER_TAU);
+  pointer.sx += (pointer.x - pointer.sx) * follow;
+  pointer.sy += (pointer.y - pointer.sy) * follow;
+  // Keep the angles within a turn, both by the same whole turns, so that the easing never unwinds.
+  const wrap = Math.round(pointer.x / (2 * Math.PI)) * 2 * Math.PI;
+  pointer.x -= wrap; pointer.sx -= wrap;
   const { shown, breath } = advance(dt);
   // A baked form's field loads as it draws near, and the form shows once it is there.
   fields.frame(show.eggsNear(time), shown, Math.min(0.1, Math.max(0, rawDt)));

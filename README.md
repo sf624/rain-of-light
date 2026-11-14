@@ -34,7 +34,7 @@ Inspired by teamLab's *Light Sculpture - Point*.
 ## Use
 
 - **Click or tap**: a ripple of light, and a bell.
-- **Drag**: look around.
+- **Drag**: look around. Sideways, the view turns about the centre as far as you drag, round and round; up and down, it rises and sinks a little.
 - **Buttons**, bottom right: volume, sound ♪, full screen, settings ⚙. On a
   touch screen, a phone with an arrow turns the picture between landscape
   and portrait.

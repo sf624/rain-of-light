@@ -135,7 +135,7 @@ Query: `t=110`, with the page's buttons shown and `p` pressed, on
 ### Pointer and keys
 
 - **Click or tap**: a ripple of light, and a bell.
-- **Drag**: look around; the picture follows the mouse or the finger. On a
+- **Drag**: look around; the picture follows the mouse or the finger. Sideways there is no limit (a drag across the view's width turns it 90°); up and down, the eye rises or sinks by at most one unit. On a
   touch screen a short tap that hardly moves rings a ripple; a longer touch
   or a move looks around.
 
