@@ -84,12 +84,11 @@ for (const item of SCHEMA.flatMap((g) => g.items)) {
 // the eye steps back from the centre (while it stays inside the room), the
 // visible distance with it (by half as much: farther strands than that only
 // crowd the picture, and cost frames). A tall view also has room above and
-// below the horizon: the eye looks level, and the forms float higher over
-// the floor (see forms.js), so a form stands in the upper middle with its
-// image in the floor well below it. At 16:9 and wider nothing changes: there
+// below the horizon: the eye looks level, so a form stands in the upper
+// middle with its image in the floor well below it. At 16:9 and wider nothing changes: there
 // the Field of view and Distance settings are what is seen.
 const WIDE = 16 / 9, FOV_MAX = 96, FOV_SHARE = 0.2, BACK_SHARE = 0.35;
-const TALL = { pitch: -0.06, rise: 0.6 };   // in a view as tall as a phone's: added to the eye's pitch, and to the forms' height (a share)
+const TALL = { pitch: -0.06 };   // in a view as tall as a phone's: added to the eye's pitch
 function viewFit() {
   const need = W > 0 && H > 0 ? Math.max(1, WIDE * H / W) : 1;   // how many times too narrow the view is
   const tan = Math.min(Math.tan(S.fov * Math.PI / 360) * need ** FOV_SHARE,
@@ -98,7 +97,7 @@ function viewFit() {
   const back = S.radius > 0 ? radius / S.radius : 1;
   const tall = Math.min(1, (need - 1) / 2.8);                    // 0 at 16:9 .. 1 on a phone held upright
   return { fov: 2 * Math.atan(tan), radius, far: 1 + (back - 1) * 0.5,
-    pitch: ROOM.pitch + TALL.pitch * tall, rise: 1 + TALL.rise * tall };
+    pitch: ROOM.pitch + TALL.pitch * tall, tall };
 }
 const fovRad = () => viewFit().fov;
 
@@ -718,7 +717,7 @@ function advance(dt, replay = false) {
   projM = perspective(fovRad(), aspect, 0.1, 60);
   const f = norm(sub(at, eye));
   const r = norm(cross(f, [0, 1, 0]));
-  camera = { eye, f, r, u: cross(r, f), aspect, rise: fit.rise };
+  camera = { eye, f, r, u: cross(r, f), aspect, tall: fit.tall };
 
   // A wave now and then, somewhere in the field.
   if (S.ripples > 0 && time > nextAuto) {

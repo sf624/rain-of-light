@@ -5,29 +5,67 @@
 // and goes in a way of its own, always where it floats: none rises from
 // the floor or sinks into it (see show.js for the fades of its light).
 //
-// Each function returns { centre, size, turn, tilt, yaw, f, dissolve, bound }:
-// what the shader's form needs (see formsAt in shaders.js). f is per form
-// (f[0..2], see each); dissolve (0 .. 1) lifts the form away as rising points
-// (the veil); bound is how far from the centre any of its light reaches, so
-// LEDs farther away skip it.
+// Each function returns { centre, low, size, turn, tilt, yaw, f, dissolve,
+// bound }: what the shader's form needs (see formsAt in shaders.js). f is per
+// form (f[0..2], see each); dissolve (0 .. 1) lifts the form away as rising
+// points (the veil); bound is how far from the centre any of its light
+// reaches, so LEDs farther away skip it. The height of its centre is not its
+// own: centre[1] is how far above the lowest place of its path it floats
+// (0 at the lowest), and low how far below its centre its light
+// reaches now (see lowestAt; without it, its bound).
+// motion rests it on the layer of light (ground).
 // `face` is the way from the eye towards the form (an angle about the
 // vertical, eased in show.js): some forms turn a face to the room, and some
 // keep beyond their path as the eye sees it (see BACK).
 
-import { ROOM, BAKED } from './config.js';
+import { BAKED } from './config.js';
 import { SOLIDS, KNOTS } from './figures.js';
 
-const FLOOR = -ROOM.height / 2 - ROOM.foot;        // the mirror floor
+// A form's lowest light is where it still shows clearly: a quarter of its
+// brightest, as measured on screen. The thin forms' light around their line
+// (at full quality; see fineness in shaders.js): a rod's half width, the
+// ring's thread with its soft sheath, and a solid's corner point (rod in
+// shaders.js).
+const ROD = 0.3, THREAD = 0.55, CORNER = 0.45;
+// How far each form rises and falls over the lowest place of its path: a
+// little, so that it never floats far over the layer.
+const BOB = 0.2;
+
+// How far below its centre a rigid shape's light reaches in its pose: its
+// points (as in shaders.js, in units of its size) turned about its axis
+// (turn) and leaning (tilt; the yaw changes no height, see turned in
+// shaders.js). The deepest point counts, softly (SOFT), so that the form
+// never jolts as another point becomes the lowest. A new shape states its
+// points; a form whose light is no rigid shape (the veil) states its depth.
+const SOFT = 4;                                     // per unit: a few tenths of a unit over the deepest point where two are as deep
+export function lowestAt(points, size, turn, tilt) {
+  const cs = Math.cos(turn), sn = Math.sin(turn), ct = Math.cos(tilt), st = Math.sin(tilt);
+  let sum = 0;
+  for (const [x, y, z] of points) sum += Math.exp(-SOFT * size * (ct * y + st * (cs * z - sn * x)));
+  return Math.log(sum) / SOFT;
+}
+// The same for a figure that spins about the axis that faces the room (z;
+// spin) and then leans (tilt): a knot's link or band (see knotLight). Its
+// points lie close along its curves, which move smoothly: the deepest counts
+// as it is (softly, many close points would lift it).
+export function lowestSpun(points, size, spin, tilt) {
+  const cs = Math.cos(spin), sn = Math.sin(spin), ct = Math.cos(tilt), st = Math.sin(tilt);
+  let d = -Infinity;
+  for (const [x, y, z] of points) d = Math.max(d, -size * (ct * (sn * x + cs * y) + st * z));
+  return d;
+}
 const TAU = Math.PI * 2;
 const smooth = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 
 // An orb: gathers where it hovers, growing a little as its light comes
 // (GROW), and shrinks a little as it goes; between, it drifts slowly across
 // the room and breathes.
+const ORB_LOW = 0.85;                               // where its light still shows clearly, of its size (see orbLight)
 function orb(age, w, leave, ph, face) {
   const size = 3.3 + 0.3 * Math.sin(0.11 * age + ph), drift = 2.0;
   return {
-    centre: [drift * Math.sin(0.035 * age + ph), -3.4 + 0.6 * Math.sin(0.03 * age + ph), drift * Math.cos(0.028 * age + ph)],
+    centre: [drift * Math.sin(0.035 * age + ph), BOB * (1 + Math.sin(0.03 * age + ph)), drift * Math.cos(0.028 * age + ph)],
+    low: ORB_LOW * size,                            // (as it breathes; it grows about its centre as it comes)
     size: size * (GROW + (1 - GROW) * w), bound: size * 1.3,
   };
 }
@@ -36,13 +74,16 @@ function orb(age, w, leave, ph, face) {
 // into it as it goes. Its face turns towards the room (never edge-on, where
 // it would read as a plain column), leaning a little to and fro.
 // f[0]: how far it has unfurled (0.15 .. 1).
+const SPIRAL_RIM = 0.85;                            // its disc's light shows clearly out to this share of its size (see spiralLight)
 function spiral(age, w, leave, ph, face) {
-  const size = 5.8, drift = 2.0;
+  const size = 4.2, drift = 2.0;
+  const tilt = 1.4 + 0.3 * Math.sin(0.023 * age + 2 * ph);   // its face's lean from level
   return {
-    centre: [drift * Math.sin(0.025 * age + ph), -2.6 + 0.6 * Math.sin(0.02 * age + ph), drift * Math.cos(0.02 * age + ph)],
+    centre: [drift * Math.sin(0.025 * age + ph), BOB * (1 + Math.sin(0.02 * age + ph)), drift * Math.cos(0.02 * age + ph)],
+    low: SPIRAL_RIM * size * Math.abs(Math.sin(tilt)),   // its rim, unfurled, at its lean
     size, turn: 0.1 * age + ph,
     yaw: face + 0.75 * Math.sin(0.031 * age + ph),
-    tilt: 1.4 + 0.3 * Math.sin(0.023 * age + 2 * ph),
+    tilt,
     f: [0.15 + 0.85 * smooth(age / 24) * (1 - smooth(leave * 1.15)), 0, 0],
     bound: size * 1.05,
   };
@@ -74,7 +115,10 @@ function ring(age, w, leave, ph, face, go) {
   }
   const n = e.map((x, i) => x * Math.cos(th) + along[i] * Math.sin(th));
   return {
-    centre: [drift * Math.sin(0.02 * age + ph), -3.0 + 0.4 * Math.sin(0.025 * age + ph), drift * Math.cos(0.017 * age + ph)],
+    centre: [drift * Math.sin(0.02 * age + ph), BOB * (1 + Math.sin(0.025 * age + ph)), drift * Math.cos(0.017 * age + ph)],
+    // Its rim reaches lowest upright, and half as low at its most level: it
+    // rolls a little on the layer as it tumbles, never far over it.
+    low: size * (0.5 + 0.5 * Math.sqrt(Math.max(0, 1 - n[1] * n[1]))) + THREAD,
     size, turn: 0.12 * age + ph,
     yaw: Math.atan2(-n[0], -n[2]), tilt: Math.acos(Math.max(-1, Math.min(1, n[1]))),   // (see turned in shaders.js)
     f: [Math.abs(Math.cos(th)), 0, 0],
@@ -82,10 +126,9 @@ function ring(age, w, leave, ph, face, go) {
   };
 }
 
-// A veil, like an aurora: a curtain of light across the room, low over the
-// floor so that its rays stand in the middle of the view, hanging in
+// A veil, like an aurora: a curtain of light across the room, hanging in
 // folds that slowly travel along it, its rays rising from a bright lower
-// hem; it unrolls from one end, sways slowly about the way it faces the
+// hem just over the layer of light; it unrolls from one end, sways slowly about the way it faces the
 // room, and goes by lifting away upward.
 // f[0]: how much of it has unrolled (0 .. 1); f[1]: how far it has lifted;
 // f[2]: half its length.
@@ -93,7 +136,8 @@ function veil(age, w, leave, ph, face) {
   const size = 4.6;                                 // the height of its longest rays
   const half = 8, drift = 1.5;
   return {
-    centre: [drift * Math.sin(0.015 * age + ph), -4.5 + 0.35 * Math.sin(0.03 * age + ph), drift * Math.cos(0.012 * age + ph)],
+    centre: [drift * Math.sin(0.015 * age + ph), BOB * (1 + Math.sin(0.03 * age + ph)), drift * Math.cos(0.012 * age + ph)],
+    low: 0.75 + 0.3 + 0.1,                          // its hem's lowest fold (see veilLight) and the glow below it
     size, turn: 0.05 * age + ph * 3,
     yaw: face + 0.16 * Math.sin(0.017 * age + ph * 2),
     f: [smooth(age / 20), 6 * smooth(leave), half],
@@ -109,13 +153,14 @@ function veil(age, w, leave, ph, face) {
 // draw back into the corners. Each time it is one of SOLIDS (figures.js),
 // for its whole life (v).
 // f[0]: which solid; f[1]: how far the edges are drawn (0 .. 1).
+// It rests on its lowest corner (corners: SOLIDS in figures.js).
 function solid(age, w, leave, ph, face, go, v) {
-  const { size, y } = SOLIDS[v], drift = 1.3;
+  const { size, corners } = SOLIDS[v], drift = 1.3;
+  const turn = 0.055 * age + ph, tilt = 0.3 + 0.1 * Math.sin(0.05 * age + 3 * ph);
   return {
-    centre: [drift * Math.sin(0.024 * age + ph), y + 0.3 * Math.sin(0.027 * age + ph), drift * Math.cos(0.019 * age + ph)],
-    size, turn: 0.055 * age + ph,
+    centre: [drift * Math.sin(0.024 * age + ph), BOB * (1 + Math.sin(0.027 * age + ph)), drift * Math.cos(0.019 * age + ph)],
+    low: lowestAt(corners, size, turn, tilt) + CORNER, size, turn, tilt,
     yaw: 0.04 * age + 2 * ph,
-    tilt: 0.3 + 0.1 * Math.sin(0.05 * age + 3 * ph),
     f: [v, smooth((age - 5) / 17) * (1 - smooth(leave * 1.25)), 0],
     bound: size + 1.2,
   };
@@ -128,39 +173,44 @@ function solid(age, w, leave, ph, face, go, v) {
 // sways about the place where its loops stand widest open, never as far as
 // where they close into one line; a rigid figure (a link, a band) spins
 // slowly about the axis that faces the room, and leans a little to and fro,
-// so that its crossings show which way they pass.
+// so that its crossings show which way they pass. It rests on its lowest
+// light: a Lissajous curve's at the bottom of its box, a rigid figure's in
+// its pose (its points in figures.js).
 // turn: its phase, or its spin; f[0] .. f[1]: the part of the curve that
 // shows; f[2]: which knot.
 function knot(age, w, leave, ph, face, go, v) {
-  const k = KNOTS[v], drift = 1.3;
+  const k = KNOTS[v], { size } = k, drift = 1.3;
   const rigid = k.curve !== 'lissajous';
+  const turn = rigid ? 0.05 * age + ph : k.widest + k.sway * Math.sin(0.04 * age + ph);
+  const tilt = rigid ? (k.lean || 0) + 0.15 * Math.sin(0.023 * age + 3 * ph) : 0;
   return {
-    centre: [drift * Math.sin(0.022 * age + ph), k.y + 0.3 * Math.sin(0.03 * age + ph), drift * Math.cos(0.018 * age + ph)],
-    size: k.size,
-    turn: rigid ? 0.05 * age + ph : k.widest + k.sway * Math.sin(0.04 * age + ph),
+    centre: [drift * Math.sin(0.022 * age + ph), BOB * (1 + Math.sin(0.03 * age + ph)), drift * Math.cos(0.018 * age + ph)],
+    low: (rigid ? lowestSpun(k.points, size, turn, tilt) : size * k.box[1]) + ROD,
+    size, turn, tilt,
     yaw: face + (rigid ? 0.2 : 0.35) * Math.sin(0.027 * age + 2 * ph),
-    tilt: rigid ? (k.lean || 0) + 0.15 * Math.sin(0.023 * age + 3 * ph) : 0,
     f: [-0.1 + 1.2 * smooth(leave * 1.1), -0.05 + 1.15 * smooth(age / 18), v],
-    bound: k.size * Math.hypot(...k.reach) + 0.8,
+    bound: size * Math.hypot(...k.reach) + 0.8,
   };
 }
 
-// A baked form (see BAKED): it sits on the floor, its side to the
+// A baked form (see BAKED): it rests on the layer of light, its side to the
 // room, and sways slowly about the vertical, so that it shows its profile
 // and, now and then, a little of its front and its back; it never turns
 // round (its outline would read only from the side).
 // f[0]: its slab in the shader's field; f[1]: the top of its shape in its
 // box (see tools/bake-field.py), so that LEDs above it skip it.
 const BASE = 0.9;                                   // its base lies this far below its box's centre (of its size, see tools/bake-field.py)
+const SKIN = 0.35;                                  // its skin's light below its base (see bakedLight)
 // Like the orb, it comes and goes by its light's fade alone (FADING), growing
-// a little as it comes (GROW), its base kept on the floor.
+// a little as it comes (GROW), its base kept on the layer.
 function baked(egg, age, w, leave, ph, face) {
   const size = egg.size * (GROW + (1 - GROW) * w), drift = 1.2;
   return {
-    centre: [drift * Math.sin(0.02 * age + ph), -ROOM.height / 2 + BASE * size + 0.1, drift * Math.cos(0.017 * age + ph)],
+    centre: [drift * Math.sin(0.02 * age + ph), 0, drift * Math.cos(0.017 * age + ph)],
+    low: BASE * size + SKIN,                        // its base, kept on the layer as it grows
     size, yaw: face + 0.55 * Math.sin(0.045 * age + ph),
     f: [egg.field, egg.top, 0],
-    bound: size * 1.75, onFloor: true,
+    bound: size * 1.75,
   };
 }
 
@@ -183,14 +233,15 @@ export const FADING = new Set(['orb', ...BAKED.map((egg) => egg.name)]);
 // { at, fade }: its age as it began to go and how long its light takes to go;
 // the forms see how far it has gone on its way out (leave, 0 .. 1). anchor is the place on its own path (the eye's way to it
 // gives `face`); centre is where it shows.
-// rise: how many times higher over the floor it floats (a tall view has the
-// room for it; see viewFit in main.js), unless it sits on the floor (onFloor).
+// ground: the height the forms rest on, the top of the layer's band (see
+// show.js): at the lowest of its path (centre[1] 0), a form's lowest light
+// (low below its centre) just touches it.
 // v: which of its figures it is (the solid, the knot, see figures.js).
-export function motion(name, age, w, go, r, face, rise = 1, v = 0) {
+export function motion(name, age, w, go, r, face, ground, v = 0) {
   const leave = go ? smooth((age - go.at) / go.fade) : 0;
   const m = MOTIONS[name](age, w, leave, r * TAU, face, go, v);
-  const [x, y, z] = m.centre, back = BACK[name] || 0;
-  const lift = m.onFloor ? 1 : rise;                // (a baked form stays on the floor)
+  const [x, h, z] = m.centre, back = BACK[name] || 0;
+  const y = ground + (m.low ?? m.bound) + h;
   return { turn: 0, tilt: 0, yaw: 0, f: [0, 0, 0], dissolve: 0, ...m,
-    anchor: m.centre, centre: [x + back * Math.sin(face), FLOOR + (y - FLOOR) * lift, z + back * Math.cos(face)] };
+    anchor: [x, y, z], centre: [x + back * Math.sin(face), y, z + back * Math.cos(face)] };
 }

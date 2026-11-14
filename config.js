@@ -92,7 +92,11 @@ export const FORMS = [
   { name: 'solid',     type: 5, weight: 0.4, palettes: ['ice', 'amber', 'aurora', 'sakura'], variants: SOLIDS.map((x) => x.name) },
   { name: 'knot',      type: 6, weight: 0.4, palettes: ['aurora', 'amber', 'sakura', 'deep sea'], variants: KNOTS.map((x) => x.name) },
 ];
-export const LAYER = { name: 'layer', type: 2, palettes: ['deep sea', 'ice', 'aurora', 'sakura', 'amber'] };
+// The layer's surface lies height over the strands' feet, its bright band
+// thick around it (each a range: each time the layer has its own). The forms
+// rest on the top of its band (see ground in show.js).
+export const LAYER = { name: 'layer', type: 2, palettes: ['deep sea', 'ice', 'aurora', 'sakura', 'amber'],
+  height: [0.5, 1.8], thick: [0.2, 0.45] };
 // The baked forms: shapes baked into fields of distance (fields/*.bin, see
 // fields.js and tools/bake-field.py), drawn as a glowing skin. They are not
 // cast like the forms above, and no setting names them: each is an easter
