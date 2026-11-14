@@ -22,7 +22,7 @@ reload.
 | File | What |
 | --- | --- |
 | `index.html`, `style.css` | the viewer page, with a small settings panel |
-| `lab.html` | the lab: the same page, with every setting in its panel (`data-page="lab"`) |
+| `lab.html` | the lab: the same page, with every setting in its panel (`data-page="lab"`); opened by its address, the viewer page does not link to it |
 | `boot.js` | shows any error on the page, and registers the service worker |
 | `main.js` | the frame loop: puts the directors' choices to work, the camera, the drawing |
 | `director.js` | the rain's director: which weather, colour mode, density and camera move come when, from the seed; and the colour story's mood |
@@ -127,7 +127,7 @@ about 11 s to 3 s. It visits:
   (`#tune`): the repository link and the commit link from a fake
   `version.json`, that the sliders let a finger scroll, which settings
   each panel shows (the viewer page: the items marked `viewer` in
-  `config.js`), the link to the other page, and that the viewer page sees
+  `config.js`), the lab's link to the viewer page (the viewer page has no link to the lab), and that the viewer page sees
   a setting the lab saved and its Reset clears it;
 - the pinned scenes (`rain` in the lab, `crystal`, both with the click,
   keys and Reset), a time part-way through the show
