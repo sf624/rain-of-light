@@ -769,24 +769,39 @@ the eye on one diagonal, the other going away on the other.
 - The photon ring, a thin bright ring, hugs the edge of the shadow as
   the eye sees it.
 - The jets (`HOLE_JET`, `HOLE_CONE`): two cones of pale blue-white along
-  the axis, from just outside the heart, 0.25 units wide at the base
-  (at least an LED gap) and widening by 0.06 per unit, fading with
-  distance, with knots that run outwards (one every 3 units, 2.2 units
-  a second). The one that comes towards the eye passes in front of the
-  heart and runs through LEDs nearer the eye, so its points and its
-  knots grow as they come; it fades over 2.6 units and is gone by 7. The
-  one that goes away is half as bright (as a jet beamed away is dimmer),
-  runs through farther, denser LEDs, is hidden by the heart at its base,
-  and dims by half where the disc lies in front of it (where the line of
-  sight to it crosses the disc between its rims); it fades over 2.6
-  units and is gone by 5, before the layer of light (the form rests on
-  it, see How high a form floats).
+  the axis, from just outside the heart, 0.25 units wide at the base (at
+  least an LED gap) and widening by 0.06 per unit, fading with distance.
+  Their matter runs outwards at 2.2 units a second (`HOLE_FLOW`), so what
+  a jet shows at a distance is what left the heart that long ago: its
+  light is a function of that time (`tau`, each jet on its own clock),
+  never of a fixed beat (`holeFlow`). Two octaves of a smooth noise of it
+  make clumps of matter, each its own size, spacing and brightness (a
+  slower noise sets each clump's brightness); the fine octave fades as the
+  matter travels, so clumps soften and spread; a noise over tens of
+  seconds makes quiet stretches now and then, and another a stronger
+  outflow now and then. The noise has a new value at each whole number of
+  its time, from a hash, so nothing repeats. The flow also sways a little
+  from the axis as it left, by up to 0.05 units per unit out, and the sway
+  runs out with it. Clumps at a fixed interval would read as a blinking
+  machine. The one that comes towards the eye passes in front of the heart
+  and runs through LEDs nearer the eye, so its points and its clumps grow
+  as they come; it fades over 2.6 units and is gone by 7. The one that
+  goes away is half as bright (as a jet beamed away is dimmer), runs
+  through farther, denser LEDs, is hidden by the heart at its base, and
+  dims by half where the disc lies in front of it (where the line of sight
+  to it crosses the disc between its rims); it fades over 2.6 units and is
+  gone by 5, before the layer of light (the form rests on it, see How high
+  a form floats).
 - Its rays: only its hottest light casts them, and none that would run
   across the heart (`HoleRay`). Its wires take a small share of its
   light (a disc is not its strands).
 - Its reach counts its jets: an LED is near it within its disc's sphere,
   or near its axis along the jets, within 1.2 units and more as they
-  widen (`holeReach`); the rain gives way by the same measure.
+  widen (`holeReach`); the rain gives way by the same measure. Most LEDs
+  in that reach lie off the disc, off the lens's slab (which faces the
+  eye, with the photon ring) and off the jets' cones: they stop after a
+  few dot products (the test at the top of `holeLight`), and only the
+  others work out the disc's frame, the lens and the jets.
 - *Its shadow.* Light here only adds, so the black hole's heart is dark by
   absence: every LED whose line of sight from the eye passes through the
   hole's sphere gives no light, whatever it shows (rest, twinkle, drops,
