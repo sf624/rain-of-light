@@ -134,7 +134,7 @@ export const SCENES = { rain: { rain: 'on', form: 'none', layer: 'off' }, crysta
 
 // ---------- tunable settings (panel: p key or the gear button; also ?key=value) ----------
 export const DEFAULTS = {
-  rain: 'auto', form: 'auto', solid: 'auto', knot: 'auto', layer: 'auto', mirror: 0.6, walls: 0, haze: 0, burn: 0.7, twinkle: 0.4, rainShare: 1,
+  rain: 'auto', form: 'auto', solid: 'auto', knot: 'auto', layer: 'auto', mirror: 0.6, walls: 0, haze: 0, burn: 0.7, twinkle: 0.4, paleDrops: 1, rainShare: 1,
   leds: small ? 210 : 1000, aspect: 1, grid: 0, rows: 0,
   layout: 'strands', jitter: 'off', density: 'auto', strandShare: 1.0, rowShare: 1.0, strandMin: 0.66, rowMin: 0.68,
   size: 0.018, maxPx: 4.5, rest: 0.03, wire: 0.2,
@@ -175,6 +175,8 @@ export const SCHEMA = [
     { key: 'burn', label: 'Burn-out (0: off)', min: 0, max: 1, step: 0.05,
       hint: 'The brightest light loses its colour and burns out to white' },
     { key: 'twinkle', label: 'Twinkle', min: 0, max: 2, step: 0.05 },
+    { key: 'paleDrops', label: 'Pale drops in a still room (0: off)', min: 0, max: 3, step: 0.05,
+      hint: 'The few strands that carry pale drops when no rain passage shows; a passage spreads from them' },
     { key: 'rainShare', label: 'Share of strands with rain', min: 0, max: 1, step: 0.01,
       hint: 'At 1, every strand of a lattice of up to 72 a side; a denser one carries rain on as many strands per area, not on all' },
   ] },

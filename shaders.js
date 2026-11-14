@@ -295,6 +295,7 @@ void gather(inout Lit L, vec4 r, float sd, float w) {
 const float SHARE_FADE = 0.3;
 float rainOn(float n, float k) {
   float s = uRainShare * k;
+  if (s <= 0.0) return 0.0;
   s *= 1.0 + (1.0 / (1.0 - 0.5 * SHARE_FADE) - 1.0) * pow(s, 8.0);
   return clamp((s - hash(n + 9.0)) / (SHARE_FADE * max(s, 1e-4)) + 0.5, 0.0, 1.0);
 }

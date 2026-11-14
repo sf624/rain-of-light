@@ -311,7 +311,7 @@ async function visit(cdp, base, query, interact, full = false, fetches = null) {
       if (!/ring \d\.\d\d/.test(before)) fail(`[${label}] the HUD names no ring at ${t0text}: ${before}`);
       const change = (key, value) => evalJs(`(() => { const i = document.querySelector('.tuner-row[data-key=${JSON.stringify(key)}]').querySelector('input, select');
         i.value = ${JSON.stringify(value)}; i.dispatchEvent(new Event(i.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true })); })()`);
-      for (const [key, value] of [['exposure', '1.2'], ['twinkle', '0.1'], ['color', 'cloud'], ['weather', 'downpour'], ['layout', 'scatter']]) {
+      for (const [key, value] of [['exposure', '1.2'], ['twinkle', '0.1'], ['paleDrops', '0'], ['color', 'cloud'], ['weather', 'downpour'], ['layout', 'scatter']]) {
         await change(key, value);
         const after = await settled(`after ${key}`);
         if (after !== before) fail(`[${label}] changing ${key} while paused changed the moment: ${before} -> ${after}`);
@@ -473,6 +473,7 @@ await visit(cdp, base, 'lab.html#tune', false);
 await visit(cdp, base, '#tune', false);
 // Rain alone (in the lab) and no rain, and the whole show part-way through (a form, rain going or coming).
 await visit(cdp, base, 'lab.html?rain=on&form=none&layer=off', true);
+await visit(cdp, base, 'lab.html?rain=off&form=none&layer=off&paleDrops=0', false);   // a still room without its pale drops
 await visit(cdp, base, 'lab.html?pause=1&t=20&rain=on&form=none&layer=off', false);   // the lab's clock
 await visit(cdp, base, 'lab.html?pause=1&t=45&seed=7&hud=1', false);   // paused part-way through a form's coming: settings keep the moment
 await visit(cdp, base, 'lab.html?pause=1&t=Infinity&rain=on&form=none&layer=off', false);   // a start time that is no number

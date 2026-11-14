@@ -64,6 +64,11 @@
       {"q": "twinkle=0.4", "label": "twinkle=0.4"},
       {"q": "twinkle=2", "label": "twinkle=2"}
     ] },
+    { "name": "pale-drops", "cols": 3, "base": "rain=off&form=none&layer=off&weather=downpour&twinkle=0&t=30", "cells": [
+      {"q": "paleDrops=0", "label": "paleDrops=0"},
+      {"q": "paleDrops=1", "label": "paleDrops=1"},
+      {"q": "paleDrops=3", "label": "paleDrops=3"}
+    ] },
     { "name": "rain-share", "cols": 3, "base": "rain=on&form=none&layer=off&flow=down&t=30", "cells": [
       {"q": "rainShare=0.2", "label": "rainShare=0.2"},
       {"q": "rainShare=0.6", "label": "rainShare=0.6"},

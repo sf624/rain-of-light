@@ -208,6 +208,7 @@ things that are not in the panel:
 | Haze (0: off) | `haze` | 0 to 2 | `0` | A wide, soft glow around the brightest light. Off by default: the picture has no blur. |
 | Burn-out (0: off) | `burn` | 0 to 1 | `0.7` | The brightest light loses its colour and burns out to white. |
 | Twinkle | `twinkle` | 0 to 2 | `0.4` | In a still room, some LEDs flash now and then: as many per volume of the room whatever the density (one in five on a lattice of 72 strands a side). It fades out as a rain passage comes. |
+| Pale drops in a still room | `paleDrops` | 0 to 3 | `1` | How many pale drops fall in a still room, as a multiple of the usual share (3 to 8 percent of the strands, more in heavier weather). `0` leaves not one drop, so the still room holds only its twinkle, its forms and the layer; a rain passage still spreads in strand by strand from nothing. |
 | Share of strands with rain | `rainShare` | 0 to 1 | `1` | The share of strands that carry rain. At 1, rain falls on every strand of a lattice of up to 72 strands a side; a denser one carries it on as many strands per area, not on all. |
 
 ### What plays: Rain and Form
@@ -225,7 +226,7 @@ decide that part; the others pin it.
 | --- | --- | --- | --- |
 | `auto` | The whole show: rain, forms, rain through a form, still rooms and sideways rain come and go (the passages below). | The form held for good; the show's rain comes and goes around it, sideways now and then. | Passages of rain (sideways now and then) and still rooms take turns. |
 | `on` | Rain that never ends, with the whole show's forms coming and going through it: a lasting storm. | The form held in rain that never ends. | Rain that never ends, and no form (the layer when it comes). |
-| `off` | Only the forms, on a timeline of their own: form after form, with a still room now and then, so the room is seldom empty. | The form held in a room without rain. | A still room: a few pale drops, and the layer when it comes. |
+| `off` | Only the forms, on a timeline of their own: form after form, with a still room now and then, so the room is seldom empty. | The form held in a room without rain. | A still room: a few pale drops (their own setting, Pale drops, can turn them off), and the layer when it comes. |
 
 - While rain falls, a form glows brighter, to hold its own among the rain,
   and it comes and goes from the top down (see below). With Rain `on`, so
@@ -364,6 +365,15 @@ Query: `rain=off&form=none&layer=off&t=30` with `twinkle=0`,
 `twinkle=0.4`, `twinkle=2`. Twinkle belongs to the still room: it fades
 out as a rain passage comes. The glitter of sideways rain (see Direction)
 is the rain's own and does not follow it.
+
+### Pale drops in a still room
+
+![The still room three times in a downpour, with twinkle off: no pale drops, the usual few, and many](img/pale-drops.jpg)
+
+Query: `rain=off&form=none&layer=off&weather=downpour&twinkle=0&t=30` with
+`paleDrops=0`, `paleDrops=1`, `paleDrops=3`. The drops belong to the
+still room: they fade as a rain passage comes, and the passage grows from
+the strands that carry them (at 0, from nothing).
 
 ### Share of strands with rain
 

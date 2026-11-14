@@ -350,8 +350,9 @@ speed (`flow`) and amount (`rain`) of each weather.
 Not every strand carries rain. `shaders.js: rainOn` lights a strand's rain
 while its hash is under the share (`uRainShare`). Strands near the edge of
 the share fade over 30% of it (`SHARE_FADE`), so no strand's rain switches
-on or off at once. In a still room the share is 3 to 8% (the pale drops).
-In a rain passage it is the setting `rainShare`, less a third under a form.
+on or off at once. In a still room the share is 3 to 8% (the pale drops), times the setting
+`paleDrops` (`main.js: sparseShare`; at 0 no strand carries one, and a passage
+spreads in from nothing). In a rain passage it is the setting `rainShare`, less a third under a form.
 
 The falling time `look.flow` is integrated in `main.js: ease`, so a change
 of speed never makes drops jump. It wraps at `FLOW_WRAP` (1000). Each drop's
