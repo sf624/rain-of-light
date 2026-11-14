@@ -101,38 +101,35 @@ function viewFit() {
 }
 const fovRad = () => viewFit().fov;
 
-const { program, programLater, target, freeTarget } = createGL(gl);
+const { program, target, freeTarget } = createGL(gl);
 
 // ---------- the lattice ----------
+// The GPU builds the programs while the lattice is made: nothing reads their
+// outcome before that (gl.js: program).
 const plain = { point: program(POINT_VS, POINT_FS), wire: program(POINT_VS, WIRE_FS) };
-// The figures' tables (shaders.js: FIGURES), one uniform block for every program of the LEDs.
-const figureBuffer = gl.createBuffer();
-gl.bindBuffer(gl.UNIFORM_BUFFER, figureBuffer);
-gl.bufferData(gl.UNIFORM_BUFFER, FIGURES, gl.STATIC_DRAW);
-gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, figureBuffer);
-const figuresBlock = (prog) => gl.uniformBlockBinding(prog.p, gl.getUniformBlockIndex(prog.p, 'Figures'), 0);
-for (const prog of [plain.point, plain.wire]) figuresBlock(prog);
+const downProg = program(QUAD_VS, DOWN_FS);
+const blurProg = program(QUAD_VS, BLUR_FS);
+const compProg = program(QUAD_VS, COMPOSITE_FS);
 // The same with the light of the easter egg that shows (egg-shaders.js), built the first time that
-// egg shows, without waiting for the GPU: until they are done (a few frames, as the egg fades in) the
-// plain programs draw. While no egg shows, the LEDs are drawn by programs with no egg in them at all.
-// An egg whose programs cannot be built is dropped (eggs.drop): the show goes on without it.
-const withEggs = new Map();   // the egg's type -> { point, wire }: each gives its program when done
+// egg shows, and used once the GPU has built them (gl.js: ready): until then (a few frames, as the egg
+// fades in) the plain programs draw. While no egg shows, the LEDs are drawn by programs with no egg
+// in them at all. An egg whose programs cannot be built is dropped (eggs.drop): the show goes on without it.
+const withEggs = new Map();   // the egg's type -> { point, wire, done }: done once both are ready and set up
 let eggDrawn = 0;             // the type of the egg drawn by its own programs in the last frame (for the tests)
 function eggProgs(type) {
   if (gl.isContextLost()) return plain;
   try {
     if (!withEggs.has(type)) {
       const vs = eggShader(POINT_VS, type);
-      withEggs.set(type, { point: programLater(vs, POINT_FS), wire: programLater(vs, WIRE_FS) });
+      withEggs.set(type, { point: program(vs, POINT_FS), wire: program(vs, WIRE_FS), done: false });
     }
     const p = withEggs.get(type);
     if (!p.done) {
-      const point = p.point(), wire = p.wire();
-      if (!point || !wire) return plain;
-      for (const prog of [point, wire]) { fieldsUnit(prog); figuresBlock(prog); }
-      p.done = { point, wire };
+      if (!p.point.ready() || !p.wire.ready()) return plain;
+      for (const prog of [p.point, p.wire]) { fieldsUnit(prog); figuresBlock(prog); }   // (their first use: throws if a build failed)
+      p.done = true;
     }
-    return p.done;
+    return p;
   } catch (err) {
     withEggs.delete(type);
     // (A context that goes fails every build: no fault of the egg's. It is built again if the context stays.)
@@ -142,15 +139,6 @@ function eggProgs(type) {
     return plain;
   }
 }
-const downProg = program(QUAD_VS, DOWN_FS);
-const blurProg = program(QUAD_VS, BLUR_FS);
-const compProg = program(QUAD_VS, COMPOSITE_FS);
-const MAX_POINT = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1]; // the largest sprite this GPU draws
-// The baked forms' fields (see fields.js), on a texture unit of their own (0 .. 4: the composite's).
-const FIELD_UNIT = 5;
-const fields = createFields(gl, FIELD_UNIT);
-const fieldsUnit = (prog) => { gl.useProgram(prog.p); gl.uniform1i(prog.u.uFields, FIELD_UNIT); };
-for (const prog of [plain.point, plain.wire]) fieldsUnit(prog);
 
 const lattice = createLattice(gl);
 let count = 0, GRID = 0, ROWS = 0, wireCount = 0, light = null;
@@ -159,6 +147,20 @@ function buildLattice() {
   light = latticeLight(GRID, ROWS, SPAN, HEIGHT);
 }
 buildLattice();
+// The figures' tables (shaders.js: FIGURES), one uniform block for every program of the LEDs.
+const figureBuffer = gl.createBuffer();
+gl.bindBuffer(gl.UNIFORM_BUFFER, figureBuffer);
+gl.bufferData(gl.UNIFORM_BUFFER, FIGURES, gl.STATIC_DRAW);
+gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, figureBuffer);
+const figuresBlock = (prog) => gl.uniformBlockBinding(prog.p, gl.getUniformBlockIndex(prog.p, 'Figures'), 0);
+const MAX_POINT = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1]; // the largest sprite this GPU draws
+// The baked forms' fields (see fields.js), on a texture unit of their own (0 .. 4: the composite's).
+const FIELD_UNIT = 5;
+const fields = createFields(gl, FIELD_UNIT);
+const fieldsUnit = (prog) => { gl.useProgram(prog.p); gl.uniform1i(prog.u.uFields, FIELD_UNIT); };
+// Every program built at load is checked here, before the first frame: a failed build shows at once.
+for (const prog of [plain.point, plain.wire]) { fieldsUnit(prog); figuresBlock(prog); }
+for (const prog of [downProg, blurProg, compProg]) void prog.u;
 const pointVao = lattice.pointVao;
 const emptyVao = gl.createVertexArray();
 

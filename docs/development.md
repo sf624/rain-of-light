@@ -21,7 +21,7 @@ reload.
 
 | File | What |
 | --- | --- |
-| `index.html`, `style.css` | the viewer page, with a small settings panel |
+| `index.html`, `style.css` | the viewer page, with a small settings panel; it lists every module in `modulepreload` hints |
 | `lab.html` | the lab: the same page, with every setting in its panel (`data-page="lab"`); opened by its address, the viewer page does not link to it |
 | `boot.js` | shows any error on the page, and registers the service worker |
 | `main.js` | the frame loop: puts the directors' choices to work, the camera, the drawing |
@@ -100,7 +100,8 @@ get none: their code would run on the site's origin.
 
 `node test/site.mjs [ROOT_COMMIT [N=COMMIT ...]]` (default: `HEAD 1=HEAD`)
 builds the site from those commits, checks the tree (the files, the
-links, `version.json`), and opens it under `/rain-of-light/` in headless
+links, `version.json`, each page's `modulepreload` hints against the
+modules it imports, and that `sw.js` precaches every module), and opens it under `/rain-of-light/` in headless
 Chrome: the root's service worker installs, and each preview loads with no
 error, loads only its own files, registers no service worker and is not
 cached. It reads commits, not the working tree: commit first. Keep `TMPDIR`
@@ -388,8 +389,9 @@ of `POINT_VS` (`eggAt`, added to the forms' light).
   programs without the eggs' code (`POINT_VS` holds it behind `#ifdef
   EGGS`, and each egg's function behind `EGG_<type>`). The first time an
   egg shows, the page builds programs with its function only
-  (`eggShader`), without waiting for them (`gl.js: programLater`; the plain
-  programs draw until they are done), and draws with them while it shows.
+  (`eggShader`), without waiting for them (`gl.js: program`, used once
+  `ready()`; the plain programs draw until then), and draws with them while
+  it shows.
   Each egg skips the LEDs far from it first (the penrose's reach; the glyph
   panel's slab; a shell's sphere).
 - **Where a figure stands** (`egg-kinds.js: facing`, the penrose and the
@@ -518,7 +520,9 @@ credits.
 `sw.js` fetches from the network first and keeps a copy of each answer. When
 the network fails, it answers from that copy. It precaches a list of files
 on install, so that one visit is enough to work offline: add a new module or
-asset to that list. The docs and the GIFs are not on it; the page does not
+asset to that list. A new module also needs its
+`<link rel="modulepreload">` in `index.html` and `lab.html` (see Start-up in
+[design.md](design.md)); `test/site.mjs` checks both lists. The docs and the GIFs are not on it; the page does not
 load them. Nor are the baked forms' fields (`fields/*.bin`): each is fetched
 only when its form is about to show, and kept from then on like every file
 fetched. It leaves the previews of pull requests (`pr/`) to the network

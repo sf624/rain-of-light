@@ -22,6 +22,30 @@
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="style.css">
+  <!-- Every module main.js imports, directly or not, so that all load at once
+       instead of one level of imports after another (test/site.mjs checks the list). -->
+  <link rel="modulepreload" href="audio.js">
+  <link rel="modulepreload" href="clock.js">
+  <link rel="modulepreload" href="config.js">
+  <link rel="modulepreload" href="controls.js">
+  <link rel="modulepreload" href="direction.js">
+  <link rel="modulepreload" href="director.js">
+  <link rel="modulepreload" href="egg-kinds.js">
+  <link rel="modulepreload" href="egg-shaders.js">
+  <link rel="modulepreload" href="eggs.js">
+  <link rel="modulepreload" href="fields.js">
+  <link rel="modulepreload" href="figures.js">
+  <link rel="modulepreload" href="forms.js">
+  <link rel="modulepreload" href="gl.js">
+  <link rel="modulepreload" href="hud.js">
+  <link rel="modulepreload" href="keys.js">
+  <link rel="modulepreload" href="lattice.js">
+  <link rel="modulepreload" href="rotate.js">
+  <link rel="modulepreload" href="shaders.js">
+  <link rel="modulepreload" href="show.js">
+  <link rel="modulepreload" href="sway.js">
+  <link rel="modulepreload" href="tuner.js">
+  <link rel="modulepreload" href="wakelock.js">
 </head>
 <body>
   <canvas id="stage" role="img" aria-label="Points of light falling like rain"></canvas>

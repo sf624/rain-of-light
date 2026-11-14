@@ -1104,6 +1104,40 @@ never shows spare capacity. So:
 Quality `full` keeps the full scale. The largest LED size in pixels
 (`uMaxPx`) shrinks with the scale.
 
+### Start-up
+
+What the first frame waits for, in order: the modules, the GPU's build of
+the programs, and the first draws (where the driver finishes its work on
+the programs). So:
+
+- **The modules come at once.** `index.html` and `lab.html` name every
+  module `main.js` imports, directly or not, in `<link rel="modulepreload">`
+  hints. Without them the browser learns of a module only when the one that
+  imports it has come: three round trips after the page's (`main.js`, then
+  its imports, then theirs) before the last one is asked for. There is no
+  build step, so the list is kept by hand; `test/site.mjs` checks it against
+  the imports.
+- **The programs build while the lattice is filled.** `gl.js: program`
+  sends a program's compile and link and reads the outcome only at its
+  first use (its uniforms, `u`), so the lattice is made in JavaScript while
+  the GPU builds the programs (its buffers' uploads still wait behind those
+  builds). `main.js` reads every program built at load once the lattice is
+  made, before the first frame: a build that failed throws then, with the
+  shader's log.
+- **A program built while the show runs waits for nothing.** An easter
+  egg's programs are built the first time the egg shows, by the same
+  `program`; `ready()` asks the GPU, without waiting, whether the build is
+  done (`KHR_parallel_shader_compile`; without it, one frame later), and
+  the plain programs draw until it is. Their first use, and so any error,
+  comes then.
+- **A shader shared by two programs compiles once.** The LEDs and the wires
+  share `POINT_VS`, the largest shader by far, and every program of the
+  LEDs (an egg's too) shares their fragment shaders; `gl.js` keeps one
+  shader object per source for the life of the context, so a program built
+  later attaches the same one. A shader whose compile failed leaves the
+  cache. A lost context takes them all with it, and the page loads afresh
+  when the context comes back.
+
 ### Errors and a lost context
 
 A classic script that runs before the module (`boot.js: showError`) shows
@@ -1158,7 +1192,7 @@ GitHub link shows.
 | `controls.js` | The sound button, the volume bar, the full-screen button. |
 | `rotate.js` | Landscape or portrait on demand; `view` maps pointer positions. |
 | `wakelock.js` | Keeps the screen awake. |
-| `gl.js` | Shader and target helpers, vector math, `perspective`, `lookAt`. |
+| `gl.js` | Program and target helpers (a program's build is checked at its first use), vector math, `perspective`, `lookAt`. |
 | `sw.js` | The service worker: network first, cache as fallback. |
 | `manifest.webmanifest` | The installable app's name, icons and display. |
 
