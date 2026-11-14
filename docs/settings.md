@@ -200,7 +200,7 @@ things that are not in the panel:
 | --- | --- | --- | --- | --- |
 | **Rain** | `rain` | `auto`, `on`, `off` | `auto` | `auto`: rain comes and goes with the show. `on`: rain always falls, and never ends. `off`: no rain; the forms of light have the room, on a timeline of their own. A change eases the rain in or out over a few seconds. |
 | **Form** | `form` | `auto`, `orb`, `spiral`, `ring`, `veil`, `solid`, `knot`, `planet`, `none` | `auto` | `auto`: forms of light come and go with the show. A name holds that form for good. `none`: no form. A change fades the form that shows out over 4 s; the next fades in once it has gone. |
-| Which solid | `solid` | `auto`, `tetrahedron`, `cube`, `star` | `auto` | `auto`: each time the solid comes, another of its figures (see [Forms](#forms)). A name: always that one. |
+| Which solid | `solid` | `auto`, `tetrahedron`, `cube` | `auto` | `auto`: each time the solid comes, another of its figures (see [Forms](#forms)). A name: always that one. |
 | Which knot | `knot` | `auto`, `lissajous`, `hopf`, `mobius` | `auto` | As for the solid. |
 | Which planet | `planet` | `auto`, `saturn`, `uranus` | `auto` | As for the solid. |
 | Layer of light | `layer` | `auto`, `on`, `off` | `auto` | `auto`: the layer comes and goes with the show (about 70% of the time). `on` holds it, `off` removes it. |
@@ -301,9 +301,7 @@ life: never the figure it was the time before, and over an hour each
 figure about as often as the others.
 
 - **solid**: the edges of a solid as rods of light, with a bright point at
-  each corner: a tetrahedron (`tetrahedron`), a cube (`cube`), or a star
-  of two tetrahedra through each other, one point up and one point down
-  (`star`). Its corners come first, as bright points; the edges are drawn
+  each corner: a tetrahedron (`tetrahedron`) or a cube (`cube`). Its corners come first, as bright points; the edges are drawn
   out from them until they meet. It stands on a corner, leans a little and turns slowly about its upright
   axis, and goes as the edges draw back.
 - **knot**: closed lines of light, with two lights running round each:
@@ -316,10 +314,10 @@ figure about as often as the others.
   which line passes in front where two cross. A knot is drawn once round
   as it comes (a link: all its rings at once), and undone as it goes.
 
-![The figures of the two forms of mathematics: the solid's tetrahedron, cube and star; the knot's Lissajous figure, Hopf link and Möbius band](img/figures.jpg)
+![The figures of the two forms of mathematics: the solid's tetrahedron and cube; the knot's Lissajous figure, Hopf link and Möbius band](img/figures.jpg)
 
 Query: `rain=off&layer=off&t=40` with `form=solid&solid=tetrahedron`,
-`solid=cube`, `solid=star`; `form=knot&knot=lissajous`, `knot=hopf`,
+`solid=cube`; `form=knot&knot=lissajous`, `knot=hopf`,
 `knot=mobius`.
 
 One form is a planet with rings, as often as the solid or the knot. Each
@@ -552,7 +550,7 @@ Query: `rain=on&form=none&layer=off&flow=down&t=30&color=mono&palette=aurora` wi
 
 ### Exposure
 
-![A star of white lines (the solid) over the layer, darker, as by default, and brighter](img/exposure.jpg)
+![A tetrahedron of white lines (the solid) over the layer, darker, as by default, and brighter](img/exposure.jpg)
 
 Query: `t=110` (a veil passage of the whole show) with `exposure=0.8`,
 `exposure=2.2`, `exposure=3.5`.
@@ -752,7 +750,7 @@ stands in the upper middle with its image in the floor below.
 
 ### Moves
 
-![The same moment from each camera move: orbit sees a star of white lines (the solid) over the layer; walk and spin look elsewhere in the room; gaze tilts; rise looks from lower down](img/camera.jpg)
+![The same moment from each camera move: orbit sees a tetrahedron of white lines (the solid) over the layer; walk and spin look elsewhere in the room; gaze tilts; rise looks from lower down](img/camera.jpg)
 
 Query: `t=110` with `camera=orbit`, `camera=walk`, `camera=spin`,
 `camera=gaze`, `camera=rise`. A still shows where each move has the eye at

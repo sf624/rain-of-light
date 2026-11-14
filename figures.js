@@ -29,8 +29,8 @@ function standing(points, axis) {
 
 // A solid from its corners: centred on `centre` (default: their middle),
 // scaled so that the farthest corner is 1 away, its edges the pairs of
-// corners `apart` away (default: the nearest pairs).
-function solidOf(name, { corners, axis, centre, apart, size }) {
+// nearest corners.
+function solidOf(name, { corners, axis, centre, size }) {
   const mid = centre || corners[0].map((_, i) => corners.reduce((s, p) => s + p[i], 0) / corners.length);
   let pts = corners.map((p) => sub(p, mid));
   const far = Math.max(...pts.map(len));
@@ -38,7 +38,7 @@ function solidOf(name, { corners, axis, centre, apart, size }) {
   if (axis) pts = standing(pts, axis);
   const gaps = [];
   for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) gaps.push([i, j, len(sub(pts[i], pts[j]))]);
-  const want = apart === undefined ? Math.min(...gaps.map((g) => g[2])) : apart / far;
+  const want = Math.min(...gaps.map((g) => g[2]));
   const edges = gaps.filter((g) => Math.abs(g[2] - want) < 1e-3).map(([i, j]) => [i, j]);
   // The nearest any edge comes to the centre: within it no LED is near an edge.
   const near = Math.min(...edges.map(([i, j]) => {
@@ -62,9 +62,6 @@ export const SOLIDS = [
     centre: [0, 0, 0], size: 4.2 }),
   // A cube on a corner.
   solidOf('cube', { corners: cube, axis: [1, 1, 1], size: 3.3 }),
-  // Two tetrahedra through each other (stella octangula), one point up, one
-  // down: the diagonals of a cube's faces.
-  solidOf('star', { corners: cube, axis: [1, 1, 1], apart: 2 * Math.SQRT2, size: 3.3 }),
 ];
 
 // The knots and links: closed curves, each part once round as t goes from 0
