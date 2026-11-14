@@ -1,64 +1,70 @@
 // GL helpers (made for one context) and the vector math (column-major 4x4).
 
 export function createGL(gl) {
-  function compile(type, src) {
-    const s = gl.createShader(type);
-    gl.shaderSource(s, src);
-    gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-      throw new Error(gl.getShaderInfoLog(s) + '\n' + src);
-    }
-    return s;
-  }
-
-  function program(vs, fs) {
-    const p = gl.createProgram();
-    gl.attachShader(p, compile(gl.VERTEX_SHADER, vs));
-    gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs));
-    gl.linkProgram(p);
-    return finish(p);
-  }
-
-  // A program built without waiting for it (KHR_parallel_shader_compile, where the GPU has it): the
-  // function returned gives null until it is done, then the program (or throws, as program does;
-  // an error with `lost` set when the context went while it was built: no fault of the program's).
-  // (A context may be lost at any time: a browser on WSL loses it once as it starts, a GPU resets.)
-  const parallel = gl.getExtension('KHR_parallel_shader_compile');
-  function programLater(vs, fs) {
-    const p = gl.createProgram(), sh = [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]].map(([type, src]) => {
-      const s = gl.createShader(type);
+  // One shader object per source, kept for the life of the context: programs that share a shader
+  // (the LEDs' and the wires' vertex shader, the fragment shaders of every program of the LEDs)
+  // compile it once, whenever each is built. A shader whose compile failed leaves the cache, so a
+  // program built again compiles it again.
+  const shaders = new Map();   // `${type}\n${src}` -> shader
+  function shader(type, src) {
+    const key = `${type}\n${src}`;
+    let s = shaders.get(key);
+    if (!s) {
+      s = gl.createShader(type);
       gl.shaderSource(s, src);
       gl.compileShader(s);
-      gl.attachShader(p, s);
-      return { s, src };
-    });
+      shaders.set(key, s);
+    }
+    return { s, src, key };
+  }
+
+  // A program: its compile and link are sent at once, and its outcome is read only at its first use
+  // (`u`, its uniforms), so that the page does other work while the GPU builds it. A build that
+  // failed throws at that first use, with the shader's log; the error has `lost` set when the
+  // context went while the program was built (no fault of the program's).
+  // `ready()` says, without waiting, whether that first use would wait for the GPU
+  // (KHR_parallel_shader_compile, where the GPU has it; without it, the first answer waits a frame:
+  // the driver may build it meanwhile). A program built while the show runs is used once it is ready.
+  // (A context may be lost at any time: a browser on WSL loses it once as it starts, a GPU resets.)
+  const parallel = gl.getExtension('KHR_parallel_shader_compile');
+  function program(vs, fs) {
+    const p = gl.createProgram();
+    const sh = [shader(gl.VERTEX_SHADER, vs), shader(gl.FRAGMENT_SHADER, fs)];
+    for (const { s } of sh) gl.attachShader(p, s);
     gl.linkProgram(p);
-    let done = null, asked = false;
-    return () => {
-      if (done) return done;
-      if (gl.isContextLost()) return null;
-      // (Without the extension, the first answer waits a frame: the driver may build it meanwhile.)
-      if (parallel ? !gl.getProgramParameter(p, parallel.COMPLETION_STATUS_KHR) : !asked) { asked = true; return null; }
-      for (const { s, src } of sh) {
-        if (gl.getShaderParameter(s, gl.COMPILE_STATUS)) continue;
-        const log = gl.getShaderInfoLog(s);
-        // (A failed build with no log: the context is going, and will be lost.)
-        throw Object.assign(new Error(log ? `${log}\n${src}` : 'the context went while the program was built'), { lost: !log });
-      }
-      if (!gl.getProgramParameter(p, gl.LINK_STATUS) && !gl.getProgramInfoLog(p)) throw Object.assign(new Error('the context went while the program was linked'), { lost: true });
-      return (done = finish(p));
+    let u = null, asked = false;
+    return {
+      p,
+      get u() { return u || (u = finish(p, sh)); },
+      ready() {
+        if (u) return true;
+        if (gl.isContextLost()) return false;
+        if (parallel ? gl.getProgramParameter(p, parallel.COMPLETION_STATUS_KHR) : asked) return true;
+        asked = true;
+        return false;
+      },
     };
   }
 
-  function finish(p) {
-    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  function finish(p, sh) {
+    for (const { s, src, key } of sh) {
+      if (gl.getShaderParameter(s, gl.COMPILE_STATUS)) continue;
+      const log = gl.getShaderInfoLog(s);
+      if (shaders.get(key) === s) shaders.delete(key);
+      // (A failed build with no log: the context is going, and will be lost.)
+      throw Object.assign(new Error(log ? `${log}\n${src}` : 'the context went while the program was built'), { lost: !log });
+    }
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+      const log = gl.getProgramInfoLog(p);
+      throw Object.assign(new Error(log || 'the context went while the program was linked'), { lost: !log });
+    }
     const u = {};
     const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
     for (let i = 0; i < n; i++) {
       const name = gl.getActiveUniform(p, i).name.replace(/\[0\]$/, '');
       u[name] = gl.getUniformLocation(p, name);
     }
-    return { p, u };
+    return u;
   }
 
   // A half-float render target; with `second`, a second colour attachment (tex2) beside the first.
@@ -89,7 +95,7 @@ export function createGL(gl) {
     gl.deleteFramebuffer(t.fb);
   }
 
-  return { compile, program, programLater, target, freeTarget };
+  return { program, target, freeTarget };
 }
 
 // ---------- vector math (column-major 4x4) ----------

@@ -73,6 +73,21 @@ const previews = prArgs.map((a) => ({ n: a.split('=')[0], sha: git('rev-parse', 
 const rootSha = git('rev-parse', `${rootRef}^{commit}`);
 
 // 2. The tree.
+// What a module imports: `from '…'` and `import '…'`, and with `dynamic`, `import('…')` too.
+const importsOf = (text, dynamic) => [...text.matchAll(/(?:\bfrom|\bimport)\s*['"]([^'"]+)['"]/g),
+  ...(dynamic ? text.matchAll(/\bimport\s*\(\s*['"]([^'"]+)['"]/g) : [])].map((m) => m[1]);
+// Each page's module (`<script type="module" src>`) and every module it imports
+// statically, directly or not: the page must load them all at once.
+function moduleGraph(dir, page) {
+  const html = fs.readFileSync(path.join(site, dir, page), 'utf8');
+  const graph = new Set([...html.matchAll(/<script\b[^>]*\btype="module"[^>]*\bsrc="([^"]+)"/g)].map((m) => m[1]));
+  for (const f of graph) {
+    for (const r of importsOf(fs.readFileSync(path.join(site, dir, f), 'utf8'), false)) {
+      graph.add(path.posix.normalize(path.posix.join(path.posix.dirname(f), r)));
+    }
+  }
+  return { html, graph };
+}
 function walk(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, e.name);
@@ -122,7 +137,7 @@ function checkCopy(dir, sha, pr) {
     if (f.endsWith('.html')) {
       for (const m of text.matchAll(/<(?:link|script|img|a)\b[^>]*?\s(?:href|src)="([^"]+)"/g)) refs.push(m[1]);
     } else if (f.endsWith('.js')) {
-      for (const m of text.matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*)['"]([^'"]+)['"]/g)) refs.push(m[1]);
+      refs.push(...importsOf(text, true));
     } else if (f.endsWith('.webmanifest')) {
       const man = JSON.parse(text);
       refs.push(man.start_url, man.scope, ...man.icons.map((i) => i.src));
@@ -140,6 +155,16 @@ function checkCopy(dir, sha, pr) {
       if (!files.includes(isDir ? path.posix.join(target, 'index.html') : target)) fail(`[${label}] ${f} links to ${r}: missing`);
     }
   }
+  // There is no build step: each page lists its modules by hand, in
+  // modulepreload hints, so that a module is not requested only once the one
+  // that imports it has come (one round trip per level of imports).
+  for (const page of files.filter((x) => /^[^/]+\.html$/.test(x))) {
+    const { html, graph } = moduleGraph(dir, page);
+    const hints = new Set([...html.matchAll(/<link\b[^>]*\brel="modulepreload"[^>]*\bhref="([^"]+)"/g)].map((m) => m[1]));
+    const entry = [...graph][0];
+    for (const f of graph) if (f !== entry && !hints.has(f)) fail(`[${label}] ${page} has no <link rel="modulepreload" href="${f}">`);
+    for (const f of hints) if (!graph.has(f)) fail(`[${label}] ${page} preloads ${f}, which ${entry || 'its module'} does not import`);
+  }
   console.log(`ok  tree ${label}: ${files.length} files, ${sha.slice(0, 7)}`);
 }
 checkCopy('', rootSha, null);
@@ -149,6 +174,10 @@ if (!core) fail('sw.js has no CORE list');
 for (const m of core[1].matchAll(/'([^']*)'/g)) {
   const f = m[1] === './' ? 'index.html' : m[1];
   if (!copyFiles('').includes(f)) fail(`sw.js precaches ${m[1]}, which is not in the site`);
+}
+// ... and every module a page loads is on it (else the page does not work offline).
+for (const page of ['index.html', 'lab.html']) {
+  for (const f of moduleGraph('', page).graph) if (!core[1].includes(`'${f}'`)) fail(`sw.js does not precache ${f} (a module of ${page})`);
 }
 for (const p of previews) checkCopy(`pr/${p.n}`, p.sha, p.n);
 const strays = new Set(all.filter((f) => f.startsWith('pr/')).map((f) => f.split('/')[1]));
