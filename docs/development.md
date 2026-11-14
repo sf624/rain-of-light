@@ -135,7 +135,7 @@ about 11 s to 3 s. It visits:
 - rain alone (`rain=on&form=none&layer=off`, in the lab) and no rain
   (`rain=off`), both with the click, keys and Reset; rain that never ends
   with a form through it (`rain=on&seed=1&t=60`); a time part-way through the show
-  (with and without the colour story), four of the forms held,
+  (with and without the colour story), five of the forms held,
   `?jitter=pitch`, two easter eggs pinned (penrose, and the teapot with its
   field; `form=teapot` falls back to `auto`), and the lab's clock (opened paused, it stands still;
   Space runs and stops it, also with the focus in the panel; the arrows seek

@@ -64,6 +64,8 @@ const EASE = 2.5;                             // s: a change of the Rain setting
 // follows the timeline's fades as they are (none is as steep), and a change
 // of setting fades a form in or out over BLEND seconds, down to 0 exactly.
 const BLEND = 4;
+// A black hole's shadow fades with the form's weight below this.
+const HOLE_FADE = 0.35;
 
 // The timelines: the whole show, and the show without rain (Rain off; Rain on
 // pins the rain of the whole show, see wanted).
@@ -152,9 +154,10 @@ function createTimeline(seed, pool, name, mood, baked) {
     // (A sky form's palette also tires, see TIRE; the layer's does not.)
     const x = hash(r * 53 + 2), m = leaning(true, hash(r * 53 + 4), mood, start);
     const sky = form !== LAYER;
-    const pick = palAt(names, x, m, sky ? tiredAt(start) : undefined);
-    if (sky) told.unshift({ start, hue: hueNamed(names[pick]) });
-    return { id: `${name}-${++n}`, form, r, start, pal: palAt(names, x), told: pick,
+    // (A form with colours of its own, see FORMS, has no palette to pick, and tells none.)
+    const pick = names.length ? palAt(names, x, m, sky ? tiredAt(start) : undefined) : 0;
+    if (sky && names.length) told.unshift({ start, hue: hueNamed(names[pick]) });
+    return { id: `${name}-${++n}`, form, r, start, pal: names.length ? palAt(names, x) : 0, told: pick,
       inAt, inFade: how.fade, outAt: Infinity, outFade: 1 };
   };
   const close = (e, T, how) => { if (e) { e.outAt = T + how.at; e.outFade = how.fade; } };
@@ -191,7 +194,7 @@ function createTimeline(seed, pool, name, mood, baked) {
         if (e && !e.form && kind.rain) { waiting = e; e = null; }   // (an egg with a light of its own waits for a passage without rain)
         if (e && e === waiting) waiting = null;
         // (as a form: a baked one, where there are fields; else the form comes)
-        egg = !e ? null : e.form ? (baked ? BAKED.find((f) => f.name === e.form) : null) : { name: e.name, egg: e, type: 0, palettes: form.palettes };
+        egg = !e ? null : e.form ? (baked ? BAKED.find((f) => f.name === e.form) : null) : { name: e.name, egg: e, type: 0, palettes: form.palettes, colors: form.colors };
         since = egg ? 0 : since + 1;
       }
       const as = egg || form;
@@ -332,18 +335,20 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
   const story = () => S.story === 'on';
   // An episode's palette, by name: one of its form's (the colour key moves on from it).
   const nameOf = (e, names, pal) => names[(pal + shift) % names.length];
-  const paletteOf = (e) => nameOf(e, e.form.palettes, story() ? e.told : e.pal);
+  const paletteOf = (e) => e.form.colors?.name ?? nameOf(e, e.form.palettes, story() ? e.told : e.pal);
   // The palette an episode shows in (above: the form's episode over a layer, if any).
   // The layer answers the form above it with a colour that sets it off:
   // with the story, of those the one nearer the mood as the form came.
   const shownIn = (e, above) => {
-    const under = e.form === LAYER && above && UNDER[paletteOf(above)];
+    const under = e.form === LAYER && above && (above.form.colors?.under ?? UNDER[paletteOf(above)]);
     if (!under) return paletteOf(e);
     if (!story()) return nameOf(e, under, e.pal);
     const m = leaning(true, hash(e.r * 31 + above.r * 29), mood, above.start);
     return nameOf(e, under, palAt(under, hash(e.r * 29 + above.r * 31), m));
   };
   const colorsOf = (e, above) => {
+    const own = e.form.colors;                // a form with colours of its own (see FORMS)
+    if (own) return [own.a, own.b, own.room];
     const name = shownIn(e, above);
     const of = paletteNamed;
     const p = of(name);
@@ -360,6 +365,10 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
   const C = new Float32Array(SLOTS * 3), D = new Float32Array(SLOTS * 3);
   const E = new Float32Array(SLOTS * 4), F = new Float32Array(SLOTS * 4);
   const tint = [...ROOM_TINT];
+  // A black hole's shadow (see forms.js: blackhole, and holeShade in shaders.js):
+  // its centre and radius, and how dark it is (0: none, and the shader skips it).
+  const HOLE = new Float32Array(4), JET = new Float32Array(3);   // (and the colour of its jets)
+  let holeDark = 0;
 
   // The layer's surface height and its band's half thickness: each layer has
   // its own. The forms rest on the top of its band as it is seen (ground, see
@@ -396,7 +405,9 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
         const turn = s.face === undefined ? 1 : 1 - Math.exp(-dt / 5);
         const d = goal - (s.face ?? goal);
         s.face = (s.face ?? goal) + (d - Math.round(d / (2 * Math.PI)) * 2 * Math.PI) * turn;
-        m = motion(form.name, age, w, go, r, s.face, ground, variantOf(e));
+        // (and how far the eye looks up at it, at once: a black hole shows its disc to the eye)
+        const [cx, cy, cz] = m.centre, rise = Math.atan2(cy - eye[1], Math.hypot(cx - eye[0], cz - eye[2]));
+        m = motion(form.name, age, w, go, r, s.face, ground, variantOf(e), rise);
       }
     }
     A.set([form.type, w, m.size, m.turn], k * 4);
@@ -410,6 +421,12 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
     // (also beside sideways rain, which falls from nowhere: down 0).
     E.set([sweep * down, out ? -1 : 1, m.yaw, m.dissolve], k * 4);
     F.set([...m.f, m.bound], k * 4);
+    // A form with a shadow: it darkens as the form's own move has it, and
+    // fades with the form's weight (a change of setting), never at once.
+    if (m.hole !== undefined) {
+      const dark = (m.dark ?? 1) * smooth(Math.min(1, w / HOLE_FADE));
+      if (dark > holeDark) { HOLE.set([...m.centre, m.hole]); JET.set(form.colors.jet); holeDark = dark; }
+    }
   }
 
   // view: the camera ({ eye }): the forms turn towards the eye.
@@ -460,6 +477,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
     for (const s of sky) if (s.slot !== undefined && !slots[s.slot]) slots[s.slot] = s;
     for (const s of sky) if (!slots.includes(s)) { s.slot = slots[0] ? 1 : 0; slots[s.slot] = s; }
     A.fill(0);
+    holeDark = 0;
     let sum = 0;
     const mixed = [0, 0, 0];
     const forms = [];
@@ -493,7 +511,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
     // layer: the layer of light, how much it shows and the top of its band as seen (topOf, the
     // height the forms rest on; for the eggs, see egg-kinds.js).
     const layer = slots[2] && slots[2].w > 0.001 ? { w: slots[2].w, top: topOf(slots[2].x.e.r) } : null;
-    return { rain: rainNow, storm: rainNow * skyNow, A, B, C, D, E, F, tint, forms, flow: want.flow, egg: eggNow, layer };
+    return { rain: rainNow, storm: rainNow * skyNow, A, B, C, D, E, F, tint, forms, flow: want.flow, egg: eggNow, layer, hole: HOLE, holeJet: JET, holeDark };
   }
 
   // The colour key: every form, shown now or later, takes its next palette.

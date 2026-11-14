@@ -14,8 +14,8 @@ testing and capturing, see [development.md](development.md).
 You stand in a dark room full of hanging strands of tiny LEDs, over a floor
 of black glass. Light falls down the strands like rain. Now and then the rain
 stops, and a large form of light gathers among the same LEDs: an orb, a
-spiral, a ring or a veil, or one of two forms of mathematics (a
-solid, a knot). A low sea of light (the layer) glows near
+spiral, a ring or a veil, one of two forms of mathematics (a
+solid, a knot), or a black hole. A low sea of light (the layer) glows near
 the floor. The colours drift slowly together, and calm music follows what is
 shown. A click sends a wave of light through the room and rings a bell.
 
@@ -463,7 +463,7 @@ look that no strand shows.
 
 ### Forms of light
 
-![The six forms alone: orb, spiral, ring, veil, solid and knot](img/forms.jpg)
+![The seven forms alone: orb, spiral, ring, veil, solid, knot and black hole](img/forms.jpg)
 
 `shaders.js: formsAt` adds the light of up to three forms: two sky forms
 (the one that shows, and the next, which waits until it has gone) and the layer. For each it calls a function that
@@ -512,6 +512,67 @@ the form's first colour to its second:
     faint sheet, brighter along 12 of its straight lines (`MOBIUS_RULINGS`).
   None of them costs more for a longer curve. A knot also stops early
   outside its own box (its reach, `figures.js: KNOTS`).
+- `holeLight`: a black hole as the well-known pictures show one: a thin
+  disc of orange light seen from a little above its plane, its near side
+  crossing in front of the dark heart; the disc's far side lifted over the
+  heart and, thinner, under it, as gravity bends its light (the lens); a
+  thin photon ring at the heart's edge; and two jets along the disc's axis.
+  - The disc shows itself to the eye. Its axis leans towards the eye
+    (`forms.js: blackhole`, the form's tilt) by how far the eye looks up
+    at it (`rise`, from `show.js`) and by its opening, which sways slowly
+    between 4.5 and 8 degrees. So from any side, from low or high, the eye
+    sees the disc as a wide flat ellipse from a little above, and its near
+    side crosses the heart a little below the middle. (A disc fixed in the
+    room would be seen from below by the eye, which stands lower than the
+    form, and edge-on from some heights.) The axis turns with the eye at
+    once (from `uEye` in the shader), not as `face` eases.
+  - The disc is a sheet across the strands, about one LED of each thick
+    (0.6 of the LEDs' spacing along a strand each side, at most 0.3:
+    `HOLE_SHEET`): a level sheet crosses every strand under it, so even a
+    sparse lattice draws it as a field of points; a thicker one showed
+    each strand as a short column.
+  - Its matter turns about the heart and falls into it: inward at a steady
+    pace in log radius (`HOLE_FALL`), and turning the faster the nearer it
+    is (`HOLE_SPIN` at the inner rim, as r^-1.5 farther out). Each piece
+    then follows a fixed spiral path: its angle less the turn it still has
+    to make on its way in (`path`). What moves with the matter keeps its
+    path and the time it reaches the rim (`rim`), so the disc is drawn in
+    those two numbers (`holeMatter`): streaks, arms along the paths broken
+    into strokes, and now and then a knot, a lump at one path and one
+    time. They run in with the matter. Its light and heat rise towards the
+    inner rim (deep orange-red, orange, pale yellow, near white at the
+    rim). The side that comes towards the eye (the left) is brighter, as
+    light beamed by matter moving towards the eye is. Thin wisps trail off
+    the outer edge.
+  - The lens is drawn, not computed: the LEDs stay where they are. It is
+    an image that faces the eye, thick along the line of sight
+    (`HOLE_DEEP`, 1.6 units each side), so that LEDs at many depths draw
+    it as a continuous arc. Each ring of the disc's far side shows as an
+    arch over the heart: the inner rim's hugs the heart (`HOLE_ARC`), the
+    outer edge's is wide and joins the disc at its two ends. The matter on
+    the arch is the disc's own, at the same radius and angle, so its
+    streaks run over the top with it; it fades towards the outer edge, so
+    the arch is brightest near the heart. Under the heart a thinner,
+    dimmer arch shows the disc's inner rim again (`HOLE_UNDER`). An LED
+    finds its arch by bisection (6 steps).
+  - The photon ring, a thin bright ring, hugs the edge of the shadow as
+    the eye sees it.
+  - The jets (`HOLE_JET`): two narrow beams of pale blue-white along the
+    axis, from just outside the heart, widening slowly (at least an LED
+    gap wide, so a sparse lattice still draws them) and fading with
+    distance, with knots that run outwards (one every 3 units, 2.2 units a
+    second). The upper one fades over 2.2 units and is gone by 7 units;
+    in a wide view it still shows faintly where the picture ends above
+    it. The lower one fades over 1.1 units and is gone by 2 units,
+    before it reaches the layer of light, which the form rests on by it (see How high a form
+    floats). Seen from the side they are near vertical, so each lights a
+    few strands along their length.
+  - Its rays: only its hottest light casts them, and none that would run
+    across the heart (`HoleRay`). Its wires take a small share of its
+    light (a disc is not its strands).
+  - Its reach counts its jets: an LED is near it within its disc's sphere,
+    or within 1.2 units of its axis along the jets (`holeFar`); the rain
+    gives way by the same measure.
 - `layerLight`: the layer of light, a sea near the floor in slow waves, its
   points glinting.
 - `bakedLight`: a baked form (see Baked forms below), a shape's skin.
@@ -554,12 +615,40 @@ it. Each comes and goes where it floats, in a way of its own
 the ring turns its face to the room out of a line and back into one, the
 veil unrolls from one end and lifts away upward, the solid's edges are
 drawn out from its corners and back, and the knot
-is drawn once round and undone (a link: all its rings at once). The orb has no move of its own: it grows from 0.75 of its size as
+is drawn once round and undone (a link: all its rings at once). The black
+hole gathers as a wide, faint spiral of matter that winds in until the
+disc has formed, while its heart goes dark, and then its jets grow out of
+it; it goes: the jets first, then the disc drains into the heart, the ring
+at the heart's edge shrinks to a point and goes out, and the darkness
+closes last. The orb has no move of its own: it grows from 0.75 of its size as
 its weight rises, and shrinks back as it falls (`forms.js: GROW`, `FADING`).
 
 **Colour.** The light is the form's first colour mixed towards its second,
 then towards `WHITE_HOT` by the white-hot share. Sky forms give 1.25 times
-their own light (`FORM_BODY`).
+their own light (`FORM_BODY`). Most forms take the two colours from a
+palette (see the colour story); the black hole has colours of its own
+(`config.js: FORMS`, `colors`): deep orange-red and pale yellow, its jets
+pale blue-white (`uHoleJet`), the room a deep navy while it shows, and the
+layer's palettes under it.
+
+**A black hole's shadow.** Light here only adds, so the black hole's
+heart is dark by absence: every LED whose line of sight from the eye
+passes through the hole's sphere gives no light, whatever it shows (rest,
+twinkle, drops, rain, the layer, the waves, the hole's own disc behind
+it), and its wire neither (`shaders.js: holeShade`, `hideBy`). It is one
+test of a ray against a sphere per LED, behind a uniform that is 0 when
+no black hole shows (`uHoleDark`; `uHole`: the centre and radius, from
+`show.js`). The edge is soft over about 0.6 of an LED gap at the hole's
+distance, so it is crisp and round. An image in the floor or a wall is
+tested against the hole itself and against the hole's image there, where
+its line of sight runs on past the mirror. LEDs in front of the hole
+still shine: the strands hang in front of it, and so does the near side
+of the hole's own disc, which crosses in front of the heart. The disc's
+lean, the lens and the photon ring are placed for the eye itself, so the
+floor shows them as a mirror does: the disc from below, the arch over the
+heart under it, and the ring a little off the shadow's edge. (A corner
+image, seen through two wall mirrors, is not tested against the hole's
+image in the mirror between.)
 
 **The layer** gives way where a sky form already lights the LED, so the two
 never add up to a white flare. It is dark within 4.5 units of the eye and
@@ -705,10 +794,10 @@ another, from hashes of the seed and the passage's number:
   gathers on it or runs off it.
 - Otherwise the new form is never one of the last two. Each of the others
   is as likely as its weight (`config.js: FORMS`: 1 for the orb, spiral,
-  ring and veil, 0.4 for the solid and knot)
+  ring and veil, 0.4 for the solid, the knot and the black hole)
   times the square of how many forms have come since it last did. Over an
-  hour a form comes about 36 times: each of the first four about 6.5 times, the
-  solid and the knot about 5 times (`tools/story-stats.mjs`).
+  hour a form comes about 36 times: each of the first four about 6 times, the
+  solid, the knot and the black hole about 4.3 times (`tools/story-stats.mjs`).
 - A form with figures (the solid, the knot) is each time one of them for
   its whole life (`show.js: figureOf`). They come in
   rounds: each round has every figure once, in an order shuffled from the
@@ -776,7 +865,7 @@ Where a form is comes from `forms.js: motion`, as a function of its age, of
 its weight (the orb's size, see `GROW`) and of how far it has gone on its
 way out. Each form has a life of its own
 (`forms.js: orb`, `spiral`, `ring`, `veil`, `solid`,
-`knot`). For example, the orb drifts and breathes; the ring tumbles like a
+`knot`, `blackhole`). For example, the orb drifts and breathes; the ring tumbles like a
 coin turning in the air, about a slanting diameter, once round in 80 s
 (`TURN`), so it shows its face and then its edge, a slanting line. Edge-on,
 its light is piled up along the line of sight, and it gives half as much
@@ -813,7 +902,17 @@ lowest point in their pose (`lowestSpun`, from the points round their rings
 or along the band's edge), so they rise and fall a little as they spin. The thin forms add the half thickness
 of their line (`ROD`, `THREAD`) or of a corner's point (`CORNER`). The
 veil, which is no rigid shape, states its own depth: its hem's lowest fold
-and the glow below it; a baked form, its base and its skin (the teapot, an
+and the glow below it; the black hole, the lowest of its disc's edge at
+its lean, where its light shows clearly (`BH_RIM`), the arch under its
+heart, and its lower jet where it still shows clearly (`BH.down`; it
+fades out below that before the band). With the usual lean the disc's
+near edge and the lower jet are about as low. The near edge leans towards
+the eye, so it touches the band's height nearer the eye than the heart
+is, and the eye, which stands lower, sees it a little over the band. The
+jet counts before the jets have grown and after they have gone, so the
+form stays where it is as they come and go. As the disc gathers from
+wide, its edge is lower, and the form rests a little higher (about 0.3
+units, settling over 20 s); as it drains, it stays where it is; a baked form, its base and its skin (the teapot, an
 easter egg held in the form slot, is drawn as a form and rests the same way).
 The clock, which faces the eye, keeps its lowest dots `CLEAR` over the same
 top of the band (`show.js: topOf`, see `egg-kinds.js: panel`). How far each
@@ -955,6 +1054,9 @@ The layers:
   weight, panned to where it is seen (`mixVoices`): the orb a warm low hum,
   the spiral a slow figure of notes (scheduled in `tick`), the ring a glassy tone, the veil a soft air, the solid a chord
   of three pure fifths, the knot two tones that beat at different paces,
+  the black hole a low, slow drone (the chord's root and its fifth, each a
+  pair that beats very slowly, swelling late, and a faint high fifth
+  three octaves over that comes later still, as its jets grow),
   and a baked form the ring's glassy tone, softer, with the chord's third
   over it, on D. The voice is the form's, whichever figure it shows.
   The veil also gets a little high noise (`AIRY`).

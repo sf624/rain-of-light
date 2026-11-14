@@ -484,7 +484,7 @@ await visit(cdp, base, '?rain=on&seed=1&t=60', false);   // rain that never ends
 await visit(cdp, base, '?seed=7&t=100', false);
 await visit(cdp, base, '?seed=7&t=100&story=off', false);   // without the colour story
 // The forms added later, each held part-way through its life (it has come and turned).
-for (const f of ['ring', 'veil', 'solid', 'knot']) await visit(cdp, base, `?rain=off&form=${f}&seed=2&t=40`, false);
+for (const f of ['ring', 'veil', 'solid', 'knot', 'blackhole']) await visit(cdp, base, `?rain=off&form=${f}&seed=2&t=40`, false);
 // The other kinds of knot the shader draws (seed 2 holds the Moebius band): the Lissajous curve and a link of rings.
 for (const k of ['lissajous', 'hopf']) await visit(cdp, base, `?rain=off&form=knot&knot=${k}&seed=2&t=40`, false);
 // Names that are no option (a form, a figure) fall back to the defaults.

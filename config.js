@@ -91,6 +91,12 @@ export const FORMS = [
   { name: 'veil',      type: 4, weight: 1,   palettes: ['aurora', 'sakura', 'deep sea', 'amber'] },
   { name: 'solid',     type: 5, weight: 0.4, palettes: ['ice', 'amber', 'aurora', 'sakura'], variants: SOLIDS.map((x) => x.name) },
   { name: 'knot',      type: 6, weight: 0.4, palettes: ['aurora', 'amber', 'sakura', 'deep sea'], variants: KNOTS.map((x) => x.name) },
+  // A black hole has colours of its own (colors), no palette: its disc's
+  // deep orange-red and pale yellow (white-hot at its inner rim), its jets'
+  // pale blue-white (jet), the room's tint while it shows (room), and the
+  // layer's palettes under it (under).
+  { name: 'blackhole', type: 9, weight: 0.4, label: 'black hole', palettes: [],
+    colors: { name: 'accretion', a: [1.0, 0.36, 0.05], b: [1.0, 0.76, 0.34], jet: [0.62, 0.8, 1.0], room: [0.14, 0.2, 0.62], under: ['deep sea', 'aurora'] } },
 ];
 // The layer's surface lies height over the strands' feet, its bright band
 // thick around it (each a range: each time the layer has its own). The forms
@@ -164,6 +170,7 @@ export const SCHEMA = [
     { key: 'rain', label: 'Rain', options: ['auto', 'on', 'off'], viewer: 1,
       hint: 'auto: rain comes and goes with the show / on: rain always falls, and the forms come and go through it / off: no rain, the forms of light have the room' },
     { key: 'form', label: 'Form', options: ['auto', ...FORMS.map((f) => f.name), 'none'], viewer: 2,
+      labels: ['auto', ...FORMS.map((f) => f.label ?? f.name), 'none'],
       hint: 'auto: forms of light come and go with the show / or hold one form (none: no form)' },
     ...FORMS.filter((f) => f.variants).map((f) => ({ key: f.name, label: `Which ${f.name}`, options: ['auto', ...f.variants],
       hint: `auto: each time the ${f.name} comes, another of its figures / or always this one` })),
@@ -274,6 +281,6 @@ export const SCHEMA = [
     { key: 'chimes', label: 'Bells', min: 0, max: 1, step: 0.05, viewer: 7 },
     { key: 'rainSound', label: 'Rain', min: 0, max: 1, step: 0.05, viewer: 8 },
     { key: 'formSound', label: 'Forms', min: 0, max: 1, step: 0.05, viewer: 9,
-      hint: 'The voice each form of light brings: the orb a low hum, the spiral a turning figure, the ring a glassy tone, the veil a soft air, the solid a chord of pure fifths, the knot two beating tones' },
+      hint: 'The voice each form of light brings: the orb a low hum, the spiral a turning figure, the ring a glassy tone, the veil a soft air, the solid a chord of pure fifths, the knot two beating tones, the black hole a low, slow drone and, as its jets grow, a faint high tone' },
   ] },
 ];
