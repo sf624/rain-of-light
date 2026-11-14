@@ -357,11 +357,12 @@ lab and on the viewer page. Each is off by default and does one thing:
 | `filters=krate` | the pad's low-pass filters follow its brightness once per 128 samples (`automationRate`), not at every sample |
 | `fps=<n>` | draw at most n frames a second (`fps=60` on a 120 Hz screen draws every other frame); adaptive quality judges a frame against that rate |
 | `scale=<x>` | a fixed render scale (0 .. 1), with no adaptive step |
-| `guard=1` | sound first: a sign that the sound is at risk (an underrun or a high load where the browser tells, the clock slipping over 30 ms, a frame over 100 ms, a late sound timer) lowers the picture's load one level: 60 fps (a 120 Hz screen draws every other frame), then 30 fps, then a render scale of at most 0.7, then 0.5. 30 s without a sign raises it one level again (a wait that doubles if trouble comes back soon) |
+| `guard=1` | sound first: a sign that the sound is at risk (an underrun or a high load where the browser tells, the clock slipping over 30 ms, a frame over 100 ms, a late sound timer) lowers the picture's load one level: 60 fps (a 120 Hz screen draws every other frame), then 30 fps, then no wires in the floor's image, then a render scale of at most 0.7, then no floor image, then a scale of at most 0.5. 30 s without a sign raises it one level again (a wait that doubles if trouble comes back soon) |
 | `stall=<ms>[,<s>]` | a test: the main thread is busy for ms every s seconds (5) |
 
 Settings that help too: `dpr=<n>` (the largest device pixel ratio, 2 by
-default), `leds=<n>` (thousands of LEDs), `mirror=0`, `rays=off`.
+default), `leds=<n>` (thousands of LEDs), `wire=0` (no wires: each wire
+pass runs the whole LED shader again), `mirror=0`, `rays=off`.
 
 On a screen narrower than 700 px only the main lines show, and with the
 settings panel open the HUD steps aside.

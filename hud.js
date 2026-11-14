@@ -85,7 +85,7 @@ const ROWS = [
   ['events', 'events', 'perf', (s) => (s.perf.events.length ? s.perf.events.slice(-3).join('  |  ') : 'none')],
   ['guard', 'guard', 'perf', (s) => {
     const g = s.perf.guard;
-    return g ? `level ${g.level} (fps cap ${g.fps || 'none'}, scale cap ${g.scale})${g.why ? `  last: ${g.why}` : ''}` : 'off (?guard=1)';
+    return g ? `level ${g.level} (fps cap ${g.fps || 'none'}, scale cap ${g.scale}${g.mirrorWires ? '' : ', no wires in the floor'}${g.mirror ? '' : ', no floor image'})${g.why ? `  last: ${g.why}` : ''}` : 'off (?guard=1)';
   }],
 ];
 const PERF_ROWS = ['time', 'perf', 'show'];   // shown with ?hud=perf, besides the rows marked 'perf'

@@ -1059,13 +1059,14 @@ function frame(now) {
   // its light, near or far: the strands are fine threads, and nothing near
   // the eye stands dark in front of a form.
   const images = S.walls >= 1 ? 9 : 1;
-  const passes = S.mirror > 0 ? [0, S.mirror] : [0];
+  const passes = S.mirror > 0 && perf.mirror ? [0, S.mirror] : [0];   // (?guard=1 may leave the floor's image out)
   gl.bindVertexArray(pointVao);
   gl.disable(gl.DEPTH_TEST);
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.ONE, gl.ONE);
   for (const mirror of passes) {
     for (const prog of progs) {
+      if (mirror && prog === wireProg && !perf.mirrorWires) continue;   // (and its wires)
       gl.useProgram(prog.p);
       gl.uniform3f(prog.u.uMirror, FLOOR, mirror, MIRROR_FADE);
       // The rays are a glint in the eye, not light in the room: the images in

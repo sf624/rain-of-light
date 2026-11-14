@@ -190,13 +190,16 @@ function watchClock(t) {
 
 // ---------- sound first (?guard=1) ----------
 // Each level lowers the picture's load more: 1 draws at most 60 frames a
-// second (a 120 Hz screen draws every other frame), 2 at most 30, 3 also caps
-// the render scale at 0.7, 4 at 0.5. A sign of trouble
+// second (a 120 Hz screen draws every other frame), 2 at most 30, 3 also
+// leaves out the wires in the floor's image (each wire pass runs the whole
+// LED shader again), 4 also caps the render scale at 0.7, 5 leaves out the
+// floor's image, 6 caps the scale at 0.5. A sign of trouble
 // for the sound (an underrun or a high render load where the browser tells;
 // the sound's clock falling behind; long frames or a late sound timer) steps
 // one level down; GUARD_UP s without one steps one level back up, a wait
 // that doubles each time the sound is troubled again soon after.
-const GUARD_CAPS = [[0, 1], [60, 1], [30, 1], [30, 0.7], [30, 0.5]];  // [fps, largest scale]
+// [fps, largest scale, the floor image's wires, the floor image]
+const GUARD_CAPS = [[0, 1, 1, 1], [60, 1, 1, 1], [30, 1, 1, 1], [30, 1, 0, 1], [30, 0.7, 0, 1], [30, 0.7, 0, 0], [30, 0.5, 0, 0]];
 const GUARD_UP = 30, GUARD_MAX = 300, GUARD_GAP = 4, GUARD_FRAME = 100, GUARD_SLIP = 30;
 let level = 0, levelAt = 0, upWait = GUARD_UP, lastRaised = -1e9, why = '', checkedAt = 0, veryLong = 0;
 let seen = { underruns: 0, frames: 0, ticks: 0, slip: 0 };
@@ -248,6 +251,9 @@ export const perf = {
   // The render scale: fixed (?scale=), else the adaptive step's, capped by the guard.
   scale(step) { return PERF.scale || Math.min(step, GUARD_CAPS[level][1]); },
   get fixedScale() { return PERF.scale > 0; },
+  // Draw the floor's image, and its wires? (The guard may leave them out.)
+  get mirror() { return GUARD_CAPS[level][3] > 0; },
+  get mirrorWires() { return GUARD_CAPS[level][2] > 0; },
   begin(t, gl) {
     const gap = t - lastFrame;
     if (lastFrame && gap > LONG_MS && !document.hidden) {
@@ -278,7 +284,7 @@ export const perf = {
       voices: soundLog.voices ? soundLog.voices() : null,
       events,
       dpr: devicePixelRatio,
-      guard: PERF.guard ? { level, why, fps: GUARD_CAPS[level][0], scale: GUARD_CAPS[level][1] } : null,
+      guard: PERF.guard ? { level, why, fps: GUARD_CAPS[level][0], scale: GUARD_CAPS[level][1], mirrorWires: GUARD_CAPS[level][2], mirror: GUARD_CAPS[level][3] } : null,
       sound: audio ? {
         state: audio.state, rate: audio.sampleRate, base: audio.baseLatency, out: audio.outputLatency,
         hint: PERF.latency ?? 'default', now: nowEvents.read(t), minLead, tick: tickLate.read(t),
