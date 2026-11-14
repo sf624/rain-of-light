@@ -18,7 +18,7 @@
 // vertical, eased in show.js): some forms turn a face to the room, and some
 // keep beyond their path as the eye sees it (see BACK).
 
-import { BAKED, PLANETS } from './config.js';
+import { BAKED, BODIES } from './config.js';
 import { SOLIDS, KNOTS } from './figures.js';
 import { planetLow, planetReach, planetFrame, ringsOut } from './planets.js';
 
@@ -215,7 +215,7 @@ function baked(egg, age, w, leave, ph, face) {
   };
 }
 
-// A planet (one of PLANETS, its variant): it hovers and drifts like the orb,
+// A celestial body (one of BODIES, its variant), here a ringed planet: it hovers and drifts like the orb,
 // bobbing a little and turning about its axis. Its rings turn their face
 // to the eye (see planetLight in planets.js) and open and close a little,
 // slowly (between the variant's `open`), their ellipse leaning a little to
@@ -224,13 +224,13 @@ function baked(egg, age, w, leave, ph, face) {
 // behind it, its rings spreading out from the ball as it does, and goes
 // the same way back. It rests on its lowest light: the ball, or its rings'
 // lowest edge at their lean (see planetLow).
-// f[0]: the variant; f[1]: the phase angle (0 full .. pi new); f[2]: how far
+// f[0]: the body; f[1]: the phase angle (0 full .. pi new); f[2]: how far
 // out its rings show (radii). frame: its axis and its sun as the eye sees
 // it (planets.js: planetFrame), worked out where it shows (see motion).
 const CRESCENT = 2.7;                               // the phase angle as it begins to come and as it has gone
 const OPEN_TURN = 75;                               // s: its rings open and close once in this time
 function planet(age, w, leave, ph, face, go, variant = 0) {
-  const P = PLANETS[variant] || PLANETS[0], drift = 1.6;
+  const P = BODIES[variant] || BODIES[0], drift = 1.6;
   const wax = smooth(age / 22) * (1 - smooth(leave * 1.1));
   const low = planetLow(P), phase = CRESCENT + (P.phase - CRESCENT) * wax;
   const open = P.open[0] + (P.open[1] - P.open[0]) * (0.5 + 0.5 * Math.sin(TAU * age / OPEN_TURN + ph));
@@ -244,11 +244,11 @@ function planet(age, w, leave, ph, face, go, variant = 0) {
   };
 }
 
-export const MOTIONS = { orb, spiral, ring, veil, solid, knot, planet,
+export const MOTIONS = { orb, spiral, ring, veil, solid, knot, celestial: planet,
   ...Object.fromEntries(BAKED.map((egg) => [egg.name, (age, w, leave, ph, face) => baked(egg, age, w, leave, ph, face)])) };
 // How far beyond its own path each form keeps, as the eye sees it: the loose
 // and the wide ones read from a distance, and none flares right at the eye.
-const BACK = { orb: 2.5, spiral: 2.5, ring: 2.5, veil: 3, solid: 2.5, knot: 3.5, planet: 4.5, ...Object.fromEntries(BAKED.map((egg) => [egg.name, 3])) };
+const BACK = { orb: 2.5, spiral: 2.5, ring: 2.5, veil: 3, solid: 2.5, knot: 3.5, celestial: 4.5, ...Object.fromEntries(BAKED.map((egg) => [egg.name, 3])) };
 
 // How large the orb (and a baked form) is as it begins to come and as it has gone, of its full size.
 const GROW = 0.75;
@@ -266,8 +266,8 @@ export const FADING = new Set(['orb', ...BAKED.map((egg) => egg.name)]);
 // ground: the height the forms rest on, the top of the layer's band (see
 // show.js): at the lowest of its path (centre[1] 0), a form's lowest light
 // (low below its centre) just touches it.
-// v: which of its figures it is (the solid, the knot, see figures.js; the planet's variant).
-// eye: where the eye is, for a form that shows itself to it (the planet's frame).
+// v: which of its figures it is (the solid, the knot, see figures.js; the celestial body).
+// eye: where the eye is, for a form that shows itself to it (a planet's frame).
 export function motion(name, age, w, go, r, face, ground, v = 0, eye = null) {
   const leave = go ? smooth((age - go.at) / go.fade) : 0;
   const m = MOTIONS[name](age, w, leave, r * TAU, face, go, v);

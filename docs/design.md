@@ -15,7 +15,7 @@ You stand in a dark room full of hanging strands of tiny LEDs, over a floor
 of black glass. Light falls down the strands like rain. Now and then the rain
 stops, and a large form of light gathers among the same LEDs: an orb, a
 spiral, a ring or a veil, one of two forms of mathematics (a
-solid, a knot), or a ringed planet (Saturn, Uranus). A low sea of light (the layer) glows near
+solid, a knot), or a celestial body (the ringed planets Saturn, Uranus). A low sea of light (the layer) glows near
 the floor. The colours drift slowly together, and calm music follows what is
 shown. A click sends a wave of light through the room and rings a bell.
 
@@ -463,7 +463,7 @@ look that no strand shows.
 
 ### Forms of light
 
-![The seven forms alone: orb, spiral, ring, veil, solid, knot and planet](img/forms.jpg)
+![The seven forms alone: orb, spiral, ring, veil, solid, knot and celestial body](img/forms.jpg)
 
 `shaders.js: formsAt` adds the light of up to three forms: two sky forms
 (the one that shows, and the next, which waits until it has gone) and the layer. For each it calls a function that
@@ -515,8 +515,8 @@ the form's first colour to its second:
 - `layerLight`: the layer of light, a sea near the floor in slow waves, its
   points glinting.
 - `bakedLight`: a baked form (see Baked forms below), a shape's skin.
-- `planetLight` (in `planets.js`, see below): a planet, Saturn or Uranus,
-  with its rings.
+- `planetLight` (in `planets.js`, see below): a celestial body that is a
+  ringed planet, Saturn or Uranus.
 
 Each is a field: a function of the LED's position relative to the
 form's centre, size and turn. Where the form is moves in `forms.js` (see
@@ -561,16 +561,20 @@ its weight rises, and shrinks back as it falls (`forms.js: GROW`, `FADING`).
 
 **Colour.** The light is the form's first colour mixed towards its second,
 then towards `WHITE_HOT` by the white-hot share. Sky forms give 1.25 times
-their own light (`FORM_BODY`). A planet has four colours of its own: its
+their own light (`FORM_BODY`). A celestial body has four colours of its own; a planet's are its
 ball's two in the slot's first and second, its rings' two in a third and
 a fourth (`uFormG`, `uFormH`); `planetLight` mixes its LED's colour itself.
 
-**The planet.** The planet is a form with variants (`config.js:
-PLANETS`): each time it comes it is Saturn or Uranus. A variant has its
-own four colours in place of palettes, a size, a spin and its rings. It
-is the planet's figure, picked and pinned like the solid's (`variants`;
-`?form=planet&planet=saturn`). The HUD's forms row shows the variant also
-where a form shows its palette. Its light is `planets.js: planetLight`.
+**The celestial body.** The celestial body (`celestial`, shown as
+"celestial body") is a form whose variants are bodies of the sky
+(`config.js: BODIES`): each time it comes it is Saturn or Uranus, ringed
+planets. A body has its own four colours in place of palettes, a size, a
+spin and its rings. It is the form's figure, picked and pinned like the
+solid's (`variants`; `?form=celestial&celestial=saturn`). The HUD's forms
+row shows the body also where a form shows its palette. A planet's light
+is `planets.js: planetLight`. Old links and saved settings that name the
+planet (`form=planet`, `planet=saturn`) are read as the celestial body
+(`config.js: RENAMED`, `tuner.js: loadSettings`).
 
 - *The ball as the eye sees it.* Every LED inside the ball shows the place
   on the near surface that lies behind it on the line of sight from the
@@ -635,12 +639,12 @@ where a form shows its palette. Its light is `planets.js: planetLight`.
   high a form floats** below), on its lowest light: the ball, or its rings'
   lowest edge at their lean (`planets.js: planetLow`).
 - *Casting.* It comes as often as the solid and the knot (weight 0.4).
-  Its variants come in rounds like a solid's figures, so with two they
+  Its bodies come in rounds like a solid's figures, so with two they
   take turns, never the same twice running. It has no palette, so it takes no part in the colour story;
-  the layer under it takes the variant's `under` palettes. Its voice is
+  the layer under it takes the body's `under` palettes. Its voice is
   the orb's (`audio.js: VOICE_OF`).
-- *Cost.* Its code is in the points' shader only while a planet shows
-  (`planets.js: planetShader`), and there in place of the other sky
+- *Cost.* Its code is in the points' shader only while a body shows
+  (`celestial.js: bodyShader`), and there in place of the other sky
   forms' (while it shows, none of them does): `main.js` then draws with
   a pair of programs of its own, built as an egg's are (`builtProgs`,
   started 3 s after the page; see Start-up). SwiftShader runs a shader the
@@ -799,19 +803,19 @@ another, from hashes of the seed and the passage's number:
   gathers on it or runs off it.
 - Otherwise the new form is never one of the last two. Each of the others
   is as likely as its weight (`config.js: FORMS`: 1 for the orb, spiral,
-  ring and veil, 0.4 for the solid, the knot and the planet)
+  ring and veil, 0.4 for the solid, the knot and the celestial body)
   times the square of how many forms have come since it last did. Over an
   hour a form comes about 36 times: each of the first four about 5.5 times, the
-  solid, the knot and the planet about 4.2 times (`tools/story-stats.mjs`).
-- A form with figures (the solid, the knot; the planet's variants) is each time one of them for
+  solid, the knot and the celestial body about 4.2 times (`tools/story-stats.mjs`).
+- A form with figures (the solid, the knot; the celestial bodies) is each time one of them for
   its whole life (`show.js: figureOf`). They come in
   rounds: each round has every figure once, in an order shuffled from the
   passage's hash, and never begins with the figure the last round ended
   on. So no figure comes twice running, and each comes about as often as
   the others (the knot's about 1.4 times an hour each, the solid's,
   Saturn's and Uranus's about 2.1). An egg that takes a form's place uses
-  none of its figures (in the planet's place, which has no palettes, it
-  takes the orb's). The lab can pin one (`solid=`, `knot=`, `planet=`;
+  none of its figures (in a celestial body's place, which has no palettes, it
+  takes the orb's). The lab can pin one (`solid=`, `knot=`, `celestial=`;
   `show.js: variantOf`).
 
 The Rain setting chooses the timeline (`show.js: POOLS`, `timelineFor`):
@@ -1060,7 +1064,7 @@ The layers:
   the spiral a slow figure of notes (scheduled in `tick`), the ring a glassy tone, the veil a soft air, the solid a chord
   of three pure fifths, the knot two tones that beat at different paces,
   and a baked form the ring's glassy tone, softer, with the chord's third
-  over it, on D. The voice is the form's, whichever figure it shows. The planet sings with the orb's voice (`VOICE_OF`).
+  over it, on D. The voice is the form's, whichever figure it shows. The celestial body sings with the orb's voice (`VOICE_OF`).
   The veil also gets a little high noise (`AIRY`).
 - **Pale drops.** In a still room a high, soft note falls now and then.
 - **Reverb.** A 6 s convolution reverb (`impulse`), then a compressor.
@@ -1229,18 +1233,18 @@ the programs). So:
   made, before the first frame: a build that failed throws then, with the
   shader's log.
 - **A program built while the show runs waits for nothing.** An easter
-  egg's programs, and the planet's, are built by the same `program`
-  (`main.js: builtProgs`): an egg's the first time it shows, the planet's
+  egg's programs, and the celestial bodies', are built by the same `program`
+  (`main.js: builtProgs`): an egg's the first time it shows, the bodies'
   3 s after the page (or as it first comes, if that is sooner). `ready()`
   asks the GPU, without waiting, whether the build is done
   (`KHR_parallel_shader_compile`; without it, one frame later), and the
   plain programs draw until it is. Their first use, and so any error,
-  comes then: an egg that cannot be built is dropped, a planet that cannot
+  comes then: an egg that cannot be built is dropped, a body that cannot
   be built does not show, each with a warning in the console, and the show
   goes on.
 - **A shader shared by two programs compiles once.** The LEDs and the wires
   share `POINT_VS`, the largest shader by far, and every program of the
-  LEDs (an egg's and the planet's too) shares their fragment shaders; `gl.js` keeps one
+  LEDs (an egg's and the bodies' too) shares their fragment shaders; `gl.js` keeps one
   shader object per source for the life of the context, so a program built
   later attaches the same one. A shader whose compile failed leaves the
   cache. A lost context takes them all with it, and the page loads afresh
@@ -1292,7 +1296,8 @@ GitHub link shows.
 | `forms.js` | How each form moves through its life: centre, size, turn, tilt, its own measures, reach. |
 | `fields.js` | The baked forms' fields: the 3D texture, fetching a field when its form draws near, `able`. |
 | `figures.js` | The figures of the solid and the knot: names, corners and edges, curves, sizes and heights (one per life). |
-| `planets.js` | The planet: its rings' extent and lowest light, and the shader's `planetLight`. |
+| `celestial.js` | The celestial bodies: the programs they show with (`bodyShader`). |
+| `planets.js` | The ringed planets: their rings' extent and lowest light, and the shader's `planetLight`. |
 | `director.js` | Seeded tracks (weather, colour, density, camera), the colour story's mood, the shared `hash`. |
 | `direction.js` | The change of the rain's direction: weights and gates per direction. |
 | `audio.js` | The generative music: pad, bells, rain, form voices, reverb. |
@@ -1325,6 +1330,7 @@ flowchart TD
   tuner --> rotate
   audio --> sway
   shaders --> planets["planets.js"]
+  main --> celestial["celestial.js"]
   main --> planets
   forms --> planets
   planets --> config
@@ -1357,9 +1363,10 @@ Details and commands are in [development.md](development.md).
   the viewer page's Reset clears), rain alone in the lab and no rain
   (with the same click, keys and Reset), rain that never ends with a form
   through it, a seeded time with and without the story, four of the forms
-  held, the planet held (named in the lab, and by a name it does not
-  have), and `?jitter=pitch`; and that a `scene=` in a link or in saved
-  settings is read as Rain, Form and Layer. It then renders the sound: a held orb must be
+  held, a celestial body held (named in the lab, and by a name it does not
+  have), and `?jitter=pitch`; that a `scene=` in a link or in saved
+  settings is read as Rain, Form and Layer; and that `form=planet` and
+  `planet=` are read as the celestial body. It then renders the sound: a held orb must be
   audible, a still room at least 3 dB quieter, and neither may clip. The
   `test` workflow runs it on every pull request and push to main.
 - **`test/render-audio.mjs`** renders the page's real sound for a seed and a

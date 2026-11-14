@@ -9,7 +9,7 @@ import { createAudio } from './audio.js';
 import { createSway, createRandom } from './sway.js';
 import {
   PALETTES, WEATHER, FLOWS, COLOR_MODES, SETS, SKY, CAMERAS,
-  DEFAULTS, STORAGE_KEY, SCHEMA, ROOM, SCENES, FORMS,
+  DEFAULTS, STORAGE_KEY, SCHEMA, ROOM, SCENES, RENAMED, FORMS,
 } from './config.js';
 import { createShow } from './show.js';
 import { createDirector, hash } from './director.js';
@@ -17,7 +17,8 @@ import { createDirection } from './direction.js';
 import { FLOW_WRAP, RAY_CAP, FIGURES, POINT_VS, POINT_FS, WIRE_FS, QUAD_VS, DOWN_FS, BLUR_FS, COMPOSITE_FS } from './shaders.js';
 import { createGL, sub, cross, dot, norm, perspective, lookAt } from './gl.js';
 import { createFields } from './fields.js';
-import { createRingMap, planetShader } from './planets.js';
+import { createRingMap } from './planets.js';
+import { bodyShader } from './celestial.js';
 import { createLattice, fillLattice, latticeLight } from './lattice.js';
 import { createControls } from './controls.js';
 import { createClock, rateText } from './clock.js';
@@ -64,7 +65,7 @@ const HEIGHT = ROOM.height; // height of the lattice
 // image are parted by a thin dark seam, so the floor line can be seen.
 const FLOOR = -HEIGHT / 2 - ROOM.foot;
 const DEF = DEFAULTS;
-const S = loadSettings(DEF, STORAGE_KEY, params, SCENES);   // (an old link's ?scene= still works)
+const S = loadSettings(DEF, STORAGE_KEY, params, SCENES, RENAMED);   // (an old link's ?scene=, ?form=planet still work)
 
 // A saved or linked choice that no longer exists falls back to its default.
 for (const item of SCHEMA.flatMap((g) => g.items)) {
@@ -112,7 +113,7 @@ const downProg = program(QUAD_VS, DOWN_FS);
 const blurProg = program(QUAD_VS, BLUR_FS);
 const compProg = program(QUAD_VS, COMPOSITE_FS);
 // Programs with code of their own for a guest that shows now and then (an
-// easter egg, egg-shaders.js; the planet, planets.js), built the first time
+// easter egg, egg-shaders.js; a celestial body, celestial.js), built the first time
 // it shows, and used once the GPU has built them (gl.js: ready): until then
 // (a few frames, as it fades in) the plain programs draw. While none shows,
 // the LEDs are drawn by programs with none of that code at all. made: the
@@ -149,11 +150,11 @@ const eggProgs = (type) => builtProgs(withEggs, type, () => eggShader(POINT_VS, 
   console.warn('easter egg dropped:', err.message);
   eggs.drop(type);
 });
-// The planet's (they are started a few seconds in, so that they are done when it first comes).
-const withPlanet = new Map();
-const PLANET_TYPE = FORMS.find((f) => f.name === 'planet').type;
-const planetProgs = () => builtProgs(withPlanet, 'planet', () => planetShader(POINT_VS), (err) => console.warn('the planet cannot show:', err.message));
-setTimeout(planetProgs, 3000);
+// The celestial bodies' (they are started a few seconds in, so that they are done when one first comes).
+const withBody = new Map();
+const CELESTIAL_TYPE = FORMS.find((f) => f.name === 'celestial').type;
+const bodyProgs = () => builtProgs(withBody, 'celestial', () => bodyShader(POINT_VS), (err) => console.warn('the celestial bodies cannot show:', err.message));
+setTimeout(bodyProgs, 3000);
 
 const lattice = createLattice(gl);
 let count = 0, GRID = 0, ROWS = 0, wireCount = 0, light = null;
@@ -173,7 +174,7 @@ const MAX_POINT = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1]; // the larges
 const FIELD_UNIT = 5;
 const fields = createFields(gl, FIELD_UNIT);
 const fieldsUnit = (prog) => { gl.useProgram(prog.p); gl.uniform1i(prog.u.uFields, FIELD_UNIT); };
-// The planet's rings' profile (see planets.js), on the next unit.
+// The ringed planets' rings' profile (see planets.js), on the next unit.
 const RINGS_UNIT = 6;
 createRingMap(gl, RINGS_UNIT);
 const ringsUnit = (prog) => { gl.useProgram(prog.p); gl.uniform1i(prog.u.uRings, RINGS_UNIT); };
@@ -984,9 +985,9 @@ function frame(now) {
   // the second buffer. Without float buffers there are none.
   const rays = S.rays === 'off' || !hasFloat ? 0 : Number(S.rays);
   const eggType = eggs.showing();
-  // (While a planet shows, no egg does: an egg takes a form's place.)
-  const planetShows = [0, 1, 2].some((k) => shown.A[k * 4] === PLANET_TYPE && shown.A[k * 4 + 1] >= 0.001);
-  const { point: pointProg, wire: wireProg } = eggType ? eggProgs(eggType) : planetShows ? planetProgs() : plain;
+  // (While a celestial body shows, no egg does: an egg takes a form's place.)
+  const bodyShows = [0, 1, 2].some((k) => shown.A[k * 4] === CELESTIAL_TYPE && shown.A[k * 4 + 1] >= 0.001);
+  const { point: pointProg, wire: wireProg } = eggType ? eggProgs(eggType) : bodyShows ? bodyProgs() : plain;
   eggDrawn = pointProg !== plain.point ? eggType : 0;
   const progs = [pointProg];
   if (wiresOn) progs.push(wireProg);

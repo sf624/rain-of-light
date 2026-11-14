@@ -5,7 +5,7 @@
 // another (the rain, the form, the layer), so there is never a cut. The
 // timeline is made from hashes of one seed: a time (?t=) gives its picture.
 
-import { PALETTES, PALE, FORMS, LAYER, PASSAGES, BAKED, PLANETS } from './config.js';
+import { PALETTES, PALE, FORMS, LAYER, PASSAGES, BAKED, BODIES } from './config.js';
 import { RARE, rareEggs } from './eggs.js';
 import './egg-kinds.js';                   // (the eggs: those of the rare slot are cast here)
 import { hash, weighted, createMood, leaning, leanTo, hueOf, apart, KIN } from './director.js';
@@ -91,7 +91,7 @@ const timelineFor = (rain) => (rain === 'off' ? 'dry' : 'all');
 // the replaced form's palette (it has colours of its own: the palette only
 // goes on the colour story).
 const rareOf = (T, r) => (T >= RARE.after ? rareEggs()[Math.floor(hash(r * 67 + 9) / RARE.chance)] ?? null : null);
-// The palettes an egg takes in the planet's place (it has none of its own): the orb's.
+// The palettes an egg takes in a celestial body's place (it has none of its own): the orb's.
 const ORB = FORMS.find((f) => f.name === 'orb');
 const isRare = (form) => !!form.egg || BAKED.includes(form);
 const eggOfForm = (form) => form.egg ?? rareEggs().find((e) => e.form === form.name);
@@ -154,7 +154,7 @@ function createTimeline(seed, pool, name, mood, baked) {
     // (A sky form's palette also tires, see TIRE; the layer's does not.)
     const x = hash(r * 53 + 2), m = leaning(true, hash(r * 53 + 4), mood, start);
     const sky = form !== LAYER;
-    // (A form with no palettes, the planet, has colours of its own: it tells no hue.)
+    // (A form with no palettes, the celestial body, has colours of its own: it tells no hue.)
     const pick = names.length ? palAt(names, x, m, sky ? tiredAt(start) : undefined) : 0;
     if (sky && names.length) told.unshift({ start, hue: hueNamed(names[pick]) });
     return { id: `${name}-${++n}`, form, r, start, pal: names.length ? palAt(names, x) : 0, told: pick,
@@ -291,8 +291,8 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
     const pin = e.form.variants?.indexOf(S[e.form.name]) ?? -1;
     return pin >= 0 ? pin : e.v || 0;
   };
-  // A planet's variant (its own colours, see config.js: PLANETS), else undefined.
-  const planetOf = (e) => (e.form.name === 'planet' ? PLANETS[variantOf(e)] : undefined);
+  // A celestial body (its own colours, see config.js: BODIES), else undefined.
+  const bodyOf = (e) => (e.form.name === 'celestial' ? BODIES[variantOf(e)] : undefined);
 
   // What the settings ask for at t: the rain, and the episodes with their weights.
   // egg: an easter egg in the form slot (see eggs.js): { w, age, form, rain, layer }; rare: how
@@ -337,12 +337,12 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
   const story = () => S.story === 'on';
   // An episode's palette, by name: one of its form's (the colour key moves on from it).
   const nameOf = (e, names, pal) => names[(pal + shift) % names.length];
-  const paletteOf = (e) => planetOf(e)?.name ?? nameOf(e, e.form.palettes, story() ? e.told : e.pal);
+  const paletteOf = (e) => bodyOf(e)?.name ?? nameOf(e, e.form.palettes, story() ? e.told : e.pal);
   // The palette an episode shows in (above: the form's episode over a layer, if any).
   // The layer answers the form above it with a colour that sets it off:
   // with the story, of those the one nearer the mood as the form came.
   const shownIn = (e, above) => {
-    const under = e.form === LAYER && above && (planetOf(above)?.under ?? UNDER[paletteOf(above)]);
+    const under = e.form === LAYER && above && (bodyOf(above)?.under ?? UNDER[paletteOf(above)]);
     if (!under) return paletteOf(e);
     if (!story()) return nameOf(e, under, e.pal);
     const m = leaning(true, hash(e.r * 31 + above.r * 29), mood, above.start);
@@ -351,7 +351,7 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
   // Its colours: the first two, the room's colour with it, and the third and
   // fourth (a planet's own rings' colours, see planetLight in planets.js; for the others their second again).
   const colorsOf = (e, above) => {
-    const P = planetOf(e);
+    const P = bodyOf(e);
     if (P) return [P.colors[0], P.colors[1], P.room, P.colors[2], P.colors[3]];
     const name = shownIn(e, above);
     const of = paletteNamed;
@@ -537,14 +537,14 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
   // begins; playing: what shows now, by the kinds of passage (rain, form, storm, still; the
   // settings may pin the rain and the form: rain through a held form plays a storm whatever the passage);
   // rain, storm, gain: the eased rain, the rain through a form, and how much more a form glows among rain;
-  // items: each episode that shows, with its weight, age, whether it goes, its figure (if its form has them),
+  // items: each episode that shows, with its form's name and its label (as shown), its weight, age, whether it goes, its figure (if its form has them),
   // its palette and its colours.
   function info(t) {
     const tl = timeline(timelineFor(S.rain));
     const top = [...shown.values()].filter((s) => s.x.e.form !== LAYER).sort((a, b) => b.w - a.w)[0]?.x.e;
     const items = [...shown.values()].sort((a, b) => b.w - a.w).map((s) => ({
-      form: s.x.e.form.name, figure: s.x.e.form.variants?.[variantOf(s.x.e)], w: s.w, age: s.x.age, out: s.x.out, held: s.x.e.id.startsWith('held-'),
-      palette: shownIn(s.x.e, top), colors: planetOf(s.x.e) ? [s.col[0], s.col[1], s.col[3], s.col[4]] : [s.col[0], s.col[1]],
+      form: s.x.e.form.name, label: s.x.e.form.label ?? s.x.e.form.name, figure: s.x.e.form.variants?.[variantOf(s.x.e)], w: s.w, age: s.x.age, out: s.x.out, held: s.x.e.id.startsWith('held-'),
+      palette: shownIn(s.x.e, top), colors: bodyOf(s.x.e) ? [s.col[0], s.col[1], s.col[3], s.col[4]] : [s.col[0], s.col[1]],
     }));
     const rain = rainNow ?? 0, sky = items.some((i) => i.form !== LAYER.name && i.w > 0.5);
     const playing = rain > 0.5 ? (sky ? 'storm' : 'rain') : sky ? 'form' : 'still';
