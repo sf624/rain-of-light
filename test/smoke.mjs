@@ -479,9 +479,9 @@ if (r.exceptionDetails || !Array.isArray(r.result.value?.modes)) fail(`could not
 const { modes, storageKey: STORAGE_KEY, clashes, list: formList, choices, ...schema } = r.result.value;
 if (!clashes.slice(0, 3).every((m) => /taken twice/.test(m)) || clashes[3]) fail(`names Form takes: clashes read as ${JSON.stringify(clashes)}`);
 const LIST = ['auto', 'none', 'orb', 'spiral', 'ring', 'veil', 'solid: solid tetrahedron cube', 'knot: knot lissajous hopf mobius',
-  'celestial body: celestial saturn uranus blackhole'];
+  'celestial body: celestial saturn uranus blackhole galaxy'];
 if (formList.join() !== LIST.join()) fail(`the Form list reads ${JSON.stringify(formList)}, not ${JSON.stringify(LIST)}`);
-if (!choices.includes('hopf=knot/hopf') || !choices.includes('knot=knot') || !choices.includes('orb=orb') || choices.length !== 15) fail(`Form's choices: ${choices}`);
+if (!choices.includes('hopf=knot/hopf') || !choices.includes('knot=knot') || !choices.includes('orb=orb') || choices.length !== 16) fail(`Form's choices: ${choices}`);
 console.log('ok  Form: one name per thing (clashes refused), its list grouped by family');
 await cdp.send('Target.closeTarget', { targetId });
 
@@ -514,12 +514,14 @@ await visit(cdp, base, 'lab.html?rain=off&egg=teapot&seed=2&t=40', false, false,
 await visit(cdp, base, 'lab.html?rain=off&form=teapot&seed=2&t=40', false, false, null,
   { what: 'form=teapot to fall back to auto', js: `window.__lab.setting('form') === 'auto'` });
 // A celestial body held in the lab, drawn by its kind's own programs (celestial.js: Saturn by the
-// planets', the black hole by its own, and only those built); an old link's body it does not have
-// (which falls back to any celestial body).
+// planets', the black hole and the galaxy each by its own, and only those built); an old link's body
+// it does not have (which falls back to any celestial body).
 await visit(cdp, base, 'lab.html?rain=off&form=saturn&seed=2&t=40', false, false, null,
   { what: 'Saturn to draw with the planets\' programs', js: `window.__lab.bodies().drawn === 'planet'` });
 await visit(cdp, base, 'lab.html?rain=off&form=blackhole&seed=2&t=40', false, false, null,
   { what: 'the black hole to draw with its own programs', js: `window.__lab.bodies().drawn === 'hole' && window.__lab.bodies().built.join() === 'hole'` });
+await visit(cdp, base, 'lab.html?rain=off&form=galaxy&seed=2&t=40', false, false, null,
+  { what: 'the galaxy to draw with its own programs', js: `window.__lab.bodies().drawn === 'galaxy' && window.__lab.bodies().built.join() === 'galaxy'` });
 await visit(cdp, base, 'lab.html?rain=off&form=celestial&celestial=earth&seed=3&t=40', false, false, null,
   { what: 'celestial=earth to fall back to any celestial body', js: `window.__lab.setting('form') === 'celestial' && !!window.__lab.bodies().drawn` });
 // An old link's solid by a name it no longer has (the star): any solid, and a solid shows.

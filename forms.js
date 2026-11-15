@@ -22,6 +22,7 @@ import { BAKED, BODIES } from './config.js';
 import { SOLIDS, KNOTS } from './figures.js';
 import { planetLow, planetReach, planetFrame, ringsOut } from './planets.js';
 import { BH } from './blackhole.js';
+import { galaxyLow, galaxyReach, galaxyFrame } from './galaxy.js';
 
 // A form's lowest light is where it still shows clearly: a quarter of its
 // brightest, as measured on screen. The thin forms' light around their line
@@ -294,9 +295,58 @@ function blackhole(age, w, leave, ph, face, go, v, sight = { rise: 0.3, az: face
   };
 }
 
+// A body that fits the picture (config.js: BODIES, `fit`) is as large as the
+// picture's width allows at the distance it stands, up to its full size
+// (`size`): seen from the eye, its rim spans FIT of the picture's half width
+// each way (the eye's tangents to it: a ball of radius R at distance d spans
+// R / sqrt(d^2 - R^2) of a unit of distance). That distance is the eye's from
+// the room's centre (sight.radius) and the body's beyond its path (its
+// kind's back); the picture's half width at a unit of distance comes from
+// the field of view and the view's shape (sight.wide; both from main.js:
+// viewFit). So its size follows the view's shape, at once as a window is
+// resized, and nothing else: not its drift, nor the camera's move. FIT leaves
+// room for the drift: it keeps the galaxy's disc inside a phone's tall view
+// (390x844) at every time (see docs/design.md, the galaxy); a view as wide
+// as 4:3 holds it whole. A body's move uses it with one line:
+// size: fitted(P, sight). With no picture known (no sight), its full size.
+const FIT = 0.65;
+function fitted(P, sight) {
+  if (!P.fit || !sight?.wide) return P.size;
+  const u = FIT * sight.wide, d = sight.radius + KIND_MOVES[P.kind].back;
+  return Math.min(P.size, d * u / Math.hypot(1, u));
+}
+
+// The galaxy, a celestial body (its light is galaxyLight in galaxy.js). It
+// hovers and drifts like a planet. Its disc lies almost level, its face
+// opened a little to the eye of the show's own camera move (sight, as for
+// the black hole: a view turned or raised by a drag does not move it, the
+// viewer looks round it), by `open`, which sways slowly and unevenly, its
+// ellipse leaning a little to and fro (roll). Its stars turn about its
+// heart, the inner ones faster (turn: how far it has turned at its rim; see
+// galaxyLight). It is as large as the picture's width allows (fitted). It
+// comes out of the dark from its heart: the bulge first, then the disc
+// spreading out, and its dust lane darkens last; it goes the other way: the
+// dust clears, the disc draws in, and the heart fades last. It rests on its
+// lowest light: its disc's near rim at its lean, or its bulge's glow (galaxyLow).
+// f[0]: the body; f[1]: how far its light has come out (0 .. 1); f[2]: how dark its dust is.
+function galaxy(age, w, leave, ph, face, go, v, sight = { rise: 0.15, az: face }) {
+  const P = BODIES[v], drift = 1.4, size = fitted(P, sight);
+  const sway = 0.5 + 0.3 * Math.sin(0.021 * age + ph) + 0.2 * Math.sin(0.0137 * age + 3 * ph);
+  const open = P.open[0] + (P.open[1] - P.open[0]) * sway;
+  const tilt = Math.max(0, Math.min(0.9, open + sight.rise));
+  const roll = P.roll * (0.7 * Math.sin(0.017 * age + 2 * ph) + 0.3 * Math.sin(0.0113 * age + ph));
+  return {
+    centre: [drift * Math.sin(0.027 * age + ph), BOB * (1 + Math.sin(0.043 * age + ph)), drift * Math.cos(0.022 * age + ph)],
+    low: galaxyLow(P, tilt, size), size, turn: P.spin * age + ph,
+    f: [v, smooth(age / 18) * (1 - smooth((leave - 0.25) / 0.75)), smooth((age - 8) / 14) * (1 - smooth(leave * 2.2))],
+    frame: () => galaxyFrame(tilt, sight.az, roll),
+    bound: galaxyReach(P, size),
+  };
+}
+
 // A celestial body (one of BODIES, its variant v): it moves as its kind
 // does, and keeps as far beyond its path as its kind does (see BACK).
-const KIND_MOVES = { planet: { move: planet, back: 4.5 }, hole: { move: blackhole, back: 2 } };
+const KIND_MOVES = { planet: { move: planet, back: 4.5 }, hole: { move: blackhole, back: 2 }, galaxy: { move: galaxy, back: 4.5 } };
 function celestial(age, w, leave, ph, face, go, v, sight) {
   const { move, back } = KIND_MOVES[(BODIES[v] ?? BODIES[0]).kind];
   return { back, ...move(age, w, leave, ph, face, go, v, sight) };
@@ -326,7 +376,8 @@ export const FADING = new Set(['orb', ...BAKED.map((egg) => egg.name)]);
 // (low below its centre) just touches it.
 // v: which of its family's shapes it is (the solid's, the knot's, see figures.js; the celestial body's, BODIES).
 // eye: where the eye is, for a form that shows itself to it (a planet's frame).
-// sight: how the show's own camera sees the form ({ rise: how far it looks up at it, az: from which way }, rad; the black hole stands its disc for it).
+// sight: how the show's own camera sees the form ({ rise: how far it looks up at it, az: from which way }, rad; the black hole and the galaxy stand their disc for it),
+// and the picture ({ wide: its half width at a unit of distance, radius: the eye's distance from the room's centre }; see fitted).
 export function motion(name, age, w, go, r, face, ground, v = 0, eye = null, sight) {
   const leave = go ? smooth((age - go.at) / go.fade) : 0;
   const m = MOTIONS[name](age, w, leave, r * TAU, face, go, v, sight);

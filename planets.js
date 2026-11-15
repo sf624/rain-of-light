@@ -137,14 +137,13 @@ const URANUS = BODIES.findIndex((P) => P.name === 'uranus');
 
 // The shader's planet (only in the celestial bodies' programs, celestial.js:
 // bodyShader). It needs hash3, uTime, uLane and the slot's colours from
-// POINT_VS, and Eye and the third and fourth colours from celestial.js:
-// BODY_GLSL. (uFormG, uFormH: its rings' colours.)
+// POINT_VS, and Eye, the third and fourth colours and the frame from
+// celestial.js: BODY_GLSL. (uFormG, uFormH: its rings' colours; uFormN,
+// uFormS, uFormT: its axis, its sun, and the way across its axis that its
+// turn is counted from, see planetFrame.)
 export const PLANET_GLSL = `
 // ---------- the planet (see planets.js) ----------
 uniform sampler2D uRings;   // the rings' profile (planets.js: createRingMap)
-uniform vec3 uFormN[3];     // a planet's axis, its sun, and the way across its axis that its turn is counted from (planetFrame)
-uniform vec3 uFormS[3];
-uniform vec3 uFormT[3];
 const float P_SLAB = ${f(SLAB)};
 
 // The rings at r (radii): how dense (0 .. 1), and their tone (0 .. 1 from the third colour to the fourth).
