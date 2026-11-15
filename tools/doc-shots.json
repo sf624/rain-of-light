@@ -45,10 +45,11 @@
       {"q": "form=hopf", "label": "form=hopf"},
       {"q": "form=mobius", "label": "form=mobius"}
     ] },
-    { "name": "celestial", "cols": 3, "base": "rain=off&layer=off&t=45", "pre": 100, "cells": [
+    { "name": "celestial", "cols": 2, "base": "rain=off&layer=off&t=45", "pre": 100, "cells": [
       {"q": "form=saturn", "label": "form=saturn"},
       {"q": "form=uranus", "label": "form=uranus"},
-      {"q": "form=blackhole", "label": "form=blackhole"}
+      {"q": "form=blackhole", "label": "form=blackhole"},
+      {"q": "form=galaxy", "label": "form=galaxy"}
     ] },
     { "name": "layer", "cols": 3, "base": "rain=off&t=30", "cells": [
       {"q": "form=orb&layer=off", "label": "form=orb&layer=off"},
