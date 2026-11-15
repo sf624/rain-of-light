@@ -1,7 +1,7 @@
 // The celestial bodies: one family of forms of light (config.js: FORMS, celestial)
 // whose shapes are bodies of the sky (config.js: BODIES), one per
-// appearance: the ringed planets Saturn and Uranus (planets.js) and a black
-// hole (blackhole.js). Each body has colours of its own, in place of the
+// appearance: the ringed planets Saturn and Uranus (planets.js), a black
+// hole (blackhole.js) and a galaxy (galaxy.js). Each body has colours of its own, in place of the
 // palettes of the other forms, and is of a kind (`kind`): the bodies of one
 // kind share their shader code and their move (forms.js: KIND_MOVES).
 //
@@ -18,6 +18,7 @@
 
 import { PLANET_GLSL } from './planets.js';
 import { HOLE_GLSL } from './blackhole.js';
+import { GALAXY_GLSL } from './galaxy.js';
 
 // The kinds of body, each with its shader code (a new kind: one entry here,
 // its move in forms.js: KIND_MOVES, its bodies in config.js: BODIES). A
@@ -31,7 +32,7 @@ import { HOLE_GLSL } from './blackhole.js';
 //     and BodyThread, the share its strand's wire shows;
 //   float <kind>Shade(vec3 seen): what is left of any light seen at `seen`
 //     (an LED's, a wire's, an image's: 1 all, 0 none).
-const KINDS = [{ name: 'planet', glsl: PLANET_GLSL }, { name: 'hole', glsl: HOLE_GLSL }];
+const KINDS = [{ name: 'planet', glsl: PLANET_GLSL }, { name: 'hole', glsl: HOLE_GLSL }, { name: 'galaxy', glsl: GALAXY_GLSL }];
 
 // The vertex shader `src` (POINT_VS) with the light of the bodies of `kind`
 // in place of the other sky forms' (while a body shows, none of them does;
@@ -51,6 +52,9 @@ export const BODY_GLSL = `
 // ---------- the celestial bodies (see celestial.js) ----------
 uniform vec3 uFormG[3];     // a body's third and fourth colours
 uniform vec3 uFormH[3];
+uniform vec3 uFormN[3];     // a body's frame, if it shows itself in one (show.js: frame): an axis and two ways across it
+uniform vec3 uFormS[3];
+uniform vec3 uFormT[3];
 vec3 Eye;                   // where the eye is as this LED's image is seen (main sets it: in a mirror, the eye's image)
 float BodyRay, BodyThread;  // set by the body's light (see KINDS)
 ${KINDS.map(glslOf).join('\n')}

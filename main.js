@@ -731,7 +731,7 @@ function advance(dt, replay = false) {
   const px = replay ? 0 : pointer.sx, py = replay ? 0 : pointer.sy;
   const yaw = px, cy = Math.cos(yaw), sy = Math.sin(yaw);
   const turn = (v) => [v[0] * cy + v[2] * sy, v[1], -v[0] * sy + v[2] * cy];
-  const path = [...eye];                           // (the eye of the show's own move: a black hole faces it, see show.js)
+  const path = [...eye];                           // (the eye of the show's own move: a black hole and a galaxy face it, see show.js)
   eye = turn(eye);
   eye[1] -= py * 2.0;
   dir = turn(dir);
@@ -743,7 +743,8 @@ function advance(dt, replay = false) {
   projM = perspective(fovRad(), aspect, 0.1, 60);
   const f = norm(sub(at, eye));
   const r = norm(cross(f, [0, 1, 0]));
-  camera = { eye, f, r, u: cross(r, f), aspect, tall: fit.tall, path };
+  // (wide: the picture's half width at a unit of distance; radius: the eye's distance from the room's centre.)
+  camera = { eye, f, r, u: cross(r, f), aspect, tall: fit.tall, path, wide: Math.tan(fit.fov / 2) * aspect, radius: fit.radius };
 
   // A wave now and then, somewhere in the field.
   if (S.ripples > 0 && time > nextAuto) {

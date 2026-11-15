@@ -97,6 +97,17 @@ export const CAMERAS = [
 // The black hole (kind hole, see blackhole.js): colors, its disc's deep
 // orange-red and pale yellow (white-hot at its inner rim), then its jets'
 // pale blue-white (the third; the fourth is the same).
+// The galaxy (kind galaxy, see galaxy.js), seen almost edge-on like the
+// Sombrero galaxy: size (its disc's radius, at most: it is as large as the
+// picture's width allows, see fit); fit (its size fits the picture, see
+// forms.js: fitted); galaxy: its bulge's radius (of its disc's) and how flat
+// it is, its disc's half thickness and its dust's (thick, lane: in units,
+// the same at every size), and its dust's rings ([radius, half width,
+// density], in radii); open ([least, most]: how far its disc opens to the
+// show's eye, rad from edge-on, swaying slowly between); roll (how far its
+// ellipse leans to and fro, rad); spin (how fast its disc turns at its rim,
+// rad/s: the nearer its heart, the faster); colors (its bulge's heart and
+// rim, its disc's stars, and its knots where stars are born).
 const TAU = Math.PI * 2;
 export const BODIES = [
   // Saturn: C ring faint and dusky, B ring bright cream (brightest outward),
@@ -113,6 +124,11 @@ export const BODIES = [
     under: ['sakura', 'amber'] },
   { name: 'blackhole', label: 'black hole', kind: 'hole', voice: 'blackhole',
     colors: [[1.0, 0.36, 0.05], [1.0, 0.76, 0.34], [0.62, 0.8, 1.0], [0.62, 0.8, 1.0]], room: [0.14, 0.2, 0.62],
+    under: ['deep sea', 'aurora'] },
+  { name: 'galaxy', kind: 'galaxy', voice: 'orb', size: 9, fit: true,
+    galaxy: { bulge: 0.249, flat: 0.85, thick: 0.25, lane: 0.2, dust: [[0.8, 0.08, 1], [0.6, 0.06, 0.45]] },
+    open: [0.07, 0.13], roll: 0.1, spin: 0.012,
+    colors: [[1.0, 0.9, 0.74], [1.0, 0.66, 0.32], [0.6, 0.72, 1.0], [1.0, 0.5, 0.66]], room: [0.85, 0.7, 0.5],
     under: ['deep sea', 'aurora'] },
 ];
 

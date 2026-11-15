@@ -137,9 +137,9 @@ about 11 s to 3 s. It visits:
 - rain alone (`rain=on&form=none&layer=off`, in the lab) and no rain
   (`rain=off`), both with the click, keys and Reset; rain that never ends
   with a form through it (`rain=on&seed=1&t=60`); a time part-way through the show
-  (with and without the colour story), four of the forms held, two knots and two celestial bodies
-  held by their own names (Saturn and the black hole in the lab, each drawn by its kind's own
-  programs), an old link's body or solid that no longer exists (which falls back to any of its family),
+  (with and without the colour story), four of the forms held, two knots and three celestial bodies
+  held by their own names (Saturn, the black hole and the galaxy in the lab, each drawn by its kind's own
+  programs, and only those built), an old link's body or solid that no longer exists (which falls back to any of its family),
   `?jitter=pitch`, two easter eggs pinned (penrose, and the teapot with its
   field; `form=teapot` falls back to `auto`), and the lab's clock (opened paused, it stands still;
   Space runs and stops it, also with the focus in the panel; the arrows seek
@@ -445,6 +445,10 @@ The capture tools load the page in Chrome on a fake clock: a seeded
 only when the tool steps them. So a run is repeatable. `tools/page.mjs`
 holds what they share: it serves the repo, starts Chrome, opens the page
 (`index.html`, or `lab.html`) and hides the page's buttons.
+
+To turn the view in a capture, drag with a touch pointer (a `PointerEvent`
+with `pointerType: 'touch'`): a mouse press rings a ripple at once, and its
+wave lights the room round the form.
 
 By default Chrome runs with a window, on the GPU (written for WSLg on WSL2
 with an NVIDIA card: about 50 ms per frame). `CAP_MODE=swiftshader` uses

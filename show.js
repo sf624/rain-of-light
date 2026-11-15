@@ -426,9 +426,13 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
         const turn = s.face === undefined ? 1 : 1 - Math.exp(-dt / 5);
         const d = goal - (s.face ?? goal);
         s.face = (s.face ?? goal) + (d - Math.round(d / (2 * Math.PI)) * 2 * Math.PI) * turn;
-        // (and how the show's own camera sees it, at once, whatever a drag does: a black hole stands its disc for it)
+        // (and how the show's own camera sees it, at once, whatever a drag does: a black hole and a galaxy stand their disc for it.
+        // It looks up at it from its own height, and from as far as the farther of the two eyes: the form
+        // keeps its distance from the eye that sees it, so the show's eye, which a turn leaves behind, may
+        // stand near it once it has come round to the viewer, and the viewer near it while it comes round.)
         const [cx, cy, cz] = m.centre, [px, py, pz] = view.path ?? eye;
-        const sight = { rise: Math.atan2(cy - py, Math.hypot(cx - px, cz - pz)), az: Math.atan2(cx - px, cz - pz) };
+        const far = Math.max(Math.hypot(cx - px, cz - pz), Math.hypot(cx - eye[0], cz - eye[2]));
+        const sight = { rise: Math.atan2(cy - py, far), az: Math.atan2(cx - px, cz - pz), wide: view.wide, radius: view.radius };
         m = motion(form.name, age, w, go, r, s.face, ground, shapeOf(e), eye, sight);
       }
       const b = bodyOf(e);
@@ -457,7 +461,8 @@ export function createShow(S, { feet, seed = Math.random() * 1000, baked = true 
     }
   }
 
-  // view: the camera ({ eye, path }; path: the eye of the show's own move, before a drag): the forms turn towards the eye.
+  // view: the camera ({ eye, path, wide, radius }; path: the eye of the show's own move, before a drag): the forms turn towards the eye.
+  // wide, radius: the picture's half width at a unit of distance, and the eye's distance from the room's centre (a galaxy fits its width, see forms.js: fitted).
   // egg, rare: what the easter eggs ask (see wanted and eggs.js).
   let eggHeld = null;                         // the baked form an easter egg holds now (its name), if any
   function update(t, dt, view, egg = null, rare = 1) {

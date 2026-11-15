@@ -49,7 +49,7 @@ pictures again (see [development.md](development.md#the-pictures-of-the-docs)).
 | **wire** | The thin line between two LEDs of a strand. It glows faintly with their light (Wire glow). |
 | **rain** | Light that runs down the strands, drop after drop: a bright head and a fading trail. |
 | **passage** | One stretch of the show: rain, a form, rain through a form (storm), a still room, or sideways rain (drift). Each lasts from about 20 seconds to over a minute. |
-| **form** | A large shape of light that gathers in the room: an orb, a spiral, a ring or a veil; a solid or a knot; or a celestial body (a ringed planet, or a black hole). |
+| **form** | A large shape of light that gathers in the room: an orb, a spiral, a ring or a veil; a solid or a knot; or a celestial body (a ringed planet, a black hole, or a galaxy). |
 | **layer of light** | A sea of light near the floor. It comes and goes beside the forms. |
 | **knot** | The form drawn as closed lines of light, with two lights running round each: a figure of eight woven in depth, two linked rings or a Möbius band. |
 | **ripple** | A wave of light from a click or a tap, or from the show itself. It also rings a bell. |
@@ -199,7 +199,7 @@ things that are not in the panel:
 | Panel | URL key | Values | Default | What you see |
 | --- | --- | --- | --- | --- |
 | **Rain** | `rain` | `auto`, `on`, `off` | `auto` | `auto`: rain comes and goes with the show. `on`: rain always falls, and never ends. `off`: no rain; the forms of light have the room, on a timeline of their own. A change eases the rain in or out over a few seconds. |
-| **Form** | `form` | `auto`, `none`; a shape: `orb`, `spiral`, `ring`, `veil`, `tetrahedron`, `cube`, `lissajous`, `hopf`, `mobius`, `saturn`, `uranus`, `blackhole`; a family: `solid`, `knot`, `celestial` | `auto` | `auto`: forms of light come and go with the show. A shape's name holds that shape for good. A family's name (in the panel: any solid, any knot, any celestial body) holds one of its shapes for good, the one the seed picks. `none`: no form. The panel lists `auto` and `none`, the four shapes of their own, then each family under its heading (see [Forms](#forms)). A change fades the form that shows out over 4 s; the next fades in once it has gone. |
+| **Form** | `form` | `auto`, `none`; a shape: `orb`, `spiral`, `ring`, `veil`, `tetrahedron`, `cube`, `lissajous`, `hopf`, `mobius`, `saturn`, `uranus`, `blackhole`, `galaxy`; a family: `solid`, `knot`, `celestial` | `auto` | `auto`: forms of light come and go with the show. A shape's name holds that shape for good. A family's name (in the panel: any solid, any knot, any celestial body) holds one of its shapes for good, the one the seed picks. `none`: no form. The panel lists `auto` and `none`, the four shapes of their own, then each family under its heading (see [Forms](#forms)). A change fades the form that shows out over 4 s; the next fades in once it has gone. |
 | Layer of light | `layer` | `auto`, `on`, `off` | `auto` | `auto`: the layer comes and goes with the show (about 70% of the time). `on` holds it, `off` removes it. |
 | Floor mirror (0: off) | `mirror` | 0 to 1 | `0.6` | How bright the image in the floor is. |
 | Wall mirrors (copies per side) | `walls` | 0 or 1 | `0` | `1`: the room repeats beyond its walls, one copy on each side. Each copy draws the lattice again, so it is costly. |
@@ -366,10 +366,21 @@ or
   lattice the disc and the arches run together round the heart, and the
   jets show as two loose diagonal beams.
 
-![Saturn, a pale gold ball in broad cream and grey rings seen a little from above, the near rings crossing in front of the ball; Uranus, a pale cyan ball with thin rings standing round it; a black hole, a dark round heart in an orange disc tilted aslant, with an arch of light over the heart and pale jets on the diagonal](img/celestial.jpg)
+or
+- **a galaxy** (`galaxy`): seen almost edge-on, like the Sombrero galaxy.
+  A glowing gold bulge, white at its heart, in a broad disc of blue stars
+  with pink knots, like a hat's wide brim; a dark lane of dust crosses the
+  lower bulge, reddening the light behind it. It is as large as the
+  picture's width allows: wide in a wide view, smaller on a phone held
+  upright. Its disc opens a little to the show's camera, so when you drag
+  the view you look round it (from behind, you see it from below, the dust
+  lane arching over the bulge). Its stars turn, the inner ones faster. It
+  comes from its heart out, its dust lane last, and goes the other way.
 
-Query: `rain=off&layer=off&t=45` with `form=saturn`, `form=uranus` and
-`form=blackhole`.
+![Saturn, a pale gold ball in broad cream and grey rings seen a little from above, the near rings crossing in front of the ball; Uranus, a pale cyan ball with thin rings standing round it; a black hole, a dark round heart in an orange disc tilted aslant, with an arch of light over the heart and pale jets on the diagonal; a galaxy seen almost edge-on, a glowing gold bulge in a broad flat disc of blue stars with a dark lane across it](img/celestial.jpg)
+
+Query: `rain=off&layer=off&t=45` with `form=saturn`, `form=uranus`,
+`form=blackhole` and `form=galaxy`.
 
 A planet's rings turn their face to you and open and close a little,
 slowly, but never close to a line; the ball turns, its bands drifting. It
@@ -840,7 +851,7 @@ is 10 seconds). The default depth, 0.3, is gentler.
 | **Pad** | `music` | 0 to 1 | `0.6` | The slow pad in D major. |
 | **Bells** | `chimes` | 0 to 1 | `0.6` | The ripples' bells, and the still room's high notes. |
 | **Rain** | `rainSound` | 0 to 1 | `0.3` | The hush of rain. |
-| **Forms** | `formSound` | 0 to 1 | `0.4` | The voice each form brings: the orb a low hum, the spiral a turning figure, the ring a glassy tone, the veil a soft air, the solid a chord of pure fifths, the knot two beating tones, a planet the orb's hum, the black hole a low, slow drone and, as its jets grow, a faint high tone. |
+| **Forms** | `formSound` | 0 to 1 | `0.4` | The voice each form brings: the orb a low hum, the spiral a turning figure, the ring a glassy tone, the veil a soft air, the solid a chord of pure fifths, the knot two beating tones, a planet and the galaxy the orb's hum, the black hole a low, slow drone and, as its jets grow, a faint high tone. |
 
 `m` or the note button turns the sound on and off. Browsers start sound
 only after a click or a key, so the music begins with your first one
@@ -857,7 +868,7 @@ fades:
   spiral a slow figure of notes that climbs and turns, the ring a clear, glassy tone, the veil a soft, open air,
   the solid a still chord of pure fifths, the knot two tones that beat
   against each other. Each form keeps its voice whichever of its shapes it shows; a planet
-  has the orb's warm hum, the black hole a low, slow drone, with a faint
+  and the galaxy have the orb's warm hum, the black hole a low, slow drone, with a faint
   high tone as its jets grow.
   As it leaves, the harmony comes home to D.
 - **rain through a form**: both, fuller but not louder.

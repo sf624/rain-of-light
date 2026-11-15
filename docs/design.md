@@ -15,7 +15,7 @@ You stand in a dark room full of hanging strands of tiny LEDs, over a floor
 of black glass. Light falls down the strands like rain. Now and then the rain
 stops, and a large form of light gathers among the same LEDs: an orb, a
 spiral, a ring or a veil, one of two forms of mathematics (a
-solid, a knot), or a celestial body (the ringed planets Saturn, Uranus, or a black hole). A low sea of light (the layer) glows near
+solid, a knot), or a celestial body (the ringed planets Saturn, Uranus, a black hole, or a galaxy). A low sea of light (the layer) glows near
 the floor. The colours drift slowly together, and calm music follows what is
 shown. A click sends a wave of light through the room and rings a bell.
 
@@ -519,6 +519,8 @@ the form's first colour to its second:
   ringed planet, Saturn or Uranus.
 - `holeLight` (in `blackhole.js`, see below): the celestial body that is a
   black hole.
+- `galaxyLight` (in `galaxy.js`, see below): the celestial body that is a
+  galaxy.
 
 Each is a field: a function of the LED's position relative to the
 form's centre, size and turn. Where the form is moves in `forms.js` (see
@@ -577,8 +579,8 @@ hole's its disc's two and its jets' (`config.js: BODIES`).
 **The celestial body.** The celestial body (`celestial`, shown as
 "celestial body") is a family whose shapes are bodies of the sky
 (`config.js: BODIES`, its `members`): each time it comes it is one of
-them, Saturn, Uranus (ringed planets) or a black hole. A body is of a kind
-(`kind`: `planet` or `hole`) and has its own four colours in place of
+them, Saturn, Uranus (ringed planets), a black hole or a galaxy. A body is
+of a kind (`kind`: `planet`, `hole` or `galaxy`) and has its own four colours in place of
 palettes, the room's tint and the layer's palettes under it, and the
 voice it sings with. It is picked like any family's shape, and held by its
 own name (`?form=saturn`; `?form=celestial` holds one the seed picks).
@@ -619,7 +621,7 @@ Old links and saved settings that name the planet (`form=planet`,
   and then it shows whole (it fades in over seconds, so this is seldom
   seen).
 - *The interface.* Each kind's code gives three functions named after it
-  (`planetFar`, `planetBody`, `planetShade`; `holeFar` ...), and
+  (`planetFar`, `planetBody`, `planetShade`; `holeFar` ...; `galaxyFar` ...), and
   `BODY_GLSL` makes from them, in each kind's own block (`#ifdef
   BODY_PLANET` ...), the three that the shared shader calls only in the
   bodies' programs (`#ifdef CELESTIAL`): `bodyFar` (how far an LED is
@@ -635,8 +637,8 @@ Old links and saved settings that name the planet (`form=planet`,
   shapes: each round has every body once, in a shuffled order, never the
   same twice running. It has no palette, so it takes no part in the
   colour story; the layer under it takes the body's `under` palettes.
-  A planet sings with the orb's voice, the black hole with its own (the
-  body's `voice`).
+  A planet and the galaxy sing with the orb's voice, the black hole with
+  its own (the body's `voice`).
 
 **A ringed planet** (`planets.js`, kind `planet`): Saturn or Uranus, each
 with a size, a spin and its rings; its light is `planetLight`.
@@ -732,7 +734,14 @@ the eye on one diagonal, the other going away on the other.
   its lower jet going away. A drag does not move it: the viewer looks
   round it (turned 90 degrees, the disc is nearly edge-on and both
   arches stand over and under the heart; turned 180, it is seen from
-  below, the jets swapped). A roll this large is what the lattice
+  below, the jets swapped). Like every form it keeps its distance from
+  the viewer, so a view turned far round leaves the show's eye near it:
+  `sight` looks up at it from that eye's height, but from as far as the
+  farther of the two eyes stands, so that it leans no more than it does
+  for the show's own view (turned 180 degrees and settled, by the near
+  eye alone the black hole was looked up at about 0.1 rad more steeply,
+  leaned 0.05 rad more and floated up to 0.1 units higher; the galaxy,
+  much wider, floated 0.6 to 0.75 units higher). A roll this large is what the lattice
   needs: a jet less than about 40 degrees from the vertical lights each
   strand it crosses along a long stretch, and reads as a vertical column
   whatever its slope.
@@ -825,6 +834,83 @@ the eye on one diagonal, the other going away on the other.
   over the heart under it, and the ring a little off the shadow's edge. (A
   corner image, seen through two wall mirrors, is not tested against the
   hole's image in the mirror between.)
+
+**The galaxy** (`galaxy.js`, kind `galaxy`; its light is `galaxyLight`)
+is seen almost edge-on, like the Sombrero galaxy (`config.js: BODIES`, its
+`galaxy`). Its four colours are its bulge's warm heart and rim, its disc's
+blue stars, and pink knots where stars are born.
+
+- *A volume of light.* Each LED shows the light of the stars where it is:
+  a flattened ball (the bulge), white-hot only at its heart (the one place
+  bright enough for long rays), and a disc `thick` thick each way (0.25
+  units at every size) and at least about one LED gap, brightest in a
+  broad ring, in clumps. Seen almost edge-on, the disc gathers along each
+  line of sight into a bright band; the bulge is a glow seen through. Its
+  glow fades out by 2.9 bulge radii from its heart (`BULGE_TAIL`): with
+  the disc's rim, that is how far its light reaches (`galaxyReach`), and
+  the LEDs within that reach but beyond both the glow and the disc stop
+  at once.
+- *Proportions.* As in the Sombrero galaxy, the disc is broad against the
+  bulge: a wide flat brim with a glowing crown a quarter as wide (4:1),
+  its dust ring out near the brim's edge.
+- *Its size fits the picture* (`forms.js: fitted`; the body's `fit`). The
+  galaxy is as large as the picture's width allows at the distance it
+  stands, up to its full size (radius 9): seen from the eye, its rim
+  spans `FIT` (0.65) of the picture's half width each way. A ball of
+  radius R at distance d spans R / sqrt(d^2 - R^2) of a unit of distance,
+  so its size is d u / sqrt(1 + u^2), where u is `FIT` times the
+  picture's half width at a unit of distance (`camera.wide` in `main.js`,
+  from the field of view and the view's shape, `viewFit`), and d is the
+  eye's distance from the room's centre (`camera.radius`) and the body's
+  beyond its path (its kind's `back`, `forms.js: KIND_MOVES`). Both reach
+  it through `sight` (`show.js`). It is a function of the view's shape
+  alone: a window resized changes it at once, and neither the drift nor
+  the camera's move does. A view as wide as 4:3 holds it whole; it is 8.3
+  in a square view, 7.1 at 600x900 and 6 on a phone held upright
+  (390x844). `FIT` leaves room for the drift and the camera's move: over
+  10 seeds x 200 s the tips stay inside the frame at every shape tried, 9
+  px from its edge at worst on the phone. Another body fits the frame the
+  same way with `fit: true` and one line in its move
+  (`size: fitted(P, sight)`). Everything about it follows that one size:
+  the bulge (a quarter of it), its reach, its lowest light, the dust's
+  rings, its coming and going. The disc and the dust are as thick at
+  every size (they are drawn in the lattice's rows). A smaller galaxy
+  lights its bulge's glow the more, by its full size over its size: the
+  glow is a volume seen through, its light along a line of sight grows
+  with its size, so the crown keeps its presence on the phone; the white
+  heart is as bright at every size.
+- *Dust.* The dust lies in rings in the disc's plane (`dust`), in a slab
+  `lane` thick each way (0.2 units at every size), and at least 0.9 LED
+  gaps (`G_LANE_ROWS`). Each LED's light is dimmed by the dust its line of
+  sight to the eye passes through (`Eye`: in a mirror, the eye's image):
+  the part of that line within the slab, and the dust along it (three
+  samples, Simpson's rule), and reddened as it dims. So the near side of
+  the dust ring is a dark lane across the lower bulge, with the bulge's
+  glow below it, as in the photographs.
+- *Turning.* Its stars turn about its heart, the inner ones faster (at the
+  rim `spin`, rad/s; inside, as much more as the rim is farther out), so
+  its clumps shear slowly and never repeat.
+- *Facing the show's eye* (`forms.js: galaxy`). Its disc lies almost
+  level, leaning towards the eye of the show's own camera move by how far
+  that eye looks up at it (`sight`, as for the black hole), and opened to
+  it by `open` (0.07 to 0.13 rad, swaying unevenly), its ellipse rolling
+  a little to and fro. A view turned or raised by a drag does not move
+  it: the viewer looks round it, and from the far side sees it from
+  below, by about twice that lean: the near side of the dust ring arches
+  over the bulge.
+- *Coming and going.* It comes out of the dark from its heart: the bulge
+  first, then the disc spreading out (18 s), and the dust lane darkens
+  last (from 8 s to 22 s). It goes the other way: the dust clears, the
+  disc draws in, and the heart fades last.
+- *Height.* It rests on the layer like every form, on its lowest light:
+  its disc's near rim at its lean, or its bulge's glow below its heart
+  (`galaxy.js: galaxyLow`).
+- *Cost.* Its code is only in its own programs, so rain and the other
+  forms cost what they did. Measured with the GPU timer (RTX 3090, 1920 x
+  1080, 1700 thousand LEDs, 5 interleaved rounds, medians), its frame
+  takes 2.10 ms, 4% more than the orb's (2.02 ms) and about Saturn's. Its
+  pair of programs takes about 0.27 s to compile and link there, as
+  Saturn's does (the black hole's 0.37 s).
 
 **The layer** gives way where a sky form already lights the LED, so the two
 never add up to a white flare. It is dark within 4.5 units of the eye and
@@ -1054,7 +1140,7 @@ Where a form is comes from `forms.js: motion`, as a function of its age, of
 its weight (the orb's size, see `GROW`) and of how far it has gone on its
 way out. Each form has a life of its own
 (`forms.js: orb`, `spiral`, `ring`, `veil`, `solid`,
-`knot`; a celestial body's by its kind, `planet`, `blackhole`). For example, the orb drifts and breathes; the ring tumbles like a
+`knot`; a celestial body's by its kind, `planet`, `blackhole`, `galaxy`). For example, the orb drifts and breathes; the ring tumbles like a
 coin turning in the air, about a slanting diameter, once round in 80 s
 (`TURN`), so it shows its face and then its edge, a slanting line. Edge-on,
 its light is piled up along the line of sight, and it gives half as much
@@ -1110,7 +1196,10 @@ eye, which stands lower, sees it a little over the band. The jet counts
 before the jets have grown and after they have gone, so the form stays
 where it is as they come and go. As the disc gathers from wide, its edge
 is lower, and the form rests higher (about 0.85 units, settling over
-20 s); as it drains, it stays where it is; a baked form, its base and its skin (the teapot, an
+20 s); as it drains, it stays where it is; the galaxy, its disc's near
+rim at its lean (it leans as the show's eye looks up at it, see the
+galaxy above), or its bulge's glow below its heart (`galaxy.js:
+galaxyLow`); a baked form, its base and its skin (the teapot, an
 easter egg held in the form slot, is drawn as a form and rests the same way).
 The clock, which faces the eye, keeps its lowest dots `CLEAR` over the same
 top of the band (`show.js: topOf`, see `egg-kinds.js: panel`). How far each
@@ -1256,7 +1345,7 @@ The layers:
   pair that beats very slowly, swelling late, and a faint high fifth
   three octaves over that comes later still, as its jets grow),
   and a baked form the ring's glassy tone, softer, with the chord's third
-  over it, on D. The voice is the form's, whichever of its shapes it shows; a celestial body sings with the voice its body names (`config.js: BODIES`, `voice`): a planet with the orb's, the black hole with its own.
+  over it, on D. The voice is the form's, whichever of its shapes it shows; a celestial body sings with the voice its body names (`config.js: BODIES`, `voice`): a planet and the galaxy with the orb's, the black hole with its own.
   The veil also gets a little high noise (`AIRY`).
 - **Pale drops.** In a still room a high, soft note falls now and then.
 - **Reverb.** A 6 s convolution reverb (`impulse`), then a compressor.
@@ -1492,6 +1581,7 @@ GitHub link shows.
 | `figures.js` | The shapes of the solid and the knot: names and labels, corners and edges, curves, sizes and heights (one per life). |
 | `celestial.js` | The celestial bodies: their kinds, and the programs they show with (`bodyShader`, `BODY_GLSL`). |
 | `blackhole.js` | The black hole: its measures (`BH`) and the shader's `holeLight` and its shadow. |
+| `galaxy.js` | The galaxy: its lowest light, its reach and its frame, and the shader's `galaxyLight`. |
 | `planets.js` | The ringed planets: their rings' extent and lowest light, and the shader's `planetLight`. |
 | `director.js` | Seeded tracks (weather, colour, density, camera), the colour story's mood, the shared `hash`. |
 | `direction.js` | The change of the rain's direction: weights and gates per direction. |
@@ -1529,9 +1619,13 @@ flowchart TD
   main --> planets["planets.js"]
   celestial --> planets
   celestial --> blackhole["blackhole.js"]
+  celestial --> galaxy["galaxy.js"]
   celestial --> config
   forms --> planets
   forms --> blackhole
+  forms --> galaxy
+  galaxy --> config
+  galaxy --> gl
   planets --> config
   planets --> gl
   show --> config
@@ -1562,8 +1656,8 @@ Details and commands are in [development.md](development.md).
   the viewer page's Reset clears), rain alone in the lab and no rain
   (with the same click, keys and Reset), rain that never ends with a form
   through it, a seeded time with and without the story, four of the forms
-  held, knots and celestial bodies held by their own names (Saturn and the
-  black hole in the lab, each drawn by its kind's own programs), an old
+  held, knots and celestial bodies held by their own names (Saturn, the
+  black hole and the galaxy in the lab, each drawn by its kind's own programs), an old
   link's body or solid that no longer exists, and `?jitter=pitch`; that a `scene=` in a link or in saved
   settings is read as Rain, Form and Layer; that `form=planet`, `planet=`,
   `solid=`, `knot=` and `celestial=` are read as Form's family or shape;
